@@ -1,3 +1,9 @@
 language: cpp
+os: linux
+env:
+  - BAZEL_VERSION=3.1.0
+before_install:
+  - chmod +x scripts/install_bazel.sh
+  - scripts/install_bazel.sh
 script:
-  - echo "Everything works right now!"
+  - bazel build :all
