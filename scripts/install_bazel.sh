@@ -1,8 +1,11 @@
 # Download unzip
-sudo apt install unzip
-if [[ $? != 0 ]]; then
-    echo "Failed to install unzip"
-    exit 1
+
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+   sudo apt install unzip
+   if [[ $? != 0 ]]; then
+       echo "Failed to install unzip"
+       exit 1
+   fi
 fi
 
 # Download Linux installation script
