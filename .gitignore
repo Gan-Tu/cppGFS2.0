@@ -227,6 +227,8 @@ bazel-bin
 bazel-executables
 bazel-out
 bazel-testlogs
+/bazel*
+bazel-cppGFS2.0
 
 # Firebase
 .firebase/*.cache
