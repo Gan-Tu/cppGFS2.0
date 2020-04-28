@@ -1,3 +1,10 @@
+# Download unzip
+sudo apt install unzip
+if [[ $? != 0 ]]; then
+    echo "Failed to install unzip"
+    exit 1
+fi
+
 # Download Linux installation script
 curl -fsSLO https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
 if [[ $? != 0 ]]; then
