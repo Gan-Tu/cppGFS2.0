@@ -1,9 +1,22 @@
-# Download unzip
-
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
+   sudo apt-get update
+   # Download unzip
    sudo apt install unzip
    if [[ $? != 0 ]]; then
        echo "Failed to install unzip"
+       exit 1
+   fi
+
+   # Download gcc, g++
+   sudo apt install gcc
+   if [[ $? != 0 ]]; then
+       echo "Failed to install gcc"
+       exit 1
+   fi
+
+   sudo apt install g++
+   if [[ $? != 0 ]]; then
+       echo "Failed to install g++"
        exit 1
    fi
 fi
