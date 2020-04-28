@@ -35,7 +35,7 @@
 #include <memory>
 #include <string>
 
-#include <grpc++/grpc++.h>
+#include <grpcpp/grpcpp.h>
 
 #include "examples/grpc/helloworld.grpc.pb.h"
 

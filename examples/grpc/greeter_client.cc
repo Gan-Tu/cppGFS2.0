@@ -31,7 +31,7 @@
  *
  */
 
-#include <grpc++/grpc++.h>
+#include <grpcpp/grpcpp.h>
 
 #include <iostream>
 #include <memory>
