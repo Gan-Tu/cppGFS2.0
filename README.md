@@ -31,6 +31,39 @@ bazel test :all
 
 To learn more about how to use Bazel, or how to write Bazel build rule for C++, see the [official documentation](https://docs.bazel.build/versions/master/bazel-overview.html).
 
+
+## Coding Styles
+
+### Pull Requests & Tests
+
+They are useful, please use them. Travis-CI is built-in for pull requests, so they will tell you if your commit will break the code. Also, common sense, add tests whenever you commit large chunk of code.
+
+### Clean Git History
+
+Before you merge you local branch to master branch, please use `git rebase` when merging changes from the `master` branch and use `git rebase -i HEAD~<n>` to clean up or squash your local commit histories, so you don't have any funky duplicate commit messages, or unwanted commits.
+
+### Commit Messages
+
+Please, if possible, follow the commit message [style guide](https://dev.to/pavlosisaris/git-commits-an-effective-style-guide-2kkn):
+
+```
+
+[commit type] commit messages
+
+body (changes, links, attributions, etc)
+
+issue tracker id (for reference)
+
+```
+
+where `commit type` is one of `feat, fix, docs, style, refactor, chore, test` etc.
+
+
+### C++ Style Guide
+
+Please, if possible, follow [Google C++ style guide](https://google.github.io/styleguide/cppguide.html). If you use an IDE or any common text editors, they have extensions that help you auto format and lint your code for style errors.
+
+
 ## Examples
 
 I've included example code from gRPC. You can try it by first build all the code:
@@ -70,3 +103,4 @@ bazel run :greeter_async_client
 ```
 
 You should see a prompt "Greeter received: Hello world xx" with numbers randomly printed between 0 and 99, and blocks forever until you use Ctrl+C to quit.
+
