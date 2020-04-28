@@ -233,3 +233,6 @@ bazel-cppGFS2.0
 # Firebase
 .firebase/*.cache
 *-debug.log
+
+# Visual Studio Code
+.vscode/
