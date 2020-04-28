@@ -1,1 +1,40 @@
 load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+
+proto_library(
+  name="helloworld_proto",
+  srcs=["examples/grpc/helloworld.proto"],
+)
+
+cc_proto_library(
+  name="cc_helloworld_proto",
+  deps=[":helloworld_proto"],
+)
+
+# Generates C++ gRPC classes for services defined in a proto file.
+# See: https://github.com/grpc/grpc/blob/master/bazel/cc_grpc_library.bzl
+cc_grpc_library(
+    name = "cc_helloworld_grpc",
+    srcs = [":helloworld_proto"],
+    deps = [":cc_helloworld_proto"],
+    grpc_only = True,
+)
+
+cc_binary(
+    name = 'greeter_client',
+    srcs = ['examples/grpc/greeter_client.cc'],
+    deps = [
+        ':cc_helloworld_grpc',
+        '@com_github_grpc_grpc//:grpc++',
+    ],
+)
+
+cc_binary(
+    name = 'greeter_server',
+    srcs = ['examples/grpc/greeter_server.cc'],
+    deps = [
+        ':cc_helloworld_grpc',
+        '@com_github_grpc_grpc//:grpc++',
+    ],
+)
+

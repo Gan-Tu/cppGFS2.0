@@ -30,3 +30,25 @@ bazel test :all
 ```
 
 To learn more about how to use Bazel, or how to write Bazel build rule for C++, see the [official documentation](https://docs.bazel.build/versions/master/bazel-overview.html).
+
+## Examples
+
+I've included example code from gRPC. You can try it by first build all the code:
+
+```
+bazel build :all
+```
+
+Then, in one terminal, you can start the server by typing
+
+```
+bazel run :greeter_server
+```
+
+Then, in another terminal, you can run a client to issue a request
+
+```
+bazel run :greeter_client
+```
+
+You should see a prompt "Greeter received: Hello world".
