@@ -39,6 +39,8 @@ I've included example code from gRPC. You can try it by first build all the code
 bazel build :all
 ```
 
+### Synchronised gRPC
+
 Then, in one terminal, you can start the server by typing
 
 ```
@@ -52,3 +54,19 @@ bazel run :greeter_client
 ```
 
 You should see a prompt "Greeter received: Hello world".
+
+### Asynchronous gRPC
+
+Then, in one terminal, you can start the server by typing
+
+```
+bazel run :greeter_async_server
+```
+
+Then, in another terminal, you can run a client to issue a request
+
+```
+bazel run :greeter_async_client
+```
+
+You should see a prompt "Greeter received: Hello world xx" with numbers randomly printed between 0 and 99, and blocks forever until you use Ctrl+C to quit.
