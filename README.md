@@ -33,6 +33,10 @@ To learn more about how to use Bazel, or how to write Bazel build rule for C++, 
 
 ## Coding Styles
 
+### Command Line Parsing
+
+If you need to define, parse, and read command line flags, please use [Abseil's Flag library for Command Line Parsing](https://abseil.io/docs/cpp/guides/flags), which is easy to use and out of box.
+
 ### Pull Requests & Tests
 
 They are useful, please use them. Travis-CI is built-in for pull requests, so they will tell you if your commit will break the code. Also, common sense, add tests whenever you commit large chunk of code.
