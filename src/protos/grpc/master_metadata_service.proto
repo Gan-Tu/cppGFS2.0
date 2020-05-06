@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package protos.grpc;
+
+import "google/protobuf/empty.proto";
+import "src/protos/metadata.proto";
+
+service MasterMetadataService {
+  // Create a new file chunk for the |filename|, and return the associated
+  // chunk index and metadata. If |filename| already exists, it creates and
+  // returns a new file chunk for the |filename|. If |filename| doesn't exist,
+  // it creates the file and returns the first uninitialized empty chunk.
+  rpc CreateFileChunk(CreateFileRequest) returns (CreateFileReply) {}
+
+  // Return the chunk handle, version, and associated replica locations 
+  // for a given |filename| at |chunk_index|. If either |filename| or 
+  // |chunk_index| doesn't exist, an error status with empty reply is returned.
+  rpc OpenFile(OpenFileRequest) returns (OpenFileReply) {}
+
+  // Delete |filename|. This effectively deletes all associated file chunks.
+  // If |filename| doesn't exist yet, an error status is returned.
+  rpc DeleteFile(DeleteFileRequest) returns (google.protobuf.Empty) {}
+
+  // TODO(tugan): add gRPC calls for snapshot operations
+}
+
+message CreateFileRequest {
+  // Absolute file name or directory name
+  string filename = 1;
+}
+
+message CreateFileReply {
+  // The original request associated with this reply.
+  CreateFileRequest request = 1;
+  // A chunk index is byte_range / chunk block size. 
+  // The default chunk block size is 64MB.
+  int32 chunk_index = 2;
+  // The metadata associated with the file chunk at this chunk index
+  protos.FileChunkMetadata metadata = 3;
+}
+
+message OpenFileRequest {
+  // Absolute file name or directory name
+  string filename = 1;
+  // A chunk index is |byte_range / chunk block size|. 
+  // By default, the block size of a chunk is 64MB.
+  int32 chunk_index = 2;
+  // Open modes
+  enum OpenMode {
+    READ = 0;
+    WRITE = 1;
+    APPEND = 2;
+  }
+  OpenMode mode = 3;
+}
+
+message OpenFileReply {
+  // The original request associated with this reply.
+  OpenFileRequest request = 1;
+  // Most update-to-date chunk version known to master for this file chunk.
+  // The client, or another chunkserver, should always verify the chunk version 
+  // number before performing file operations at any chunk location, so that it 
+  // can always read/write the most up-to-date data.
+  int32 chunk_version = 2;
+  // The metadata for the requested file chunk.
+  protos.FileChunkMetadata metadata = 3;
+  // If open request is for file mutation (i.e. write and append mode), this is
+  // the chunkserver location for the primary replicac; otherwise, it is NULL.
+  //
+  // Client should send write requests to the primary chunkserver, so it can
+  // determine the serialization order of all mutations applied to the chunk,
+  // and forward the mutation order to all secondary replicas; The client 
+  // should check with master again, if the primary no longer holds a lease for
+  // write mutations. (Ref: GFS paper section 3.1)
+  protos.ChunkServerLocation primary_location = 4;
+}
+
+message DeleteFileRequest {
+  // Absolute file name or directory name
+  string filename = 1; 
+}

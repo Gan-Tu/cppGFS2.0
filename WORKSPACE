@@ -36,3 +36,17 @@ http_archive(
         "https://github.com/google/googletest/archive/release-1.10.0.tar.gz",
     ]
 )
+
+# gRPC
+http_archive(
+    name = "com_github_grpc_grpc",
+    strip_prefix = "grpc-1.28.0",
+    sha256 = "d6277f77e0bb922d3f6f56c0f93292bb4cfabfc3c92b31ee5ccea0e100303612",
+    urls = [
+        "https://github.com/grpc/grpc/archive/v1.28.0.tar.gz"
+    ]
+)
+load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+grpc_deps()
+load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
+grpc_extra_deps()

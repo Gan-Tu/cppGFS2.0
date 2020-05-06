@@ -1,0 +1,13 @@
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
+proto_library(
+  name = "metadata_proto",
+  visibility = ["//visibility:public"],
+  srcs = ["metadata.proto"],
+)
+
+cc_proto_library(
+  name="cc_metadata_proto",
+  visibility = ["//visibility:public"],
+  deps=[":metadata_proto"],
+)
