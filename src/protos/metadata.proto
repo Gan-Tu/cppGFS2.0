@@ -15,5 +15,5 @@ message ChunkServerLocation {
   // The hostname of this chunk server location
   string server_hostname = 1;
   // The port that this chunk server is listening on for requests
-  int32 server_port = 2;
+  uint32 server_port = 2;
 }
