@@ -11,9 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-   
+
 # Custom Bazel build for LevelDB on Unix/MacOS
 # Simply depend on "@com_google_leveldb//:leveldb" for use
+#
+# For Windows, you may need to change LEVELDB_PLATFORM_POSIX to
+# LEVELDB_PLATFORM_WINDOWS and uncomment all the "...windows..."
+# in the "exclude" folder below. However, I haven't tested that.
 cc_library(
     name = "leveldb",
     srcs = glob(
@@ -33,10 +37,15 @@ cc_library(
         ],
     ),
     includes = ["include"],
+    linkopts = [
+        "-Wno-dev",
+        "-pthread"
+    ],
     defines = [
         "LEVELDB_PLATFORM_POSIX=1",
         "LEVELDB_IS_BIG_ENDIAN=0",
         "LEVELDB_BUILD_TESTS=0",
     ],
+    linkstatic = 1,
     visibility = ["//visibility:public"],
 )
