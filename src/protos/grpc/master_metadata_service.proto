@@ -10,7 +10,11 @@ service MasterMetadataService {
   // chunk index and metadata. If |filename| already exists, it creates and
   // returns a new file chunk for the |filename|. If |filename| doesn't exist,
   // it creates the file and returns the first uninitialized empty chunk.
-  rpc CreateFileChunk(CreateFileRequest) returns (CreateFileReply) {}
+  //
+  // Since a Create is usually followed be read or write, we won't do lazy
+  // allocation for optimization here, and instead always create all metadata
+  // on relevant chunk servers. The request returns an error code, if it fails.
+  rpc CreateFileChunk(CreateFileChunkRequest) returns (CreateFileChunkReply) {}
 
   // Return the chunk handle, version, and associated replica locations
   // for a given |filename| at |chunk_index|. If either |filename| or
@@ -24,14 +28,15 @@ service MasterMetadataService {
   // TODO(tugan): add gRPC calls for snapshot operations
 }
 
-message CreateFileRequest {
+message CreateFileChunkRequest {
   // Absolute file name or directory name
   string filename = 1;
 }
 
-message CreateFileReply {
+// Chunk version is not returned here, as a new file always has a version of 1.
+message CreateFileChunkReply {
   // The original request associated with this reply.
-  CreateFileRequest request = 1;
+  CreateFileChunkRequest request = 1;
   // A chunk index is byte_range / chunk block size.
   // The default chunk block size is 64MB.
   uint32 chunk_index = 2;
