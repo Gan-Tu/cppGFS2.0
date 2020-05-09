@@ -1,4 +1,4 @@
-#include<iostream>
+#include <iostream>
 #include "leveldb/db.h"
 
 // Example LevelDb usage
@@ -11,7 +11,6 @@ int main(int argc, char const *argv[]) {
   assert(status.ok());
 
   std::string key("var");
-  status = db->Put(leveldb::WriteOptions(), key, "Oops.");
   status = db->Put(leveldb::WriteOptions(), key, "Hello World!");
   assert(status.ok());
 
