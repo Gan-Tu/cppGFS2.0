@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package protos;
+
+// Metadata of a given file chunk
+message FileChunkMetadata {
+  // An immutable and globally unique 64 bit chunk identifier.
+  // This is assigned by the master at the time of chunk creation.
+  string chunk_handle = 1;
+  // All the replica locations for this particular file chunk
+  repeated ChunkServerLocation locations = 2;
+}
+
+message ChunkServerLocation {
+  // The hostname of this chunk server location
+  string server_hostname = 1;
+  // The port that this chunk server is listening on for requests
+  uint32 server_port = 2;
+}

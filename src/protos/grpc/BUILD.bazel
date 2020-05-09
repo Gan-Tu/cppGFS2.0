@@ -1,0 +1,28 @@
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+
+proto_library(
+  name = "master_metadata_service_proto",
+  visibility = ["//visibility:public"],
+  srcs = ["master_metadata_service.proto"],
+  deps = [
+    "@com_google_protobuf//:empty_proto",
+    "//src/protos:metadata_proto",
+  ]
+)
+
+cc_proto_library(
+  name="cc_master_metadata_service_proto",
+  visibility = ["//visibility:public"],
+  deps=[":master_metadata_service_proto"],
+)
+
+# Generates C++ gRPC classes for services defined in a proto file.
+# See: https://github.com/grpc/grpc/blob/master/bazel/cc_grpc_library.bzl
+cc_grpc_library(
+    name = "cc_master_metadata_service_grpc",
+    visibility = ["//visibility:public"],
+    srcs = [":master_metadata_service_proto"],
+    deps = [":cc_master_metadata_service_proto"],
+    grpc_only = True,
+)
