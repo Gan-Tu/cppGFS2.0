@@ -50,3 +50,14 @@ load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 grpc_deps()
 load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
 grpc_extra_deps()
+
+# LevelDb
+# Example dependency: "@com_google_leveldb//:leveldb"
+http_archive(
+    name = "com_google_leveldb",
+    build_file = "//src/third_party/build_rules:leveldb.BUILD",
+    sha256 = "55423cac9e3306f4a9502c738a001e4a339d1a38ffbee7572d4a07d5d63949b2",
+    strip_prefix = "leveldb-1.22",
+    urls = ["https://github.com/google/leveldb/archive/1.22.tar.gz"],
+)
+
