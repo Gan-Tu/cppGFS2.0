@@ -6,19 +6,19 @@ import "google/protobuf/empty.proto";
 import "src/protos/metadata.proto";
 
 service MasterMetadataService {
-  // Create a new file chunk for the |filename|, and return the associated
-  // chunk index and metadata. If |filename| already exists, it creates and
-  // returns a new file chunk for the |filename|. If |filename| doesn't exist,
-  // it creates the file and returns the first uninitialized empty chunk.
-  //
-  // Since a Create is usually followed be read or write, we won't do lazy
-  // allocation for optimization here, and instead always create all metadata
-  // on relevant chunk servers. The request returns an error code, if it fails.
-  rpc CreateFileChunk(CreateFileChunkRequest) returns (CreateFileChunkReply) {}
-
   // Return the chunk handle, version, and associated replica locations
-  // for a given |filename| at |chunk_index|. If either |filename| or
-  // |chunk_index| doesn't exist, an error status with empty reply is returned.
+  // for a given |filename| at |chunk_index|. 
+  //
+  // For |APPEND| mode, |chunk_index| is not required, ignored if specified, 
+  // because the master will decide which chunk handle the client should write 
+  // to for the append operation; if no concurrent append exists, this is 
+  // guaranteed to be the chunk handle for the last chunk index.
+  //
+  // If either |filename| or |chunk_index| doesn't exist, an error status with 
+  // empty reply is returned if |create_if_not_exists| is false; otherwise, the
+  // master will create the chunk, and initialize its creation on all chunk 
+  // servers, before returning to client. If chunk creation fails, the open
+  // operaiton is considered to have failed.
   rpc OpenFile(OpenFileRequest) returns (OpenFileReply) {}
 
   // Delete |filename|. This effectively deletes all associated file chunks.
@@ -28,27 +28,12 @@ service MasterMetadataService {
   // TODO(tugan): add gRPC calls for snapshot operations
 }
 
-message CreateFileChunkRequest {
-  // Absolute file name or directory name
-  string filename = 1;
-}
-
-// Chunk version is not returned here, as a new file always has a version of 1.
-message CreateFileChunkReply {
-  // The original request associated with this reply.
-  CreateFileChunkRequest request = 1;
-  // A chunk index is byte_range / chunk block size.
-  // The default chunk block size is 64MB.
-  uint32 chunk_index = 2;
-  // The metadata associated with the file chunk at this chunk index
-  protos.FileChunkMetadata metadata = 3;
-}
-
 message OpenFileRequest {
   // Absolute file name or directory name
   string filename = 1;
   // A chunk index is |byte_range / chunk block size|.
   // By default, the block size of a chunk is 64MB.
+  // This is not required, and ignored, for |APPEND| mode.
   uint32 chunk_index = 2;
   // Open modes
   enum OpenMode {
@@ -57,6 +42,8 @@ message OpenFileRequest {
     APPEND = 2;
   }
   OpenMode mode = 3;
+  // Create the file chunk, if it doesn't exist
+  bool create_if_not_exists = 4;
 }
 
 message OpenFileReply {
@@ -66,6 +53,8 @@ message OpenFileReply {
   // The client, or another chunkserver, should always verify the chunk version
   // number before performing file operations at any chunk location, so that it
   // can always read/write the most up-to-date data.
+  //
+  // For newly created file chunks, chunk version is always 1.
   uint32 chunk_version = 2;
   // The metadata for the requested file chunk.
   protos.FileChunkMetadata metadata = 3;
