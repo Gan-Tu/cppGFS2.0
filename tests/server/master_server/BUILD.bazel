@@ -1,0 +1,11 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+    name = "chunk_server_manager",
+    srcs = ["chunk_server_manager.cc"],
+    copts = ["-Iexternal/gtest/include", "-Isrc/server/master_server"],
+    deps = [
+        "@com_google_test//:gtest_main",
+        "//src/server/master_server:chunk_server_manager",
+    ],
+)
