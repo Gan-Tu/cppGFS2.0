@@ -6,4 +6,5 @@ before_install:
   - chmod +x scripts/install_bazel.sh
   - scripts/install_bazel.sh
 script:
-  - bazel build :all
+  # build all targets in all subdirectories
+  - bazel build ...
