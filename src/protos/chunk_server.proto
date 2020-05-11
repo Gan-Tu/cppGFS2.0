@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package protos;
+
+message ChunkServerLocation {
+  // The hostname of this chunk server location
+  string server_hostname = 1;
+  // The port that this chunk server is listening on for requests
+  uint32 server_port = 2;
+}
+
+message ChunkServer {
+  ChunkServerLocation location = 1;
+  // Amount of memory in megabytes available on the server
+  uint32 available_memory_mb = 2;
+}

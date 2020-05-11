@@ -5,6 +5,6 @@ cc_library(
     srcs = ["chunk_server_manager.cc"],
     hdrs = ["chunk_server_manager.h"],
     visibility = ["//visibility:public"],
-    deps = ["@com_google_absl//absl/hash", 
-            "@com_google_absl//absl/container:flat_hash_map"]
+    deps = ["@com_google_absl//absl/container:flat_hash_map",
+            "//src/protos:cc_chunk_server_proto"]
 )
