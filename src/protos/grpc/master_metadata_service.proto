@@ -4,6 +4,7 @@ package protos.grpc;
 
 import "google/protobuf/empty.proto";
 import "src/protos/metadata.proto";
+import "src/protos/chunk_server.proto";
 
 service MasterMetadataService {
   // Return the chunk handle, version, and associated replica locations

@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+
 cc_library(
     name = 'master_metadata_service_impl',
     srcs = ['master_metadata_service_impl.cc'],
@@ -6,6 +8,17 @@ cc_library(
       "@com_github_grpc_grpc//:grpc++",
       "//src/protos/grpc:cc_master_metadata_service_grpc",
     ],
+)
+
+cc_library(
+  name = "chunk_server_manager",
+  srcs = ["chunk_server_manager.cc"],
+  hdrs = ["chunk_server_manager.h"],
+  visibility = ["//visibility:public"],
+  deps = [
+    "@com_google_absl//absl/container:flat_hash_map",
+    "//src/protos:cc_chunk_server_proto"
+  ]
 )
 
 cc_binary(
