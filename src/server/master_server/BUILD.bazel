@@ -5,8 +5,10 @@ cc_library(
     srcs = ['lock_manager.cc'],
     hdrs = ['lock_manager.h'],
     visibility = ["//visibility:public"],
-    deps = ["@com_google_absl//absl/synchronization",
-            "@com_google_absl//absl/container:flat_hash_map"]
+    deps = [
+      "@com_google_absl//absl/container:flat_hash_map",
+      "@com_google_absl//absl/synchronization",
+    ]
 )
 
 cc_library(
@@ -27,7 +29,7 @@ cc_library(
   hdrs = ["chunk_server_manager.h"],
   visibility = ["//visibility:public"],
   deps = [
+    "//src/protos:cc_chunk_server_proto",
     "@com_google_absl//absl/container:flat_hash_map",
-    "//src/protos:cc_chunk_server_proto"
   ]
 )
