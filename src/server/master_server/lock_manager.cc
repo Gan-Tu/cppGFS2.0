@@ -64,6 +64,10 @@ void LockManager::ReleaseLockForParentDir(std::stack<absl::Mutex*>& locks) {
    }
 }
 
+absl::Mutex* LockManager::globalLock() {
+   return globalLock_;
+}
+
 LockManager* LockManager::GetInstance() {
    static LockManager* inst = new LockManager();
    return inst;

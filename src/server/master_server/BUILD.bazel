@@ -10,6 +10,18 @@ cc_library(
 )
 
 cc_library(
+    name = 'metadata_manager',
+    srcs = ['metadata_manager.cc'],
+    hdrs = ['metadata_manager.h'],
+    visibility = ["//visibility:public"],
+    deps = ["//src/server/master_server:lock_manager",
+            "//src/protos:cc_metadata_proto",
+            "@com_google_absl//absl/synchronization",
+            "@com_google_absl//absl/container:flat_hash_map",
+            "@com_google_absl//absl/container:flat_hash_set"]
+)
+
+cc_library(
   name = "chunk_server_manager",
   srcs = ["chunk_server_manager.cc"],
   hdrs = ["chunk_server_manager.h"],
