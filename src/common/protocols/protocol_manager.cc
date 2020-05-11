@@ -4,7 +4,7 @@
 
 #include "google/protobuf/stubs/status.h"
 #include "google/protobuf/empty.pb.h"
-#include "src/common/protocols/utils.h"
+#include "src/common/utils.h"
 
 using grpc::ClientContext;
 using protos::grpc::MasterMetadataService;
@@ -14,7 +14,7 @@ using protos::grpc::DeleteFileRequest;
 using google::protobuf::Empty;
 using google::protobuf::util::StatusOr;
 using google::protobuf::util::Status;
-using gfs::protocols::utils::ConvertGrpcStatusToProtobufStatus;
+using gfs::common::utils::ConvertGrpcStatusToProtobufStatus;
 
 namespace gfs {
 namespace protocols {

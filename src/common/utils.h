@@ -1,11 +1,11 @@
-#ifndef GFS_COMMON_PROTOCOLS_UTILS_H_
-#define GFS_COMMON_PROTOCOLS_UTILS_H_
+#ifndef GFS_COMMON_UTILS_H_
+#define GFS_COMMON_UTILS_H_
 
 #include "google/protobuf/stubs/status.h"
 #include "grpcpp/grpcpp.h"
 
 namespace gfs {
-namespace protocols {
+namespace common {
 namespace utils {
 
 // Convert a grpc::Status to protocol buffer's Status, so it's compatible with
@@ -14,7 +14,7 @@ google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
     const grpc::Status& status);
 
 }  // namespace utils
-}  // namespace protocols
+}  // namespace common
 }  // namespace gfs
 
-#endif  // GFS_COMMON_PROTOCOLS_UTILS_H_
+#endif  // GFS_COMMON_UTILS_H_

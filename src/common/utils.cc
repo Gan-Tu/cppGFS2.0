@@ -4,7 +4,7 @@
 #include "grpcpp/grpcpp.h"
 
 namespace gfs {
-namespace protocols {
+namespace common {
 namespace utils {
 
 google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
@@ -67,5 +67,5 @@ google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
 }
 
 }  // namespace utils
-}  // namespace protocols
+}  // namespace common
 }  // namespace gfs
