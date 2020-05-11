@@ -1,11 +1,11 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
 
 cc_test(
-    name = "chunk_server_manager_test",
-    srcs = ["chunk_server_manager_test.cc"],
-    deps = [
-        "@com_google_test//:gtest_main",
-        "//src/server/master_server:chunk_server_manager",
-        "//src/protos:cc_chunk_server_proto",
-    ],
+  name = "chunk_server_manager_test",
+  srcs = ["chunk_server_manager_test.cc"],
+  deps = [
+    "@com_google_test//:gtest_main",
+    "//src/server/master_server:chunk_server_manager",
+    "//src/protos:cc_chunk_server_proto",
+  ],
 )
