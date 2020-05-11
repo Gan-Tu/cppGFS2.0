@@ -1,10 +1,24 @@
-load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
 cc_library(
     name = 'lock_manager',
     srcs = ['lock_manager.cc'],
     hdrs = ['lock_manager.h'],
     visibility = ["//visibility:public"],
-    deps = ["@com_google_absl//absl/synchronization",
-            "@com_google_absl//absl/container:flat_hash_map"]
+    deps = [
+      "@com_google_absl//absl/synchronization",
+      "@com_google_absl//absl/container:flat_hash_map"
+    ]
 )
+
+cc_library(
+  name = "chunk_server_manager",
+  srcs = ["chunk_server_manager.cc"],
+  hdrs = ["chunk_server_manager.h"],
+  visibility = ["//visibility:public"],
+  deps = [
+    "@com_google_absl//absl/container:flat_hash_map",
+    "//src/protos:cc_chunk_server_proto"
+  ]
+)
+

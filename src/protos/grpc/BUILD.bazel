@@ -8,6 +8,7 @@ proto_library(
   deps = [
     "@com_google_protobuf//:empty_proto",
     "//src/protos:metadata_proto",
+    "//src/protos:chunk_server_proto",
   ]
 )
 
