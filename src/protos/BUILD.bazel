@@ -4,7 +4,7 @@ proto_library(
   name = "metadata_proto",
   visibility = ["//visibility:public"],
   srcs = ["metadata.proto"],
-  deps=[":chunk_server_proto"],
+  deps = [":chunk_server_proto"],
 )
 
 cc_proto_library(
@@ -22,5 +22,5 @@ proto_library(
 cc_proto_library(
   name="cc_chunk_server_proto",
   visibility = ["//visibility:public"],
-  deps=[":chunk_server_proto"],
+  deps = [":chunk_server_proto"],
 )

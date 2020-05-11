@@ -8,7 +8,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "src/protos/chunk_server.pb.h"
 
-// Control how we do equality check for the ChunkServerLocation and ChunkServer
+// Define how we do equality check for the ChunkServerLocation and ChunkServer
 // TODO(bmokutub): Can move to a seperate header file e.g. chunk_server.h
 namespace protos {
 bool operator==(const protos::ChunkServerLocation& lhs,
@@ -24,6 +24,8 @@ bool operator==(const protos::ChunkServer& lhs,
 }  // namespace protos
 
 namespace gfs {
+
+namespace server {
 
 // For generating the hash value of a ChunkServerLocation.
 // A simple implementation.
@@ -52,9 +54,9 @@ class ChunkServerManager {
 
   void operator=(const ChunkServerManager&) = delete;
 
-  // Get a ChunkServer that is available to store a chunk.
+  // Allocates a ChunkServer to store a chunk.
   // Returns nullptr if there's no available ChunkServer.
-  std::shared_ptr<protos::ChunkServer> GetAvailableChunkServer();
+  std::shared_ptr<protos::ChunkServer> AllocateChunkServer();
 
   // Register the ChunkServer with the manager.
   // Manager can now decide to select it for chunk storage.
@@ -81,6 +83,8 @@ class ChunkServerManager {
   void SyncChunkServers();
 
  private:
+  // TODO(bmokutub): Consider a thread safe map or locking this.
+  // May not need to use shared_ptr since proto manage the memory?
   absl::flat_hash_map<protos::ChunkServerLocation,
                       std::shared_ptr<protos::ChunkServer>,
                       ChunkServerLocationHash>
@@ -88,6 +92,7 @@ class ChunkServerManager {
 
   ChunkServerManager() = default;
 };
+}  // namespace server
 }  // namespace gfs
 
 #endif  // GFS_SERVER_MASTER_SERVER_CHUNK_SERVER_MANAGER_H_

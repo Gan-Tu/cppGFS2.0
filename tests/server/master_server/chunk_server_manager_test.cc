@@ -1,10 +1,10 @@
-#include "chunk_server_manager.h"
+#include "src/server/master_server/chunk_server_manager.h"
 
 #include <memory>
 
 #include "gtest/gtest.h"
 
-namespace gfs {
+using namespace gfs::server;
 
 // The fixture for testing ChunkServerManager. Handles setup and cleanup for the
 // test methods.
@@ -32,7 +32,7 @@ TEST_F(ChunkServerManagerTest, RegisterAndGetChunkServer) {
                                *server_location));
 }
 
-TEST_F(ChunkServerManagerTest, GetAvailableChunkServer) {
+TEST_F(ChunkServerManagerTest, AllocateChunkServer) {
   protos::ChunkServerLocation* small_server_location =
       new protos::ChunkServerLocation();
   small_server_location->set_server_hostname("192.168.1.1");
@@ -60,6 +60,5 @@ TEST_F(ChunkServerManagerTest, GetAvailableChunkServer) {
       ChunkServerManager::GetInstance().RegisterChunkServer(big_chunk_server));
 
   EXPECT_EQ(*big_chunk_server,
-            *ChunkServerManager::GetInstance().GetAvailableChunkServer());
+            *ChunkServerManager::GetInstance().AllocateChunkServer());
 }
-}  // namespace gfs

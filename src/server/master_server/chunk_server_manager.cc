@@ -1,11 +1,13 @@
-#include "chunk_server_manager.h"
+#include "src/server/master_server/chunk_server_manager.h"
 
 namespace gfs {
 
+namespace server {
+
 // Iterates through the chunk servers and selects the server with
 // the max available memory.
-std::shared_ptr<protos::ChunkServer>
-ChunkServerManager::GetAvailableChunkServer() {
+// TODO(bmokutub): optimize this, maybe use a sorted map.
+std::shared_ptr<protos::ChunkServer> ChunkServerManager::AllocateChunkServer() {
   auto servers_iterator = this->chunk_servers_map_.begin();
 
   std::shared_ptr<protos::ChunkServer> max_memory_server = nullptr;
@@ -25,6 +27,9 @@ ChunkServerManager::GetAvailableChunkServer() {
 
   // TODO(bmokutub): check if this memory is enough for a chunk
   // Or when updating server info, it can be set to zero if not enough?
+  // Also consider temporarily reducing the available memory to prevent it from
+  // being selected always. Will be solved once we start updating the available
+  // memory from heartbeat info.
   return max_memory_server;
 }
 
@@ -60,4 +65,5 @@ std::shared_ptr<protos::ChunkServer> ChunkServerManager::GetChunkServer(
 }
 
 void ChunkServerManager::SyncChunkServers() {}
+}  // namespace server
 }  // namespace gfs
