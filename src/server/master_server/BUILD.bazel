@@ -8,6 +8,15 @@ cc_library(
       "@com_github_grpc_grpc//:grpc++",
       "//src/protos/grpc:cc_master_metadata_service_grpc",
     ],
+）
+  
+cc_library(
+    name = 'lock_manager',
+    srcs = ['lock_manager.cc'],
+    hdrs = ['lock_manager.h'],
+    visibility = ["//visibility:public"],
+    deps = ["@com_google_absl//absl/synchronization",
+            "@com_google_absl//absl/container:flat_hash_map"]
 )
 
 cc_library(

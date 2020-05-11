@@ -9,7 +9,7 @@
 #include "src/protos/chunk_server.pb.h"
 
 // Define how we do equality check for the ChunkServerLocation and ChunkServer
-// TODO(bmokutub): Can move to a seperate header file e.g. chunk_server.h
+// TODO(bmokutub): Can move to a separate header file e.g. chunk_server.h
 namespace protos {
 bool operator==(const protos::ChunkServerLocation& lhs,
                 const protos::ChunkServerLocation& rhs) {
