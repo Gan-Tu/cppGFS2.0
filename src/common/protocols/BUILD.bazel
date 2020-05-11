@@ -1,0 +1,23 @@
+cc_library(
+  name = "utils",
+  srcs = ["utils.cc"],
+  hdrs = ["utils.h"],
+  visibility = ["//visibility:public"],
+  deps = [
+    "@com_github_grpc_grpc//:grpc++",
+    "@com_google_protobuf//:protobuf_lite",
+  ],
+)
+
+cc_library(
+  name = "protocol_manager",
+  srcs = ["protocol_manager.cc"],
+  hdrs = ["protocol_manager.h"],
+  visibility = ["//visibility:public"],
+  deps = [
+    ":utils",
+    "@com_github_grpc_grpc//:grpc++",
+    "@com_google_protobuf//:protobuf_lite",
+    "//src/protos/grpc:cc_master_metadata_service_grpc",
+  ],
+)
