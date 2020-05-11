@@ -18,15 +18,21 @@ struct Data {
    void* buffer; 
 };
 
-// Provide an interface function to let user to initialize client and configure
-// parameters such as master's url. A user should call this function before
-// performing any of the following functions as initializations are needed
+/* Provide an interface function to let user to initialize client and configure
+ * parameters such as master's url. A user should call this function before
+ * performing any of the following functions as initializations are needed */
 void configClient(const char* masterUrl);
 
 Status create(const char* pathname);
 Status remove(const char* pathname); 
-// TODO: Add open mode if needed
-Status open(const char* pathname);
+
+/* Let's plan to support the following open mode:
+ * Read Mode | Write Mode | Create Mode | Is Directory
+ * Possible combination: 
+ * Create | Write - create and write to a file
+ * Create | Is Directory - Create a direcotry 
+ */
+Status open(const char* pathname, int flags);
 Status close(const char* pathname);
 
 StatusOr<Data> read(const char* pathname, size_t offset, size_t nbytes);

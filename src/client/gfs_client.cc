@@ -20,7 +20,7 @@ Status remove(const char* pathname) {
    return Status();
 }
 
-Status open(const char* pathname) {
+Status open(const char* pathname, int flags) {
    return Status();
 }
 
