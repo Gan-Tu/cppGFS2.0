@@ -8,7 +8,7 @@ cc_library(
       "@com_github_grpc_grpc//:grpc++",
       "//src/protos/grpc:cc_master_metadata_service_grpc",
     ],
-）
+)
   
 cc_library(
     name = 'lock_manager',
