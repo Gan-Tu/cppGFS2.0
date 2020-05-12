@@ -1,0 +1,9 @@
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
+cc_library(
+   name = "gfs_client",
+   srcs = ["gfs_client.cc"],
+   hdrs = ["gfs_client.h"],
+   visibility = ["//visibility:public"],
+   deps = ["@com_google_protobuf//:protobuf_lite"]
+)
