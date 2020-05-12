@@ -17,7 +17,7 @@ using protos::grpc::OpenFileReply;
 using protos::grpc::OpenFileRequest;
 
 namespace gfs {
-namespace protocols {
+namespace service {
 
 StatusOr<OpenFileReply> MasterMetadataServiceClient::SendRequest(
     const OpenFileRequest& request, ClientContext& context) {
@@ -55,5 +55,5 @@ Status MasterMetadataServiceClient::SendRequest(
   return SendRequest(request, default_context);
 }
 
-}  // namespace protocols
+}  // namespace service
 }  // namespace gfs

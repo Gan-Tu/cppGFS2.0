@@ -6,7 +6,7 @@
 #include "src/common/protocols/master_metadata_service_client.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
-using gfs::protocols::MasterMetadataServiceClient;
+using gfs::service::MasterMetadataServiceClient;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
 using protos::grpc::DeleteFileRequest;

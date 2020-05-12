@@ -5,7 +5,7 @@
 #include "grpcpp/grpcpp.h"
 #include "src/server/master_server/master_metadata_service_impl.h"
 
-using gfs::protocols::master::MasterMetadataServiceImpl;
+using gfs::service::MasterMetadataServiceImpl;
 using grpc::Server;
 using grpc::ServerBuilder;
 

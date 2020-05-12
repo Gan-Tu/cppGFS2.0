@@ -11,8 +11,7 @@ using protos::grpc::OpenFileReply;
 using protos::grpc::OpenFileRequest;
 
 namespace gfs {
-namespace protocols {
-namespace master {
+namespace service {
 
 grpc::Status MasterMetadataServiceImpl::OpenFile(ServerContext* context,
                                                  const OpenFileRequest* request,
@@ -31,6 +30,5 @@ grpc::Status MasterMetadataServiceImpl::DeleteFile(
   return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
 }
 
-}  // namespace master
-}  // namespace protocols
+}  // namespace service
 }  // namespace gfs

@@ -9,7 +9,7 @@
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
 namespace gfs {
-namespace protocols {
+namespace service {
 
 // Communication manager for sending gRPC requests to the master server
 // to perform metadata related operations.
@@ -85,7 +85,7 @@ class MasterMetadataServiceClient {
   std::unique_ptr<protos::grpc::MasterMetadataService::Stub> stub_;
 };
 
-}  // namespace protocols
+}  // namespace service
 }  // namespace gfs
 
 #endif  // GFS_COMMON_PROTOCOLS_MASTER_SERVICE_CLIENT_H_

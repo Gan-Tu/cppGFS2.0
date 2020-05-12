@@ -2,8 +2,7 @@
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
 namespace gfs {
-namespace protocols {
-namespace master {
+namespace service {
 
 // The synchronous implementation for handling MasterMetadataService requests
 class MasterMetadataServiceImpl final
@@ -24,6 +23,5 @@ class MasterMetadataServiceImpl final
 class MasterMetadataServiceAsyncImpl final
     : public protos::grpc::MasterMetadataService::Service {};
 
-}  // namespace master
-}  // namespace protocols
+}  // namespace service
 }  // namespace gfs
