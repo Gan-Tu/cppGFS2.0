@@ -23,7 +23,7 @@ service ChunkServerFileService {
   // number of bytes written, if the operation is successful; otherwise, 
   // return any errors.
   //
-  // The actuall number of bytes written can be smaller than requested |length|,
+  // The actual number of bytes written can be smaller than requested |length|,
   // if either EOF has reached, or the given |data| buffer is shorter than 
   // specified |length|. If |length| is smaller than the whole |data| buffer
   // length, only the first |length| bytes of the |data| buffer will be written.
@@ -55,7 +55,7 @@ message InitFileChunkReply {
 message ReadFileChunkRequest {
   // An immutable and globally unique UUID chunk identifier.
   string chunk_handle = 1;
-  // The version of the file chunk that the requestor is trying to read
+  // The version of the file chunk that the requester is trying to read
   uint32 chunk_version = 2;
   // The starting offset at which to start reading data from
   uint32 offset_start = 3;
@@ -82,7 +82,7 @@ message ReadFileChunkReply {
 message WriteFileChunkRequest {
   // An immutable and globally unique UUID chunk identifier.
   string chunk_handle = 1;
-  // The version of the file chunk that the requester is trying to read
+  // The version of the file chunk that the requester is trying to write
   uint32 chunk_version = 2;
   // The starting offset at which to start writing data to
   uint32 offset_start = 3;
