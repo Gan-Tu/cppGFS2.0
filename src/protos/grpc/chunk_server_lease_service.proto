@@ -9,6 +9,13 @@ service ChunkServerLeaseService {
   // for the given |chunk_handle| and |chunk_version| to the 
   // receiving chunk server. The receiving chunk server should ignore
   // a grant request if the lease expiration is in the past.
+  //
+  // A master only grants the lease to a chunk server if the latter is
+  // chosen to be the primary replica for write operations of given time frame.
+  //
+  // As long as |chunk_handle| is being mutated, the primary can let the master
+  // know through HeartBeat messages, and receive lease extensions from the 
+  // master indefinitely.
   rpc GrantLease(GrantLeaseRequeast) returns (GrantLeaseReply) {}
 
   // Revoke the lease that was previously granted to the receiving chunk server
@@ -17,6 +24,10 @@ service ChunkServerLeaseService {
   // a revoke request if it currently holds a lease that expires after the
   // |original_lease_expiration_time| -- this avoids issues with delayed
   // out-of-order message deliveries.
+  //
+  // A master usually revokes a lease in order to disable write mutations on
+  // the chunk server, during crucial master operations such as snapshotting or 
+  // file renaming, etc.
   rpc RevokeLease(RevokeLeaseRequeast) returns (RevokeLeaseReply) {}
 }
 
@@ -25,10 +36,14 @@ message GrantLeaseRequeast {
   string chunk_handle = 1;
   // The chunk version number for the chunk handle associated with 
   // this lease. The master usually increases the chunk version 
-  // number when it grants a *new* lease on a chunk. A chunk server
-  // should not accept the lease if it has a different chunk version.
+  // number when it grants a *new* lease on a chunk. For lease extensions, 
+  // the master doesn't need to increase the chunk version. A chunk server 
+  // should not accept the lease if it has a stale chunk version.
   uint32 chunk_version = 2;
   // The time that this granted lease expires
+  // By default, the lease expires 60 seconds after the master issued
+  // the lease grant/extension, so this is the absolute UNIX time when the
+  // lease is no longer valid, at master's NOW() + 60 seconds upon grant.
   google.protobuf.Timestamp lease_expiration_time = 3;
 }
 

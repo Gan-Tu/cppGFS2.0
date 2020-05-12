@@ -100,6 +100,7 @@ message WriteFileChunkReply {
     OK = 0;
     FAILED_NOT_FOUND = 1;
     FAILED_STALE_VERSION = 2;
+    FAILED_NOT_LEASE_HOLDER = 3;
   }
   WriteFileChunkStatus status = 2;
   // The number of bytes that was actually written
