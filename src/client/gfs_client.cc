@@ -1,40 +1,29 @@
-#include "gfs_client.h"
-
-using namespace gfs;
-using namespace client;
+#include "src/client/gfs_client.h"
 
 namespace gfs {
 namespace client {
 
-// This function should initialize objects such as the ClientStubs for between the
-// client and the master, and client and the chunk server. The param list needs to be
-// extended to include chunk server's information as well. 
-void configClient(const char* masterUrl) {
+google::protobuf::util::Status remove(const char* pathname) {
+  return google::protobuf::util::Status::OK;
 }
 
-Status create(const char* pathname) {
-   return Status();
+google::protobuf::util::Status open(const char* pathname, int flags) {
+  return google::protobuf::util::Status::OK;
 }
 
-Status remove(const char* pathname) {
-   return Status();
+google::protobuf::util::Status close(const char* pathname) {
+  return google::protobuf::util::Status::OK;
 }
 
-Status open(const char* pathname, int flags) {
-   return Status();
+google::protobuf::util::StatusOr<Data> read(const char* pathname, 
+                                            size_t offset, size_t nbytes) {
+  return Data();
 }
 
-Status close(const char* pathname) {
-   return Status();
+google::protobuf::util::Status write(const char* path, void* buffer, 
+                                     size_t offset, size_t nbytes) {
+  return google::protobuf::util::Status::OK;
 }
 
-StatusOr<Data> read(const char* pathname, size_t offset, size_t nbytes) {
-   return StatusOr<Data>();
-}
-
-Status write(const char* path, void* buffer, size_t offset, size_t nbytes) {
-   return Status();
-}
-
-} /* namespace client */
-} /* namespace gfs */
+} // namespace client 
+} // namespace gfs 
