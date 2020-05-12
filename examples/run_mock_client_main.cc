@@ -3,10 +3,10 @@
 #include <string>
 
 #include "grpcpp/grpcpp.h"
-#include "src/common/protocols/protocol_manager.h"
+#include "src/common/protocols/master_metadata_service_client.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
-using gfs::protocols::MasterMetadataServiceRpcProtocols;
+using gfs::protocols::MasterMetadataServiceClient;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
 using protos::grpc::DeleteFileRequest;
@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
   std::string server_address("0.0.0.0:50051");
   auto credentials = grpc::InsecureChannelCredentials();
   auto master_channel = grpc::CreateChannel(server_address, credentials);
-  MasterMetadataServiceRpcProtocols metadata_client(master_channel);
+  MasterMetadataServiceClient metadata_client(master_channel);
 
   // Prepare a mock gRPC request and client context
   OpenFileRequest open_request;

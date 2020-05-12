@@ -1,5 +1,5 @@
-#ifndef GFS_COMMON_PROTOCOLS_PROTOCOL_MANAGER_H_
-#define GFS_COMMON_PROTOCOLS_PROTOCOL_MANAGER_H_
+#ifndef GFS_COMMON_PROTOCOLS_MASTER_SERVICE_CLIENT_H_
+#define GFS_COMMON_PROTOCOLS_MASTER_SERVICE_CLIENT_H_
 
 #include <memory>
 
@@ -16,9 +16,9 @@ namespace protocols {
 //
 // Example:
 //
-//  grpc::Channel master_channel = 
+//  grpc::Channel master_channel =
 //     grpc::CreateChannel("0.0.0.0:50051", grpc::InsecureChannelCredentials());
-//  MasterMetadataServiceRpcProtocols metadata_client(master_channel);
+//  MasterMetadataServiceClient metadata_client(master_channel);
 //
 //  OpenFileRequest request;
 //  // Populate your requests here ...
@@ -36,12 +36,12 @@ namespace protocols {
 //  if (status_or.ok()) {
 //    std::cout << status_or.ValueOrDie().DebugString() << std::endl;
 //  }
-class MasterMetadataServiceRpcProtocols {
+class MasterMetadataServiceClient {
  public:
   // Initialize a protocol manager for talking to a gRPC server listening on
   // the specified gRPC |channel|, which handles gRPCs defined in the
   // MasterMetadataService.
-  MasterMetadataServiceRpcProtocols(std::shared_ptr<grpc::Channel> channel)
+  MasterMetadataServiceClient(std::shared_ptr<grpc::Channel> channel)
       : stub_(protos::grpc::MasterMetadataService::NewStub(channel)) {}
 
   // Send an OpenFile gRPC |request| to the master server, and return master's
@@ -88,4 +88,4 @@ class MasterMetadataServiceRpcProtocols {
 }  // namespace protocols
 }  // namespace gfs
 
-#endif  // GFS_COMMON_PROTOCOLS_PROTOCOL_MANAGER_H_
+#endif  // GFS_COMMON_PROTOCOLS_MASTER_SERVICE_CLIENT_H_

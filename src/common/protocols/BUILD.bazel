@@ -1,7 +1,7 @@
 cc_library(
-  name = "protocol_manager",
-  srcs = ["protocol_manager.cc"],
-  hdrs = ["protocol_manager.h"],
+  name = "master_metadata_service_client",
+  srcs = ["master_metadata_service_client.cc"],
+  hdrs = ["master_metadata_service_client.h"],
   visibility = ["//visibility:public"],
   deps = [
     "@com_github_grpc_grpc//:grpc++",
