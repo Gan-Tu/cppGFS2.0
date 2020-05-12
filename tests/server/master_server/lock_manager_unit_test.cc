@@ -46,7 +46,7 @@ TEST_F(LockManagerUnitTest, AddLockInParallel) {
 }
 
 TEST_F(LockManagerUnitTest, AddSameLockInParallel) {
-  // Add the same lock in paralle, ensure that only one succeeds
+  // Add the same lock in parallel, ensure that only one succeeds
   auto numOfThreads(10);
   std::atomic<int> cnt(0);
 
