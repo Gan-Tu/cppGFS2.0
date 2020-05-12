@@ -16,7 +16,7 @@ LockManager::LockManager() {
   globalLock_ = new absl::Mutex();
 }
 
-bool LockManager::Exist(const std::string& pathname) {
+bool LockManager::Exist(const std::string& pathname) const {
   auto idx(std::hash<std::string>{}(pathname) % shard_size_);
   absl::MutexLock anchor(metaLocks_[idx]);
   return filePathLocks_[idx].count(pathname);
@@ -31,7 +31,7 @@ absl::Mutex* LockManager::AddLockIfNonExist(const std::string& pathname) {
   return filePathLocks_[idx].at(pathname);
 }
 
-absl::Mutex* LockManager::GetLock(const std::string& pathname) {
+absl::Mutex* LockManager::GetLock(const std::string& pathname) const {
   auto idx(std::hash<std::string>{}(pathname) % shard_size_);
   absl::MutexLock anchor(metaLocks_[idx]);
   return filePathLocks_[idx].at(pathname);
@@ -68,7 +68,7 @@ void LockManager::ReleaseLockForParentDir(std::stack<absl::Mutex*>& locks) {
   }
 }
 
-absl::Mutex* LockManager::globalLock() {
+absl::Mutex* LockManager::globalLock() const {
    return globalLock_;
 }
 

@@ -2,6 +2,7 @@
 #include <stack>
 
 namespace gfs {
+namespace server {
 
 /* This is a helper class which is an RAII wrapper to automatically release the
  * reader locks acquired in a stack upon destruction */
@@ -119,4 +120,6 @@ MetadataManager* MetadataManager::GetInstance() {
    static MetadataManager* inst = new MetadataManager();
    return inst;
 }
+
+} /* namespace server */
 } /* namespace gfs */

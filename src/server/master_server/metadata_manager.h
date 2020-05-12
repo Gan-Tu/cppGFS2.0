@@ -8,6 +8,7 @@
 using protos::FileMetadata;
 
 namespace gfs {
+namespace server {
 
 /* The MetadataManager manages the following resources that are central to the master
  * node in GFS. 
@@ -65,6 +66,7 @@ class MetadataManager {
       LockManager* lockManager_;
 };
 
+} /* namespace server  */
 } /* namespace gfs */
 
 #endif /* SERVER_MASTER_SERVER_METADATA_MANAGER */

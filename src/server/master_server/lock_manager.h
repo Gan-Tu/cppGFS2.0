@@ -36,12 +36,12 @@ class LockManager {
  public:
   /* Methods to check the existence of the lock for a given path, add a lock and
    * access a lock*/
-  bool Exist(const std::string& pathname);
+  bool Exist(const std::string& pathname) const;
 
   /* Instantiate a lock for a given file if it is non-existent. Otherwise return
    * a null pointer indicating that it has been created by someone else*/
   absl::Mutex* AddLockIfNonExist(const std::string& pathname);
-  absl::Mutex* GetLock(const std::string& pathname);
+  absl::Mutex* GetLock(const std::string& pathname) const;
 
   /* Acquire readerLock for the parent paths of a given pathname, i.e. if
    * pathname is "/foo/bar/baz", the lock manager acquires reader lock for
@@ -54,7 +54,7 @@ class LockManager {
 
   /* Access a global lock. Though named global, one can perform ReaderLock and
    * WriterLock using it. */
-  absl::Mutex* globalLock();
+  absl::Mutex* globalLock() const;
 
   /* Get the instance of the LockManager, which is a singleton */
   static LockManager* GetInstance();

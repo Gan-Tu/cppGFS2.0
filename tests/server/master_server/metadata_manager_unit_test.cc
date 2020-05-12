@@ -3,7 +3,7 @@
 #include <thread>
 #include <set>
 
-using namespace gfs;
+using namespace gfs::server;
 
 class MetadataManagerUnitTest : public ::testing::Test {
    protected:
