@@ -18,6 +18,13 @@ service ChunkServerFileService {
   // If |offset_start| is larger than the chunk size, no bytes will be read
   rpc ReadFileChunk(ReadFileChunkRequest) returns (ReadFileChunkReply) {}
 
+  // Advance the |chunk_version| of the specified |chunk_handle| by one on the
+  // receiving chunk server. This request is only sent by the master to all the
+  // chunk servers that hold the most up-to-date replica for the |chunk_handle|,
+  // *before* it grants a *new* lease for a write operation. 
+  rpc AdvanceFileChunkVersion(AdvanceFileChunkVersionRequest) 
+    returns (AdvanceFileChunkVersionReply) {}
+
   // Write |length| number of bytes of given |data| buffer to |chunk_handle| 
   // of known version |chunk_version| at |offset_start|. Return the actual 
   // number of bytes written, if the operation is successful; otherwise, 
@@ -77,6 +84,24 @@ message ReadFileChunkReply {
   bytes data = 3;
   // The number of bytes that was actually read
   uint32 bytes_read = 4;
+}
+
+message AdvanceFileChunkVersionRequest {
+  // An immutable and globally unique UUID chunk identifier.
+  string chunk_handle = 1;
+}
+
+message AdvanceFileChunkVersionReply {
+  // The original request associated with this reply.
+  AdvanceFileChunkVersionRequest request = 1;
+  // The status of file chunk version update operation
+  enum AdvanceFileChunkVersionStatus {
+    OK = 0;
+    FAILED_NOT_FOUND = 1;
+  }
+  AdvanceFileChunkVersionStatus status = 2;
+  // The new chunk version after the version advance
+  uint32 chunk_version = 3;
 }
 
 message WriteFileChunkRequest {

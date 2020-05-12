@@ -35,10 +35,10 @@ message GrantLeaseRequeast {
   // An immutable and globally unique UUID chunk identifier.
   string chunk_handle = 1;
   // The chunk version number for the chunk handle associated with 
-  // this lease. The master usually increases the chunk version 
-  // number when it grants a *new* lease on a chunk. For lease extensions, 
-  // the master doesn't need to increase the chunk version. A chunk server 
-  // should not accept the lease if it has a stale chunk version.
+  // this lease. The master usually increases the chunk version number
+  // immediately *before* it grants a *new* lease on a chunk. For lease 
+  // extensions, the master doesn't need to increase the chunk version. 
+  // A chunk server should not accept the lease if it has a stale chunk version. 
   uint32 chunk_version = 2;
   // The time that this granted lease expires
   // By default, the lease expires 60 seconds after the master issued
