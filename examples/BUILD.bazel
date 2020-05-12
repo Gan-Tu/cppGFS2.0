@@ -3,3 +3,13 @@ cc_binary(
   srcs = ["leveldb_main.cc"],
   deps = ["@com_google_leveldb//:leveldb"],
 )
+
+cc_binary(
+  name="run_mock_client_main",
+  srcs = ["run_mock_client_main.cc"],
+  deps = [
+    "@com_github_grpc_grpc//:grpc++",
+    "@com_google_protobuf//:protobuf_lite",
+    "//src/common/protocol_client:master_metadata_service_client",
+  ],
+)
