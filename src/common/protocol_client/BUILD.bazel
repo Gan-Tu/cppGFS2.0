@@ -1,0 +1,12 @@
+cc_library(
+  name = "master_metadata_service_client",
+  srcs = ["master_metadata_service_client.cc"],
+  hdrs = ["master_metadata_service_client.h"],
+  visibility = ["//visibility:public"],
+  deps = [
+    "@com_github_grpc_grpc//:grpc++",
+    "@com_google_protobuf//:protobuf_lite",
+    "//src/common:utils",
+    "//src/protos/grpc:cc_master_metadata_service_grpc",
+  ],
+)
