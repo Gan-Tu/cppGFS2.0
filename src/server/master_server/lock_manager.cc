@@ -37,37 +37,6 @@ absl::Mutex* LockManager::GetLock(const std::string& pathname) const {
   return filePathLocks_[idx].at(pathname);
 }
 
-bool LockManager::AcquireLockForParentDir(const std::string& pathname,
-                                          std::stack<absl::Mutex*>& locks) {
-  // Make sure that initially the stack is empty
-  assert(locks.empty());
-
-  auto slashPos(pathname.find('/', 1));
-  while (slashPos != std::string::npos) {
-    auto dir(pathname.substr(0, slashPos));
-    // If some of these intermediate path does not exist, return false
-    if (!Exist(dir)) {
-      while (!locks.empty()) locks.pop();
-      return false;
-    }
-    // Grab the reader lock for dir and push it to the stack
-    auto l(GetLock(dir));
-    l->ReaderLock();
-    locks.push(l);
-    slashPos = pathname.find('/', slashPos + 1);
-  }
-  return true;
-}
-
-void LockManager::ReleaseLockForParentDir(std::stack<absl::Mutex*>& locks) {
-  while (!locks.empty()) {
-    // Unlock the reader locks in a reverse sequence
-    auto l(locks.top());
-    locks.pop();
-    l->ReaderUnlock();
-  }
-}
-
 absl::Mutex* LockManager::globalLock() const {
    return globalLock_;
 }
@@ -75,6 +44,45 @@ absl::Mutex* LockManager::globalLock() const {
 LockManager* LockManager::GetInstance() {
   static LockManager* inst = new LockManager();
   return inst;
+}
+
+/* Acquire readerLock for the parent paths of a given pathname, i.e. if
+ * pathname is "/foo/bar/baz", the lock manager acquires reader lock for
+ * "/foo" and "/foo/bar", and store these locks in a stack. */
+ParentLocksAnchor::ParentLocksAnchor(LockManager* _lm, 
+                                     const std::string& _pathname) {
+  auto slashPos(_pathname.find('/', 1));
+  while (slashPos != std::string::npos) {
+    auto dir(_pathname.substr(0, slashPos));
+    // If some of these intermediate path does not exist, return false
+    if (!_lm->Exist(dir)) {
+      succ_ = false;
+      return;
+    }
+    // Grab the reader lock for dir and push it to the stack
+    auto l(_lm->GetLock(dir));
+    l->ReaderLock();
+    lks_.push(l);
+    slashPos = _pathname.find('/', slashPos + 1);
+  }
+  succ_ =  true;
+}
+     
+bool ParentLocksAnchor::succ() const {
+  return succ_;
+}
+
+size_t ParentLocksAnchor::lock_size() const {
+  return lks_.size();
+}
+
+ParentLocksAnchor::~ParentLocksAnchor() {
+  while (!lks_.empty()) {
+  // Unlock the reader locks in a reverse sequence
+    auto l(lks_.top());
+    lks_.pop();
+    l->ReaderUnlock();
+  }
 }
 
 }  // namespace server

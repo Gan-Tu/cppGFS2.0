@@ -4,13 +4,15 @@
 #include "gtest/gtest.h"
 #include "src/server/master_server/lock_manager.h"
 
+using namespace gfs::server;
+
 class LockManagerUnitTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    lockManager_ = gfs::server::LockManager::GetInstance();
+    lockManager_ = LockManager::GetInstance();
   }
 
-  gfs::server::LockManager* lockManager_;
+  LockManager* lockManager_;
 };
 
 TEST_F(LockManagerUnitTest, AddLock) {
@@ -79,10 +81,7 @@ TEST_F(LockManagerUnitTest, AcquireLockForParentDir) {
   auto c(lockManager_->AddLockIfNonExist("/a/b/c"));
   EXPECT_NE(c, nullptr);
 
-  std::stack<absl::Mutex*> locks;
-  lockManager_->AcquireLockForParentDir("/a/b/c", locks);
-  EXPECT_EQ(locks.size(), (unsigned int)2);
-
-  lockManager_->ReleaseLockForParentDir(locks);
-  EXPECT_EQ(locks.size(), 0);
+  ParentLocksAnchor anchor(lockManager_, "/a/b/c");
+  EXPECT_EQ(anchor.succ(), true);
+  EXPECT_EQ(anchor.lock_size(), (unsigned int)2);
 }

@@ -4,30 +4,6 @@
 namespace gfs {
 namespace server {
 
-/* This is a helper class which is an RAII wrapper to automatically release the
- * reader locks acquired in a stack upon destruction */
-class ParentLocksAnchor {
-   public:
-      ParentLocksAnchor(LockManager* _lm, const std::string& _pathname) : lm_(_lm) {
-         succ_ = lm_->AcquireLockForParentDir(_pathname, lks_); 
-      }
-     
-      bool succ() const {
-         return succ_;
-      }
-
-      ~ParentLocksAnchor() {
-         if(succ_) {
-            lm_->ReleaseLockForParentDir(lks_);
-         }
-      }
-
-   private:
-      LockManager* lm_;
-      std::stack<absl::Mutex*> lks_;
-      bool succ_;
-};
-
 MetadataManager::MetadataManager() {
    lockManager_ = LockManager::GetInstance();
 }
