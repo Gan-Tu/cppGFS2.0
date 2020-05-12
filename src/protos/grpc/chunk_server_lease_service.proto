@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package protos.grpc;
+
+import "google/protobuf/timestamp.proto";
+
+service ChunkServerLeaseService {
+  // Grant a lease that expires at given |lease_expiration_time|
+  // for the given |chunk_handle| and |chunk_version| to the 
+  // receiving chunk server. The receiving chunk server should ignore
+  // a grant request if the lease expiration is in the past.
+  rpc GrantLease(GrantLeaseRequeast) returns (GrantLeaseReply) {}
+
+  // Revoke the lease that was previously granted to the receiving chunk server
+  // and was supposed to expire at the |original_lease_expiration_time| for the
+  // given |chunk_handle|. The receiving chunk server should ignore
+  // a revoke request if it currently holds a lease that expires after the
+  // |original_lease_expiration_time| -- this avoids issues with delayed
+  // out-of-order message deliveries.
+  rpc RevokeLease(RevokeLeaseRequeast) returns (RevokeLeaseReply) {}
+}
+
+message GrantLeaseRequeast {
+  // An immutable and globally unique UUID chunk identifier.
+  string chunk_handle = 1;
+  // The chunk version number for the chunk handle associated with 
+  // this lease. The master usually increases the chunk version 
+  // number when it grants a *new* lease on a chunk. A chunk server
+  // should not accept the lease if it has a different chunk version.
+  uint32 chunk_version = 2;
+  // The time that this granted lease expires
+  google.protobuf.Timestamp lease_expiration_time = 3;
+}
+
+message GrantLeaseReply {
+  // The original request associated with this reply.
+  GrantLeaseRequeast request = 1;
+  // The lease acceptance status by the chunk server
+  enum GrantLeaseStatus {
+    // The chunk server accepts the new lease
+    ACCEPTED = 0;
+    // Request is ignored because it's already expired when received
+    IGNORED_EXPIRED_LEASE = 1;
+    // Request is rejected because chunk server doesn't have this chunk handle
+    REJECTED_NOT_FOUND = 2;
+    // Request is rejected because chunk server has a stale version of the chunk
+    REJECTED_STALE_VERSION = 3;
+  }
+  GrantLeaseStatus status = 2;
+}
+
+message RevokeLeaseRequeast {
+  // An immutable and globally unique UUID chunk identifier.
+  string chunk_handle = 1;
+  // The original time that the revoked lease was supposed to expire
+  google.protobuf.Timestamp original_lease_expiration_time = 2;
+}
+
+message RevokeLeaseReply {
+  // The original request associated with this reply.
+  RevokeLeaseRequeast request = 1;
+  // The lease revoke status by the chunk server
+  enum RevokeLeaseStatus {
+    // The chunk server has revoked its holding lease
+    REVOKED = 0;
+    // Revoke is ignored because chunk server has a newer lease
+    IGNORED_HAS_NEWER_LEASE = 1;
+    // Request is rejected because chunk server doesn't have this chunk handle
+    REJECTED_NOT_FOUND = 2;
+  }
+  RevokeLeaseStatus status = 2;
+}

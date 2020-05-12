@@ -27,3 +27,26 @@ cc_grpc_library(
     deps = [":cc_master_metadata_service_proto"],
     grpc_only = True,
 )
+
+proto_library(
+  name = "chunk_server_lease_service_proto",
+  visibility = ["//visibility:public"],
+  srcs = ["chunk_server_lease_service.proto"],
+  deps = [
+    "@com_google_protobuf//:timestamp_proto",
+  ]
+)
+
+cc_proto_library(
+  name="cc_chunk_server_lease_service_proto",
+  visibility = ["//visibility:public"],
+  deps=[":chunk_server_lease_service_proto"],
+)
+
+cc_grpc_library(
+    name = "cc_chunk_server_lease_service_grpc",
+    visibility = ["//visibility:public"],
+    srcs = [":chunk_server_lease_service_proto"],
+    deps = [":cc_chunk_server_lease_service_proto"],
+    grpc_only = True,
+)
