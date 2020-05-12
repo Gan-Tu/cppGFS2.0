@@ -1,17 +1,16 @@
+#include <stack>
+#include <thread>
+
 #include "gtest/gtest.h"
 #include "src/server/master_server/lock_manager.h"
-#include <thread>
-#include <stack>
-
-using namespace gfs;
 
 class LockManagerUnitTest : public ::testing::Test {
-   protected:
-      void SetUp() override {
-         lockManager_ = LockManager::GetInstance();
-      }
+ protected:
+  void SetUp() override {
+    lockManager_ = gfs::server::LockManager::GetInstance();
+  }
 
-      LockManager* lockManager_;
+  gfs::server::LockManager* lockManager_;
 };
 
 TEST_F(LockManagerUnitTest, AddLock) {
@@ -29,45 +28,45 @@ TEST_F(LockManagerUnitTest, AddLockInParallel) {
   // create /0, /1, ... /10
   auto numOfThreads(10);
   std::vector<std::thread> threads;
-  for(int i=0; i<numOfThreads; i++) {
-     threads.push_back(std::thread([&,i]() {
-       lockManager_->AddLockIfNonExist("/"+std::to_string(i));
-     }));
+  for (int i = 0; i < numOfThreads; i++) {
+    threads.push_back(std::thread([&, i]() {
+      lockManager_->AddLockIfNonExist("/" + std::to_string(i));
+    }));
   }
 
   // Join all threads
-  for(int i=0; i<numOfThreads; i++) {
-     threads[i].join();
+  for (int i = 0; i < numOfThreads; i++) {
+    threads[i].join();
   }
 
   // Check that all locks exist
-  for(int i=0; i<numOfThreads; i++) {
-     EXPECT_EQ(lockManager_->Exist("/"+std::to_string(i)), true);
+  for (int i = 0; i < numOfThreads; i++) {
+    EXPECT_EQ(lockManager_->Exist("/" + std::to_string(i)), true);
   }
 }
 
 TEST_F(LockManagerUnitTest, AddSameLockInParallel) {
-   // Add the same lock in paralle, ensure that only one succeeds
+  // Add the same lock in parallel, ensure that only one succeeds
   auto numOfThreads(10);
   std::atomic<int> cnt(0);
 
   std::vector<std::thread> threads;
-  for(int i=0; i<numOfThreads; i++) {
-     threads.push_back(std::thread([&,i]() {
-       auto lk(lockManager_->AddLockIfNonExist("/samePath"));
-       if(lk) {
-          cnt++;
-       }
-     }));
+  for (int i = 0; i < numOfThreads; i++) {
+    threads.push_back(std::thread([&, i]() {
+      auto lk(lockManager_->AddLockIfNonExist("/samePath"));
+      if (lk) {
+        cnt++;
+      }
+    }));
   }
 
   // Join all threads
-  for(int i=0; i<numOfThreads; i++) {
-     threads[i].join();
+  for (int i = 0; i < numOfThreads; i++) {
+    threads[i].join();
   }
 
   // Only one of the above calls returns successfully
-  EXPECT_EQ(cnt.load(), 1);    
+  EXPECT_EQ(cnt.load(), 1);
 }
 
 TEST_F(LockManagerUnitTest, AcquireLockForParentDir) {
@@ -79,9 +78,9 @@ TEST_F(LockManagerUnitTest, AcquireLockForParentDir) {
   EXPECT_NE(b, nullptr);
   auto c(lockManager_->AddLockIfNonExist("/a/b/c"));
   EXPECT_NE(c, nullptr);
-  
+
   std::stack<absl::Mutex*> locks;
-  lockManager_->AcquireLockForParentDir("/a/b/c",locks);
+  lockManager_->AcquireLockForParentDir("/a/b/c", locks);
   EXPECT_EQ(locks.size(), (unsigned int)2);
 
   lockManager_->ReleaseLockForParentDir(locks);
