@@ -3,7 +3,7 @@
 #include <string>
 
 #include "grpcpp/grpcpp.h"
-#include "src/common/protocols/master_metadata_service_client.h"
+#include "src/common/protocol_client/master_metadata_service_client.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
 using gfs::service::MasterMetadataServiceClient;

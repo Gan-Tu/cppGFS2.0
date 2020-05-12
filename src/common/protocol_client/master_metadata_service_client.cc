@@ -1,4 +1,4 @@
-#include "src/common/protocols/master_metadata_service_client.h"
+#include "src/common/protocol_client/master_metadata_service_client.h"
 
 #include <memory>
 
