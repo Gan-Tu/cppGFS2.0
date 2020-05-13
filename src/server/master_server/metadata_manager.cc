@@ -33,7 +33,7 @@ bool MetadataManager::CreateFileMetadata(const std::string& pathname) {
   absl::WriterMutexLock anchorForGlobalLock(lockManager_->globalLock());
   // The reason that we acquire the global lock is that we need to synchronization
   // between write and read from the fileMetadata collection.
-  if(fileMetadata_.count(pathname)) {
+  if(fileMetadata_.contains(pathname)) {
     return false;
   }
    
@@ -43,7 +43,7 @@ bool MetadataManager::CreateFileMetadata(const std::string& pathname) {
 
 bool MetadataManager::ExistFileMetadata(const std::string& pathname) const {
   absl::ReaderMutexLock(lockManager_->globalLock());
-  return fileMetadata_.count(pathname);
+  return fileMetadata_.contains(pathname);
 }
 
 std::shared_ptr<FileMetadata> MetadataManager::GetFileMetadata(
@@ -78,7 +78,7 @@ std::string MetadataManager::CreateChunkHandle(const std::string& pathname,
   auto& chunk_handle_map(*fdata->mutable_chunk_handles());
   
   // Return null UIDD if this chunk_index exists
-  if(chunk_handle_map.count(chunk_index)) {
+  if(chunk_handle_map.contains(chunk_index)) {
     return "";
   }
    

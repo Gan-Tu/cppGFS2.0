@@ -19,13 +19,13 @@ LockManager::LockManager() {
 bool LockManager::Exist(const std::string& pathname) const {
   auto idx(std::hash<std::string>{}(pathname) % shard_size_);
   absl::MutexLock anchor(metaLocks_[idx]);
-  return filePathLocks_[idx].count(pathname);
+  return filePathLocks_[idx].contains(pathname);
 }
 
 absl::Mutex* LockManager::AddLockIfNonExist(const std::string& pathname) {
   auto idx(std::hash<std::string>{}(pathname) % shard_size_);
   absl::MutexLock anchor(metaLocks_[idx]);
-  if (filePathLocks_[idx].count(pathname)) return NULL;
+  if (filePathLocks_[idx].contains(pathname)) return NULL;
 
   filePathLocks_[idx][pathname] = new absl::Mutex();
   return filePathLocks_[idx].at(pathname);
