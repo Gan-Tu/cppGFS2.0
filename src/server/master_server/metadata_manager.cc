@@ -8,6 +8,7 @@ namespace server {
 
 MetadataManager::MetadataManager() {
   lockManager_ = LockManager::GetInstance();
+  fileMetadataLock_ = new absl::Mutex();
 }
 
 bool MetadataManager::CreateFileMetadata(const std::string& pathname) {
@@ -30,7 +31,7 @@ bool MetadataManager::CreateFileMetadata(const std::string& pathname) {
    
   absl::WriterMutexLock anchorForNewLock(newLock);
   // Step 3. writeLock the global lock, instantiate a FileMetadata object
-  absl::WriterMutexLock anchorForGlobalLock(lockManager_->globalLock());
+  absl::WriterMutexLock anchorForFileMetadata(fileMetadataLock_);
   // The reason that we acquire the global lock is that we need to synchronization
   // between write and read from the fileMetadata collection.
   if(fileMetadata_.contains(pathname)) {
@@ -42,7 +43,7 @@ bool MetadataManager::CreateFileMetadata(const std::string& pathname) {
 }
 
 bool MetadataManager::ExistFileMetadata(const std::string& pathname) const {
-  absl::ReaderMutexLock(lockManager_->globalLock());
+  absl::ReaderMutexLock anchor(fileMetadataLock_);
   return fileMetadata_.contains(pathname);
 }
 
@@ -50,7 +51,7 @@ std::shared_ptr<FileMetadata> MetadataManager::GetFileMetadata(
   const std::string& pathname) const {
   // readLock the global lock and retrieve the filemetadata. The reason for a
   // readLock is because we are not mutating anything in the fileMetadata_.
-  absl::ReaderMutexLock(lockManager_->globalLock());
+  absl::ReaderMutexLock anchor(fileMetadataLock_);
   return fileMetadata_.at(pathname);
 }
 

@@ -13,7 +13,6 @@ LockManager::LockManager() {
   metaLocks_ = std::vector<absl::Mutex*>(shard_size_, new absl::Mutex());
   filePathLocks_ =
       std::vector<absl::flat_hash_map<std::string, absl::Mutex*>>(shard_size_);
-  globalLock_ = new absl::Mutex();
 }
 
 bool LockManager::Exist(const std::string& pathname) const {
@@ -35,10 +34,6 @@ absl::Mutex* LockManager::GetLock(const std::string& pathname) const {
   auto idx(std::hash<std::string>{}(pathname) % shard_size_);
   absl::MutexLock anchor(metaLocks_[idx]);
   return filePathLocks_[idx].at(pathname);
-}
-
-absl::Mutex* LockManager::globalLock() const {
-   return globalLock_;
 }
 
 LockManager* LockManager::GetInstance() {

@@ -65,6 +65,8 @@ class MetadataManager {
                        std::shared_ptr<protos::FileMetadata>> fileMetadata_;
    /* Lock manager to manager the synchronization of operations */
    LockManager* lockManager_;
+   /* A lock to lock fileMetadata_ */
+   absl::Mutex* fileMetadataLock_;
 };
 
 } // namespace server

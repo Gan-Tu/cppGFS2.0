@@ -27,8 +27,8 @@ namespace server {
  * vector of "meta locks" to manage the synchronization of each maps.
  *
  * The LockManager supports methods to check whether a path name exists, add a
- * lock for a given path name and get a lock. It also provides a global lock 
- * so one can use for synchronization purposes. */
+ * lock for a given path name and get a lock. 
+ */
 class LockManager {
  public:
   /* Methods to check the existence of the lock for a given path, add a lock and
@@ -39,10 +39,6 @@ class LockManager {
    * a null pointer indicating that it has been created by someone else*/
   absl::Mutex* AddLockIfNonExist(const std::string& pathname);
   absl::Mutex* GetLock(const std::string& pathname) const;
-
-  /* Access a global lock. Though named global, one can perform ReaderLock and
-   * WriterLock using it. */
-  absl::Mutex* globalLock() const;
 
   /* Get the instance of the LockManager, which is a singleton */
   static LockManager* GetInstance();
@@ -57,8 +53,6 @@ class LockManager {
   // A sharded hash map that maps from file path to mutexes, which are
   // used to lock per-file metadata, i.e. filePathToMetadata above
   std::vector<absl::flat_hash_map<std::string, absl::Mutex*>> filePathLocks_;
-  // A global lock
-  absl::Mutex* globalLock_;
 };
 
 /* A helper class which is an RAII wrapper to automatically acquire reader  
