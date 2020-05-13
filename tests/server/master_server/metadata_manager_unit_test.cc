@@ -28,6 +28,7 @@ TEST_F(MetadataManagerUnitTest, CreateSingleFileMetadata) {
    EXPECT_EQ(metadataManager_->CreateFileMetadata("/foo"), true);
    EXPECT_EQ(metadataManager_->ExistFileMetadata("/foo"), true);
    auto fooData(metadataManager_->GetFileMetadata("/foo"));
+   EXPECT_EQ(fooData->filename(), "/foo");
    auto firstChunkHandle(metadataManager_->CreateChunkHandle("/foo", 0));
    EXPECT_EQ(firstChunkHandle,"0");
    EXPECT_EQ(fooData->chunk_handles_size(), (unsigned int)1);
@@ -55,6 +56,7 @@ TEST_F(MetadataManagerUnitTest, CreateMultiFileMetadataInParallel) {
      // Ensure that the files are created successfully
      EXPECT_EQ(metadataManager_->ExistFileMetadata(fileName),true);
      auto fData(metadataManager_->GetFileMetadata(fileName));
+     EXPECT_EQ(fData->filename(), fileName);
      auto& chunk_handles(*fData->mutable_chunk_handles());
      // Ensure that chunk handle exists for chunk_index 0 for each file
      EXPECT_EQ(chunk_handles.count(0), 1);
@@ -101,6 +103,7 @@ TEST_F(MetadataManagerUnitTest, CreateSingleFileMultiChunksInParallel) {
   joinAndClearThreads(threads);
 
   auto fData(metadataManager_->GetFileMetadata(fileName));
+  EXPECT_EQ(fData->filename(), fileName);
   std::set<std::string> uniqueIds;
   EXPECT_EQ(fData->chunk_handles_size(), numOfThreads);
   auto& chunk_handles(*fData->mutable_chunk_handles());

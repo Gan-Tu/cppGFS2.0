@@ -39,6 +39,8 @@ bool MetadataManager::CreateFileMetadata(const std::string& pathname) {
   }
    
   fileMetadata_[pathname] = std::make_shared<FileMetadata>();
+  // Initialize the filename
+  fileMetadata_[pathname]->set_filename(pathname);
   return true;
 }
 
