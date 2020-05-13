@@ -52,7 +52,7 @@ class MetadataManager {
 
    /* Assign a new chunk handle. This function returns a unique chunk handle
     * everytime when it gets called */
-   std::string CreateChunkHandle(); 
+   std::string AllocateNewChunkHandle(); 
 
    /* Instance function to access the singleton */
    static MetadataManager* GetInstance();

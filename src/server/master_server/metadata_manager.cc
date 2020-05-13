@@ -71,7 +71,7 @@ std::string MetadataManager::CreateChunkHandle(const std::string& pathname,
 
   // Step 4. compute a new chunk handle, and insert the (chunk_index, chunkHandle)
   //         pair to fileMetadata_
-  std::string newChunkHandle(CreateChunkHandle());
+  std::string newChunkHandle(AllocateNewChunkHandle());
   fdata->set_filename(pathname);
   auto& chunk_handle_map(*fdata->mutable_chunk_handles());
   
@@ -88,7 +88,7 @@ void MetadataManager::DeleteFile(const std::string& pathname) {
    // [TODO]: phase 2
 }
 
-std::string MetadataManager::CreateChunkHandle() {
+std::string MetadataManager::AllocateNewChunkHandle() {
   auto ret(globalChunkId_.fetch_add(1));
   return std::to_string(ret);
 }
