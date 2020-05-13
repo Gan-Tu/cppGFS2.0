@@ -49,38 +49,38 @@ LockManager* LockManager::GetInstance() {
 /* Acquire readerLock for the parent paths of a given pathname, i.e. if
  * pathname is "/foo/bar/baz", the lock manager acquires reader lock for
  * "/foo" and "/foo/bar", and store these locks in a stack. */
-ParentLocksAnchor::ParentLocksAnchor(LockManager* _lm, 
-                                     const std::string& _pathname) {
-  auto slashPos(_pathname.find('/', 1));
+ParentLocksAnchor::ParentLocksAnchor(LockManager* lockManager, 
+                                     const std::string& pathname) {
+  auto slashPos(pathname.find('/', 1));
   while (slashPos != std::string::npos) {
-    auto dir(_pathname.substr(0, slashPos));
+    auto dir(pathname.substr(0, slashPos));
     // If some of these intermediate path does not exist, return false
-    if (!_lm->Exist(dir)) {
-      succ_ = false;
+    if (!lockManager->Exist(dir)) {
+      ok_ = false;
       return;
     }
     // Grab the reader lock for dir and push it to the stack
-    auto l(_lm->GetLock(dir));
+    auto l(lockManager->GetLock(dir));
     l->ReaderLock();
-    lks_.push(l);
-    slashPos = _pathname.find('/', slashPos + 1);
+    locks_.push(l);
+    slashPos = pathname.find('/', slashPos + 1);
   }
-  succ_ =  true;
+  ok_ =  true;
 }
      
-bool ParentLocksAnchor::succ() const {
-  return succ_;
+bool ParentLocksAnchor::ok() const {
+  return ok_;
 }
 
 size_t ParentLocksAnchor::lock_size() const {
-  return lks_.size();
+  return locks_.size();
 }
 
 ParentLocksAnchor::~ParentLocksAnchor() {
-  while (!lks_.empty()) {
+  while (!locks_.empty()) {
   // Unlock the reader locks in a reverse sequence
-    auto l(lks_.top());
-    lks_.pop();
+    auto l(locks_.top());
+    locks_.pop();
     l->ReaderUnlock();
   }
 }

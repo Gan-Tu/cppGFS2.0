@@ -82,6 +82,6 @@ TEST_F(LockManagerUnitTest, AcquireLockForParentDir) {
   EXPECT_NE(c, nullptr);
 
   ParentLocksAnchor anchor(lockManager_, "/a/b/c");
-  EXPECT_EQ(anchor.succ(), true);
+  EXPECT_EQ(anchor.ok(), true);
   EXPECT_EQ(anchor.lock_size(), (unsigned int)2);
 }

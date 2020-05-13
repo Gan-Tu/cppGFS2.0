@@ -14,7 +14,7 @@ bool MetadataManager::CreateFileMetadata(const std::string& pathname) {
   // Step 1. Lock (readerlock underneath) the parent directory first
   ParentLocksAnchor parentLockAnchor(lockManager_, pathname);
              
-  if (!parentLockAnchor.succ()) {
+  if (!parentLockAnchor.ok()) {
     // If this operation fails, which means some of the parent directory does not
     // exist, we return false
     return false;
@@ -58,7 +58,7 @@ std::string MetadataManager::CreateChunkHandle(const std::string& pathname,
                                                uint32_t chunk_index) {
   // Step 1. readlock the parent directories
   ParentLocksAnchor parentLockAnchor(lockManager_, pathname);
-  if(!parentLockAnchor.succ()) {
+  if(!parentLockAnchor.ok()) {
     // If this operation fails, which means some of the parent directory does not
     // exist, we return false
     return "";

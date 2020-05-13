@@ -69,13 +69,13 @@ class LockManager {
  * */
 class ParentLocksAnchor {
   public:
-   ParentLocksAnchor(LockManager* _lm, const std::string& _pathname);
+   ParentLocksAnchor(LockManager* lockManager, const std::string& pathname);
    ~ParentLocksAnchor();
-   bool succ() const;
+   bool ok() const;
    size_t lock_size() const; 
   private:
-   std::stack<absl::Mutex*> lks_;
-   bool succ_;
+   std::stack<absl::Mutex*> locks_;
+   bool ok_;
 };
 
 }  // namespace server
