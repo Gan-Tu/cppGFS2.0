@@ -125,3 +125,35 @@ TEST_F(MetadataManagerUnitTest, CreateSingleFileMultiChunksInParallel) {
   // Ensure that all chunk handles created are unique
   EXPECT_EQ(uniqueIds.size(), numOfThreads);
 }
+
+// Check error messages for a few different cases 
+// 1) Create a file metadata and then create it again
+// 2) Get a a non-existing file metadata
+// 3) Create a chunk index for a non-existing file
+// 4) Create a chunk index for a file twice 
+TEST_F(MetadataManagerUnitTest, CheckErrorMessages) {
+  auto newFileName("/newFile");
+  auto createRes(metadataManager_->CreateFileMetadata(newFileName));
+  EXPECT_EQ(createRes.ok(), true);
+  auto dupCreateRes(metadataManager_->CreateFileMetadata(newFileName));
+  // Note: ideally here we should say file metadata already exists. But before
+  // creating a file metadata we always first create a lock. If the lock already
+  // exsits we return early. Improvement could be done by handling the error returned
+  // from the lockManager
+  EXPECT_EQ(dupCreateRes.error_message(),
+            "Lock already exists for /newFile");
+
+  auto nonExistFile("/nonExist");
+  auto nonExistRes(metadataManager_->GetFileMetadata(nonExistFile));
+  EXPECT_EQ(nonExistRes.status().error_message(),
+            "File metadata does not exist: /nonExist");
+ 
+  auto nonExistCreateRes(metadataManager_->CreateChunkHandle(nonExistFile,0));
+  EXPECT_EQ(nonExistCreateRes.status().error_message(),
+            "File metadata does not exist: /nonExist"); 
+
+  auto nonExistFile2("/newFile/foo");
+  auto nonExistCreateRes2(metadataManager_->CreateChunkHandle(nonExistFile2,0));
+  EXPECT_EQ(nonExistCreateRes2.status().error_message(),
+            "File metadata does not exist: /newFile/foo");
+} 

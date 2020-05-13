@@ -35,7 +35,7 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
   if (filePathLocks_[idx].contains(pathname)) {
     return google::protobuf::util::Status(
              google::protobuf::util::error::OUT_OF_RANGE, 
-             "Key already exists for "+pathname);
+             "Lock already exists for "+pathname);
   }
 
   auto ret(new absl::Mutex());
@@ -51,7 +51,7 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::FetchLock(
   if (!filePathLocks_[idx].contains(pathname)) {
     return google::protobuf::util::Status(
              google::protobuf::util::error::OUT_OF_RANGE, 
-             "Key does not exist for "+pathname);
+             "Lock does not exist for "+pathname);
   }
   
   return filePathLocks_[idx].at(pathname);
