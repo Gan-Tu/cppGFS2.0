@@ -27,18 +27,33 @@ bool LockManager::Exist(const std::string& pathname) const {
   return filePathLocks_[idx].contains(pathname);
 }
 
-absl::Mutex* LockManager::AddLockIfNonExist(const std::string& pathname) {
+google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
+  const std::string& pathname) {
+  
   auto idx(bucket_id(pathname));
   absl::MutexLock anchor(metaLocks_[idx]);
-  if (filePathLocks_[idx].contains(pathname)) return NULL;
+  if (filePathLocks_[idx].contains(pathname)) {
+    return google::protobuf::util::Status(
+             google::protobuf::util::error::OUT_OF_RANGE, 
+             "Key already exists for "+pathname);
+  }
 
-  filePathLocks_[idx][pathname] = new absl::Mutex();
-  return filePathLocks_[idx].at(pathname);
+  auto ret(new absl::Mutex());
+  filePathLocks_[idx][pathname] = ret;
+  return ret;
 }
 
-absl::Mutex* LockManager::GetLock(const std::string& pathname) const {
+google::protobuf::util::StatusOr<absl::Mutex*> LockManager::FetchLock(
+  const std::string& pathname) const {
+  
   auto idx(std::hash<std::string>{}(pathname) % shard_size_);
   absl::MutexLock anchor(metaLocks_[idx]);
+  if (!filePathLocks_[idx].contains(pathname)) {
+    return google::protobuf::util::Status(
+             google::protobuf::util::error::OUT_OF_RANGE, 
+             "Key does not exist for "+pathname);
+  }
+  
   return filePathLocks_[idx].at(pathname);
 }
 
@@ -56,21 +71,29 @@ ParentLocksAnchor::ParentLocksAnchor(LockManager* lockManager,
   while (slashPos != std::string::npos) {
     auto dir(pathname.substr(0, slashPos));
     // If some of these intermediate path does not exist, return false
-    if (!lockManager->Exist(dir)) {
-      ok_ = false;
+    // Otherwise, grab the reader lock for dir and push it to the stack
+    auto res(lockManager->FetchLock(dir));
+    if(!res.ok()) {
+      status_ = google::protobuf::util::Status(
+                  google::protobuf::util::error::OUT_OF_RANGE,
+                  "Lock for " + dir + " does not exist"); 
       return;
     }
-    // Grab the reader lock for dir and push it to the stack
-    auto l(lockManager->GetLock(dir));
+    
+    auto l(res.ValueOrDie());
     l->ReaderLock();
     locks_.push(l);
     slashPos = pathname.find('/', slashPos + 1);
   }
-  ok_ =  true;
+  status_ = google::protobuf::util::Status::OK;
 }
      
 bool ParentLocksAnchor::ok() const {
-  return ok_;
+  return status_.ok();
+}
+
+google::protobuf::util::Status ParentLocksAnchor::status() const {
+  return status_;
 }
 
 size_t ParentLocksAnchor::lock_size() const {

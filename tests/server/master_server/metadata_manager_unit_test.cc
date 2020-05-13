@@ -25,11 +25,18 @@ void joinAndClearThreads(std::vector<std::thread>& threads) {
 
 // The simplest case that one creates a file /foo, and add a file chunk
 TEST_F(MetadataManagerUnitTest, CreateSingleFileMetadata) {
-   EXPECT_EQ(metadataManager_->CreateFileMetadata("/foo"), true);
+   auto createRes(metadataManager_->CreateFileMetadata("/foo"));
+   EXPECT_EQ(createRes.ok(), true);
+   
    EXPECT_EQ(metadataManager_->ExistFileMetadata("/foo"), true);
-   auto fooData(metadataManager_->GetFileMetadata("/foo"));
+   auto fooDataRes(metadataManager_->GetFileMetadata("/foo"));
+   EXPECT_EQ(fooDataRes.ok(), true);
+   auto fooData(fooDataRes.ValueOrDie());
    EXPECT_EQ(fooData->filename(), "/foo");
-   auto firstChunkHandle(metadataManager_->CreateChunkHandle("/foo", 0));
+   
+   auto firstChunkHandleRes(metadataManager_->CreateChunkHandle("/foo", 0));
+   EXPECT_EQ(firstChunkHandleRes.ok(), true);
+   auto firstChunkHandle(firstChunkHandleRes.ValueOrDie());
    EXPECT_EQ(firstChunkHandle,"0");
    EXPECT_EQ(fooData->chunk_handles_size(), (unsigned int)1);
 }
@@ -55,7 +62,9 @@ TEST_F(MetadataManagerUnitTest, CreateMultiFileMetadataInParallel) {
      auto fileName("/"+std::to_string(i));
      // Ensure that the files are created successfully
      EXPECT_EQ(metadataManager_->ExistFileMetadata(fileName),true);
-     auto fData(metadataManager_->GetFileMetadata(fileName));
+     auto fDataRes(metadataManager_->GetFileMetadata(fileName));
+     EXPECT_EQ(fDataRes.ok(), true);
+     auto fData(fDataRes.ValueOrDie());
      EXPECT_EQ(fData->filename(), fileName);
      auto& chunk_handles(*fData->mutable_chunk_handles());
      // Ensure that chunk handle exists for chunk_index 0 for each file
@@ -79,8 +88,8 @@ TEST_F(MetadataManagerUnitTest, CreateSingleFileMultiChunksInParallel) {
   // Create the same file concurrently
   for(int i=0; i<numOfThreads; i++) {
      threads.push_back(std::thread([&,i]() {
-       auto succ(metadataManager_->CreateFileMetadata(fileName));
-       if(succ) {
+       auto createRes(metadataManager_->CreateFileMetadata(fileName));
+       if(createRes.ok()) {
          cnts++;
        }
      }));
@@ -102,7 +111,9 @@ TEST_F(MetadataManagerUnitTest, CreateSingleFileMultiChunksInParallel) {
   // Join all threads
   joinAndClearThreads(threads);
 
-  auto fData(metadataManager_->GetFileMetadata(fileName));
+  auto fDataRes(metadataManager_->GetFileMetadata(fileName));
+  EXPECT_EQ(fDataRes.ok(), true);
+  auto fData(fDataRes.ValueOrDie());
   EXPECT_EQ(fData->filename(), fileName);
   std::set<std::string> uniqueIds;
   EXPECT_EQ(fData->chunk_handles_size(), numOfThreads);

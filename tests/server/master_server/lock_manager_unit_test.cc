@@ -18,11 +18,13 @@ class LockManagerUnitTest : public ::testing::Test {
 TEST_F(LockManagerUnitTest, AddLock) {
   EXPECT_EQ(lockManager_->Exist("/foo"), false);
   // Successfully add a lock for /foo
-  auto foo(lockManager_->AddLockIfNonExist("/foo"));
-  EXPECT_NE(foo, nullptr);
+  auto fooRes(lockManager_->CreateLock("/foo"));
+  EXPECT_EQ(fooRes.ok(), true);
+  EXPECT_NE(fooRes.ValueOrDie(), nullptr);
   // Successfully add a lock for /foo/bar
-  auto bar(lockManager_->AddLockIfNonExist("/foo/bar"));
-  EXPECT_NE(bar, nullptr);
+  auto barRes(lockManager_->CreateLock("/foo/bar"));
+  EXPECT_EQ(barRes.ok(), true);
+  EXPECT_NE(barRes.ValueOrDie(), nullptr);
 }
 
 TEST_F(LockManagerUnitTest, AddLockInParallel) {
@@ -32,7 +34,7 @@ TEST_F(LockManagerUnitTest, AddLockInParallel) {
   std::vector<std::thread> threads;
   for (int i = 0; i < numOfThreads; i++) {
     threads.push_back(std::thread([&, i]() {
-      lockManager_->AddLockIfNonExist("/" + std::to_string(i));
+      lockManager_->CreateLock("/" + std::to_string(i));
     }));
   }
 
@@ -55,8 +57,8 @@ TEST_F(LockManagerUnitTest, AddSameLockInParallel) {
   std::vector<std::thread> threads;
   for (int i = 0; i < numOfThreads; i++) {
     threads.push_back(std::thread([&, i]() {
-      auto lk(lockManager_->AddLockIfNonExist("/samePath"));
-      if (lk) {
+      auto lkRes(lockManager_->CreateLock("/samePath"));
+      if (lkRes.ok()) {
         cnt++;
       }
     }));
@@ -74,12 +76,12 @@ TEST_F(LockManagerUnitTest, AddSameLockInParallel) {
 TEST_F(LockManagerUnitTest, AcquireLockForParentDir) {
   // Add lock for /a, /a/b and /a/b/c and test that the AcquireLockForParentDir
   // method works as expected by checking the stack size
-  auto a(lockManager_->AddLockIfNonExist("/a"));
-  EXPECT_NE(a, nullptr);
-  auto b(lockManager_->AddLockIfNonExist("/a/b"));
-  EXPECT_NE(b, nullptr);
-  auto c(lockManager_->AddLockIfNonExist("/a/b/c"));
-  EXPECT_NE(c, nullptr);
+  auto aRes(lockManager_->CreateLock("/a"));
+  EXPECT_NE(aRes.ValueOrDie(), nullptr);
+  auto bRes(lockManager_->CreateLock("/a/b"));
+  EXPECT_NE(bRes.ValueOrDie(), nullptr);
+  auto cRes(lockManager_->CreateLock("/a/b/c"));
+  EXPECT_NE(cRes.ValueOrDie(), nullptr);
 
   ParentLocksAnchor anchor(lockManager_, "/a/b/c");
   EXPECT_EQ(anchor.ok(), true);

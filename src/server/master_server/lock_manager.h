@@ -7,6 +7,8 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
 
+#include "google/protobuf/stubs/statusor.h"
+
 namespace gfs {
 namespace server {
 
@@ -35,10 +37,13 @@ class LockManager {
    * access a lock*/
   bool Exist(const std::string& pathname) const;
 
-  /* Instantiate a lock for a given file if it is non-existent. Otherwise return
-   * a null pointer indicating that it has been created by someone else*/
-  absl::Mutex* AddLockIfNonExist(const std::string& pathname);
-  absl::Mutex* GetLock(const std::string& pathname) const;
+  /* Create a lock for a given path, return error if the lock already exists */
+  google::protobuf::util::StatusOr<absl::Mutex*>
+    CreateLock(const std::string& pathname);
+ 
+  /* Retrieve a lock for a given path, return error if the lock does not exist */
+  google::protobuf::util::StatusOr<absl::Mutex*> 
+    FetchLock(const std::string& pathname) const;
 
   /* Get the instance of the LockManager, which is a singleton */
   static LockManager* GetInstance();
@@ -68,10 +73,11 @@ class ParentLocksAnchor {
    ParentLocksAnchor(LockManager* lockManager, const std::string& pathname);
    ~ParentLocksAnchor();
    bool ok() const;
+   google::protobuf::util::Status status() const;
    size_t lock_size() const; 
   private:
    std::stack<absl::Mutex*> locks_;
-   bool ok_;
+   google::protobuf::util::Status status_;
 };
 
 }  // namespace server

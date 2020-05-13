@@ -4,6 +4,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "src/server/master_server/lock_manager.h"
 #include "src/protos/metadata.pb.h"
+#include "google/protobuf/stubs/statusor.h"
 
 namespace gfs {
 namespace server {
@@ -29,21 +30,24 @@ class MetadataManager {
    MetadataManager();
       
    /* Create the file metadata (and a lock associated with this file) for a 
-    * given file path. This function returns false if the file path already 
+    * given file path. This function returns error if the file path already 
     * exists or if any of the intermediate parent directory does not exist. */
-   bool CreateFileMetadata(const std::string& pathname);
+   google::protobuf::util::Status CreateFileMetadata(const std::string& pathname);
 
    /* Check if metadata file a file exists */
    bool ExistFileMetadata(const std::string& pathname) const;
       
    /* Access the file metadata for a given file path. The caller of this 
-    * function needs to ensure the lock for this file is properly used */
-   std::shared_ptr<protos::FileMetadata> GetFileMetadata(
-     const std::string& pathname) const;
+    * function needs to ensure the lock for this file is properly used. 
+    * return error if fileMetadata does not exist */
+   google::protobuf::util::StatusOr<
+     std::shared_ptr<protos::FileMetadata>> GetFileMetadata(
+       const std::string& pathname) const;
 
    /* Create a file chunk for a given pathname and a chunk index.  */
-   std::string CreateChunkHandle(const std::string& pathname, 
-                                 uint32_t chunk_index);
+   google::protobuf::util::StatusOr<std::string> 
+     CreateChunkHandle(const std::string& pathname, 
+                       uint32_t chunk_index);
 
    /* Delete a file, and delete all chunk handles associated with this file */
    void DeleteFile(const std::string& pathname);
