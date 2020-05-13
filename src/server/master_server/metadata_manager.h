@@ -1,11 +1,9 @@
-#ifndef SERVER_MASTER_SERVER_METADATA_MANAGER_H
-#define SERVER_MASTER_SERVER_METADATA_MANAGER_H
+#ifndef GFS_SERVER_MASTER_SERVER_METADATA_MANAGER_H_
+#define GFS_SERVER_MASTER_SERVER_METADATA_MANAGER_H_
 
 #include "absl/container/flat_hash_set.h"
 #include "src/server/master_server/lock_manager.h"
 #include "src/protos/metadata.pb.h"
-
-using protos::FileMetadata;
 
 namespace gfs {
 namespace server {
@@ -40,7 +38,7 @@ class MetadataManager {
       
    /* Access the file metadata for a given file path. The caller of this 
     * function needs to ensure the lock for this file is properly used */
-   std::shared_ptr<FileMetadata> GetFileMetadata(
+   std::shared_ptr<protos::FileMetadata> GetFileMetadata(
      const std::string& pathname) const;
 
    /* Create a file chunk for a given pathname and a chunk index.  */
@@ -63,12 +61,13 @@ class MetadataManager {
    /* Store all deleted chunk handles in a hashset  */
    absl::flat_hash_set<std::string> deletedChunkHandles_;
    /* Map from file path to FileMetadata */
-   absl::flat_hash_map<std::string, std::shared_ptr<FileMetadata>> fileMetadata_;
+   absl::flat_hash_map<std::string, 
+                       std::shared_ptr<protos::FileMetadata>> fileMetadata_;
    /* Lock manager to manager the synchronization of operations */
    LockManager* lockManager_;
 };
 
-} /* namespace server  */
-} /* namespace gfs */
+} // namespace server
+} // namespace gfs
 
 #endif /* SERVER_MASTER_SERVER_METADATA_MANAGER */

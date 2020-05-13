@@ -1,6 +1,8 @@
 #include "metadata_manager.h"
 #include <stack>
 
+using protos::FileMetadata;
+
 namespace gfs {
 namespace server {
 
@@ -94,8 +96,8 @@ std::string MetadataManager::AllocateNewChunkHandle() {
 }
 
 MetadataManager* MetadataManager::GetInstance() {
-  static MetadataManager* inst = new MetadataManager();
-  return inst;
+  static MetadataManager* metadataManager = new MetadataManager();
+  return metadataManager;
 }
 
 } /* namespace server */
