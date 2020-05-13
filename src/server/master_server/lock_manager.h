@@ -53,6 +53,8 @@ class LockManager {
   // A sharded hash map that maps from file path to mutexes, which are
   // used to lock per-file metadata, i.e. filePathToMetadata above
   std::vector<absl::flat_hash_map<std::string, absl::Mutex*>> filePathLocks_;
+
+  uint16_t bucket_id(const std::string& pathname) const;
 };
 
 /* A helper class which is an RAII wrapper to automatically acquire reader  

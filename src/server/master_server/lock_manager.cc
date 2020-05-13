@@ -7,6 +7,12 @@
 namespace gfs {
 namespace server {
 
+/* A private helper class to compute the index in the filePathLocks_ collection for a
+ * pathanme. */
+inline uint16_t LockManager::bucket_id(const std::string& pathname) const {
+   return std::hash<std::string>{}(pathname) % shard_size_;
+}
+
 /* Initialize the meta locks and the vector of filePathLocks  */
 LockManager::LockManager() {
   shard_size_ = std::max(std::thread::hardware_concurrency(), (unsigned int) 1);
@@ -16,13 +22,13 @@ LockManager::LockManager() {
 }
 
 bool LockManager::Exist(const std::string& pathname) const {
-  auto idx(std::hash<std::string>{}(pathname) % shard_size_);
+  auto idx(bucket_id(pathname));
   absl::MutexLock anchor(metaLocks_[idx]);
   return filePathLocks_[idx].contains(pathname);
 }
 
 absl::Mutex* LockManager::AddLockIfNonExist(const std::string& pathname) {
-  auto idx(std::hash<std::string>{}(pathname) % shard_size_);
+  auto idx(bucket_id(pathname));
   absl::MutexLock anchor(metaLocks_[idx]);
   if (filePathLocks_[idx].contains(pathname)) return NULL;
 
