@@ -19,13 +19,13 @@ class LockManagerUnitTest : public ::testing::Test {
 TEST_F(LockManagerUnitTest, AddLock) {
   EXPECT_EQ(lockManager_->Exist("/foo"), false);
   // Successfully add a lock for /foo
-  auto fooRes(lockManager_->CreateLock("/foo"));
-  EXPECT_TRUE(fooRes.ok());
-  EXPECT_NE(fooRes.ValueOrDie(), nullptr);
+  auto foo_lock_or(lockManager_->CreateLock("/foo"));
+  EXPECT_TRUE(foo_lock_or.ok());
+  EXPECT_NE(foo_lock_or.ValueOrDie(), nullptr);
   // Successfully add a lock for /foo/bar
-  auto barRes(lockManager_->CreateLock("/foo/bar"));
-  EXPECT_TRUE(barRes.ok());
-  EXPECT_NE(barRes.ValueOrDie(), nullptr);
+  auto bar_lock_or(lockManager_->CreateLock("/foo/bar"));
+  EXPECT_TRUE(bar_lock_or.ok());
+  EXPECT_NE(bar_lock_or.ValueOrDie(), nullptr);
 }
 
 // Add locks in parallel for the case that they share nothing
@@ -58,8 +58,8 @@ TEST_F(LockManagerUnitTest, AddSameLockInParallel) {
   std::vector<std::thread> threads;
   for (int i = 0; i < numOfThreads; i++) {
     threads.push_back(std::thread([&, i]() {
-      auto lkRes(lockManager_->CreateLock("/samePath"));
-      if (lkRes.ok()) {
+      auto path_lock_or(lockManager_->CreateLock("/samePath"));
+      if (path_lock_or.ok()) {
         cnt++;
       }
     }));
@@ -77,12 +77,12 @@ TEST_F(LockManagerUnitTest, AddSameLockInParallel) {
 // Add lock for /a, /a/b and /a/b/c and test that the ParentLocksAnchor 
 // works as expected by checking the stack size
 TEST_F(LockManagerUnitTest, AcquireLockForParentDir) {
-  auto aRes(lockManager_->CreateLock("/a"));
-  EXPECT_NE(aRes.ValueOrDie(), nullptr);
-  auto bRes(lockManager_->CreateLock("/a/b"));
-  EXPECT_NE(bRes.ValueOrDie(), nullptr);
-  auto cRes(lockManager_->CreateLock("/a/b/c"));
-  EXPECT_NE(cRes.ValueOrDie(), nullptr);
+  auto a_lock_or(lockManager_->CreateLock("/a"));
+  EXPECT_NE(a_lock_or.ValueOrDie(), nullptr);
+  auto b_lock_or(lockManager_->CreateLock("/a/b"));
+  EXPECT_NE(b_lock_or.ValueOrDie(), nullptr);
+  auto c_lock_or(lockManager_->CreateLock("/a/b/c"));
+  EXPECT_NE(c_lock_or.ValueOrDie(), nullptr);
 
   ParentLocksAnchor anchor(lockManager_, "/a/b/c");
   EXPECT_TRUE(anchor.ok());
@@ -95,21 +95,21 @@ TEST_F(LockManagerUnitTest, AcquireLockForParentDir) {
 // not exist"
 // 3. Use ParentLocksAnchor to lock a path where some intermediate path does not
 // exist, this should result in an error saying "Lock for path does not exist"
-TEST_F(LockManagerUnitTest, CheckErrorMessageForLock) {
-  auto createRes(lockManager_->CreateLock("/duplicate"));
-  EXPECT_TRUE(createRes.ok());
-  auto dupCreateRes(lockManager_->CreateLock("/duplicate"));
-  EXPECT_EQ(dupCreateRes.status().error_message(), 
-            "Lock already exists for /duplicate");
+TEST_F(LockManagerUnitTest, CheckErrorCases) {
+  auto create_lock_or(lockManager_->CreateLock("/duplicate"));
+  EXPECT_TRUE(create_lock_or.ok());
+  auto duplicate_create_lock_or(lockManager_->CreateLock("/duplicate"));
+  EXPECT_EQ(duplicate_create_lock_or.status().error_code(), 
+            google::protobuf::util::error::ALREADY_EXISTS);
 
-  auto nonExistRes(lockManager_->FetchLock("/nonExist"));
-  EXPECT_EQ(nonExistRes.ok(), false);
-  EXPECT_EQ(nonExistRes.status().error_message(),
-            "Lock does not exist for /nonExist");
+  auto non_exist_lock_or(lockManager_->FetchLock("/nonExist"));
+  EXPECT_EQ(non_exist_lock_or.ok(), false);
+  EXPECT_EQ(non_exist_lock_or.status().error_code(),
+            google::protobuf::util::error::NOT_FOUND);
 
-  auto nonExistPath("/aa/bb/cc");
-  ParentLocksAnchor anchor(lockManager_, nonExistPath);
+  auto non_exist_path_lock_or("/aa/bb/cc");
+  ParentLocksAnchor anchor(lockManager_, non_exist_path_lock_or);
   EXPECT_EQ(anchor.ok(), false);
-  EXPECT_EQ(anchor.status().error_message(),
-            "Lock for /aa does not exist");
+  EXPECT_EQ(anchor.status().error_code(),
+            google::protobuf::util::error::NOT_FOUND);
 }
