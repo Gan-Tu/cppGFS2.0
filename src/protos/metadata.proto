@@ -4,6 +4,16 @@ package protos;
 
 import "src/protos/chunk_server.proto";
 
+// Metadata of a given file. The reason that we define the file metadata in proto is
+// that later we will use the protobuf to serialize / deserialize this data to
+// checkpoint / log files
+message FileMetadata {
+   // File name
+   string filename = 1;
+   // An map of chunk index to chunk handle
+   map<uint32, string> chunk_handles = 2;
+}
+
 // Metadata of a given file chunk
 message FileChunkMetadata {
   // An immutable and globally unique UUID chunk identifier.

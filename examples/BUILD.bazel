@@ -1,17 +1,19 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
 cc_binary(
-  name="leveldb_main",
-  srcs = ["leveldb_main.cc"],
-  deps = ["@com_google_leveldb//:leveldb"],
+    name = "leveldb_main",
+    srcs = ["leveldb_main.cc"],
+    deps = ["@com_google_leveldb//:leveldb"],
 )
 
 cc_binary(
-  name="run_mock_client_main",
-  srcs = ["run_mock_client_main.cc"],
-  deps = [
-    "@com_github_grpc_grpc//:grpc++",
-    "@com_google_protobuf//:protobuf_lite",
-    "//src/common/protocol_client:master_metadata_service_client",
-  ],
+    name = "run_mock_client_main",
+    srcs = ["run_mock_client_main.cc"],
+    deps = [
+        "//src/common/protocol_client:master_metadata_service_client",
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_google_protobuf//:protobuf_lite",
+    ],
 )
 
 cc_binary(
