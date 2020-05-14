@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package protos.grpc;
+
+import "google/protobuf/timestamp.proto";
+
+service ChunkServerLeaseService {
+  // Grant a lease that expires at given |lease_expiration_time|
+  // for the given |chunk_handle| and |chunk_version| to the 
+  // receiving chunk server. The receiving chunk server should ignore
+  // a grant request if the lease expiration is in the past.
+  //
+  // A master only grants the lease to a chunk server if the latter is
+  // chosen to be the primary replica for write operations of given time frame.
+  //
+  // As long as |chunk_handle| is being mutated, the primary can let the master
+  // know through HeartBeat messages, and receive lease extensions from the 
+  // master indefinitely.
+  rpc GrantLease(GrantLeaseRequeast) returns (GrantLeaseReply) {}
+
+  // Revoke the lease that was previously granted to the receiving chunk server
+  // and was supposed to expire at the |original_lease_expiration_time| for the
+  // given |chunk_handle|. The receiving chunk server should ignore
+  // a revoke request if it currently holds a lease that expires after the
+  // |original_lease_expiration_time| -- this avoids issues with delayed
+  // out-of-order message deliveries.
+  //
+  // A master usually revokes a lease in order to disable write mutations on
+  // the chunk server, during crucial master operations such as snapshotting or 
+  // file renaming, etc.
+  rpc RevokeLease(RevokeLeaseRequeast) returns (RevokeLeaseReply) {}
+}
+
+message GrantLeaseRequeast {
+  // An immutable and globally unique UUID chunk identifier.
+  string chunk_handle = 1;
+  // The chunk version number for the chunk handle associated with 
+  // this lease. The master usually increases the chunk version number
+  // immediately *before* it grants a *new* lease on a chunk. For lease 
+  // extensions, the master doesn't need to increase the chunk version. 
+  // A chunk server should not accept the lease if it has a stale chunk version. 
+  uint32 chunk_version = 2;
+  // The time that this granted lease expires
+  // By default, the lease expires 60 seconds after the master issued
+  // the lease grant/extension, so this is the absolute UNIX time when the
+  // lease is no longer valid, at master's NOW() + 60 seconds upon grant.
+  google.protobuf.Timestamp lease_expiration_time = 3;
+}
+
+message GrantLeaseReply {
+  // The original request associated with this reply.
+  GrantLeaseRequeast request = 1;
+  // The lease acceptance status by the chunk server
+  enum GrantLeaseStatus {
+    // The chunk server accepts the new lease
+    ACCEPTED = 0;
+    // Request is ignored because it's already expired when received
+    IGNORED_EXPIRED_LEASE = 1;
+    // Request is rejected because chunk server doesn't have this chunk handle
+    REJECTED_NOT_FOUND = 2;
+    // Request is rejected because chunk server has a stale version of the chunk
+    REJECTED_STALE_VERSION = 3;
+  }
+  GrantLeaseStatus status = 2;
+}
+
+message RevokeLeaseRequeast {
+  // An immutable and globally unique UUID chunk identifier.
+  string chunk_handle = 1;
+  // The original time that the revoked lease was supposed to expire
+  google.protobuf.Timestamp original_lease_expiration_time = 2;
+}
+
+message RevokeLeaseReply {
+  // The original request associated with this reply.
+  RevokeLeaseRequeast request = 1;
+  // The lease revoke status by the chunk server
+  enum RevokeLeaseStatus {
+    // The chunk server has revoked its holding lease
+    REVOKED = 0;
+    // Revoke is ignored because chunk server has a newer lease
+    IGNORED_HAS_NEWER_LEASE = 1;
+    // Request is rejected because chunk server doesn't have this chunk handle
+    REJECTED_NOT_FOUND = 2;
+  }
+  RevokeLeaseStatus status = 2;
+}
