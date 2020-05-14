@@ -1,0 +1,136 @@
+syntax = "proto3";
+
+package protos.grpc;
+
+service ChunkServerFileService {
+  // Create an empty file chunk with |chunk_handle| at the chunk server.
+  // The chunk server returns error if |chunk_handle| already exists; 
+  // otherwise a new file chunk with version 1 is initialized.
+  // This request is only sent by the master to the chunk server
+  rpc InitFileChunk(InitFileChunkRequest) returns (InitFileChunkReply) {}
+
+  // Read |chunk_handle| of known version |chunk_version| at |offset_start|
+  // for |length| number of bytes. Return the data and the actual number of 
+  // bytes read, if the operation is successful; otherwise, return any error.
+  //
+  // The actual number of bytes read may be smaller than the number of bytes 
+  // requested, if EOF has reached: |offset_start| + |length| > chunk size.
+  // If |offset_start| is larger than the chunk size, no bytes will be read
+  rpc ReadFileChunk(ReadFileChunkRequest) returns (ReadFileChunkReply) {}
+
+  // Advance the |chunk_version| of the specified |chunk_handle| by one on the
+  // receiving chunk server. This request is only sent by the master to all the
+  // chunk servers that hold the most up-to-date replica for the |chunk_handle|,
+  // *before* it grants a *new* lease for a write operation. 
+  rpc AdvanceFileChunkVersion(AdvanceFileChunkVersionRequest) 
+    returns (AdvanceFileChunkVersionReply) {}
+
+  // Write |length| number of bytes of given |data| buffer to |chunk_handle| 
+  // of known version |chunk_version| at |offset_start|. Return the actual 
+  // number of bytes written, if the operation is successful; otherwise, 
+  // return any errors.
+  //
+  // The actual number of bytes written can be smaller than requested |length|,
+  // if either EOF has reached, or the given |data| buffer is shorter than 
+  // specified |length|. If |length| is smaller than the whole |data| buffer
+  // length, only the first |length| bytes of the |data| buffer will be written.
+  // If |offset_start| is larger than the chunk size, no bytes will be written
+  rpc WriteFileChunk(WriteFileChunkRequest) returns (WriteFileChunkReply) {}
+
+  // TODO(tugan): add support for the master to ask chunk server to copy file
+  // from other chunk servers for min file replica count maintenance
+
+  // TODO(tugan): add support for snapshot and append operations
+}
+
+message InitFileChunkRequest {
+  // An immutable and globally unique UUID chunk identifier.
+  string chunk_handle = 1;
+}
+
+message InitFileChunkReply {
+  // The original request associated with this reply.
+  InitFileChunkRequest request = 1;
+  // The status of file chunk creation operation
+  enum InitFileChunkStatus {
+    CREATED = 0;
+    ALREADY_EXISTS = 1;
+  }
+  InitFileChunkStatus status = 2;
+}
+
+message ReadFileChunkRequest {
+  // An immutable and globally unique UUID chunk identifier.
+  string chunk_handle = 1;
+  // The version of the file chunk that the requester is trying to read
+  // If the chunk server has a stale version compared to what was requested,
+  // chunk server will return an error, and ask the client to send the request
+  // to another chunk server that has the most up-to-date version.
+  uint32 chunk_version = 2;
+  // The starting offset at which to start reading data from
+  uint32 offset_start = 3;
+  // The number of bytes to read
+  uint32 length = 4;
+}
+
+message ReadFileChunkReply {
+  // The original request associated with this reply.
+  ReadFileChunkRequest request = 1;
+  // The status of file chunk read operation
+  enum ReadFileChunkStatus {
+    OK = 0;
+    FAILED_NOT_FOUND = 1;
+    FAILED_STALE_VERSION = 2;
+  }
+  ReadFileChunkStatus status = 2;
+  // The read data, if operation is successful
+  bytes data = 3;
+  // The number of bytes that was actually read
+  uint32 bytes_read = 4;
+}
+
+message AdvanceFileChunkVersionRequest {
+  // An immutable and globally unique UUID chunk identifier.
+  string chunk_handle = 1;
+}
+
+message AdvanceFileChunkVersionReply {
+  // The original request associated with this reply.
+  AdvanceFileChunkVersionRequest request = 1;
+  // The status of file chunk version update operation
+  enum AdvanceFileChunkVersionStatus {
+    OK = 0;
+    FAILED_NOT_FOUND = 1;
+  }
+  AdvanceFileChunkVersionStatus status = 2;
+  // The new chunk version after the version advance
+  uint32 new_chunk_version = 3;
+}
+
+message WriteFileChunkRequest {
+  // An immutable and globally unique UUID chunk identifier.
+  string chunk_handle = 1;
+  // The version of the file chunk that the requester is trying to write
+  uint32 chunk_version = 2;
+  // The starting offset at which to start writing data to
+  uint32 offset_start = 3;
+  // The number of bytes to write
+  uint32 length = 4;
+  // The data to write
+  bytes data = 5;
+}
+
+message WriteFileChunkReply {
+  // The original request associated with this reply.
+  WriteFileChunkRequest request = 1;
+  // The status of file chunk write operation
+  enum WriteFileChunkStatus {
+    OK = 0;
+    FAILED_NOT_FOUND = 1;
+    FAILED_STALE_VERSION = 2;
+    FAILED_NOT_LEASE_HOLDER = 3;
+  }
+  WriteFileChunkStatus status = 2;
+  // The number of bytes that was actually written
+  uint32 bytes_written = 3;
+}
