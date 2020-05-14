@@ -1,21 +1,29 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_test")
 
 cc_test(
     name = "lock_manager_unit_test",
     srcs = ["lock_manager_unit_test.cc"],
     deps = [
-       "//src/server/master_server:lock_manager",
-       "@com_google_test//:gtest_main"
-    ]
+        "//src/server/master_server:lock_manager",
+        "@com_google_test//:gtest_main",
+    ],
 )
 
 cc_test(
-  name = "chunk_server_manager_test",
-  srcs = ["chunk_server_manager_test.cc"],
-  deps = [
-    "@com_google_test//:gtest_main",
-    "//src/server/master_server:chunk_server_manager",
-    "//src/protos:cc_chunk_server_proto",
-  ]
+    name = "metadata_manager_unit_test",
+    srcs = ["metadata_manager_unit_test.cc"],
+    deps = [
+        "//src/server/master_server:metadata_manager",
+        "@com_google_test//:gtest_main",
+    ],
 )
 
+cc_test(
+    name = "chunk_server_manager_test",
+    srcs = ["chunk_server_manager_test.cc"],
+    deps = [
+        "//src/protos:cc_chunk_server_proto",
+        "//src/server/master_server:chunk_server_manager",
+        "@com_google_test//:gtest_main",
+    ],
+)
