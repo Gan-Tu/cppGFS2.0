@@ -15,15 +15,15 @@ google::protobuf::util::Status close(const char* pathname) {
   return google::protobuf::util::Status::OK;
 }
 
-google::protobuf::util::StatusOr<Data> read(const char* pathname, 
-                                            size_t offset, size_t nbytes) {
+google::protobuf::util::StatusOr<Data> read(const char* pathname, size_t offset,
+                                            size_t nbytes) {
   return Data();
 }
 
-google::protobuf::util::Status write(const char* path, void* buffer, 
+google::protobuf::util::Status write(const char* path, void* buffer,
                                      size_t offset, size_t nbytes) {
   return google::protobuf::util::Status::OK;
 }
 
-} // namespace client 
-} // namespace gfs 
+}  // namespace client
+}  // namespace gfs

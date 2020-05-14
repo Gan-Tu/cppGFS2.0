@@ -1,8 +1,9 @@
 #include <iostream>
+
 #include "leveldb/db.h"
 
 // Example LevelDb usage
-int main(int argc, char const *argv[]) {
+int main(int argc, char const* argv[]) {
   leveldb::DB* db;
   leveldb::Options options;
   options.create_if_missing = true;

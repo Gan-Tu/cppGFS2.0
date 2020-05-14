@@ -1,54 +1,57 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
 cc_library(
-    name = 'master_metadata_service_impl',
-    srcs = ['master_metadata_service_impl.cc'],
-    hdrs = ['master_metadata_service_impl.h'],
+    name = "master_metadata_service_impl",
+    srcs = ["master_metadata_service_impl.cc"],
+    hdrs = ["master_metadata_service_impl.h"],
     deps = [
-      "@com_github_grpc_grpc//:grpc++",
-      "//src/protos/grpc:cc_master_metadata_service_grpc",
+        "//src/protos/grpc:cc_master_metadata_service_grpc",
+        "@com_github_grpc_grpc//:grpc++",
     ],
 )
-  
+
 cc_library(
-    name = 'lock_manager',
-    srcs = ['lock_manager.cc'],
-    hdrs = ['lock_manager.h'],
+    name = "lock_manager",
+    srcs = ["lock_manager.cc"],
+    hdrs = ["lock_manager.h"],
     visibility = ["//visibility:public"],
     deps = [
-      "@com_google_absl//absl/container:flat_hash_map",
-      "@com_google_protobuf//:protobuf_lite",
-      "@com_google_absl//absl/synchronization",
-    ]
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_protobuf//:protobuf_lite",
+    ],
 )
 
 cc_library(
-    name = 'metadata_manager',
-    srcs = ['metadata_manager.cc'],
-    hdrs = ['metadata_manager.h'],
+    name = "metadata_manager",
+    srcs = ["metadata_manager.cc"],
+    hdrs = ["metadata_manager.h"],
     visibility = ["//visibility:public"],
-    deps = ["//src/server/master_server:lock_manager",
-            "//src/protos:cc_metadata_proto",
-            "@com_google_absl//absl/synchronization",
-            "@com_google_absl//absl/container:flat_hash_map",
-            "@com_google_absl//absl/container:flat_hash_set"]
+    deps = [
+        "//src/protos:cc_metadata_proto",
+        "//src/server/master_server:lock_manager",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/synchronization",
+    ],
 )
 
 cc_library(
-  name = "chunk_server_manager",
-  srcs = ["chunk_server_manager.cc"],
-  hdrs = ["chunk_server_manager.h"],
-  visibility = ["//visibility:public"],
-  deps = [
-    "//src/protos:cc_chunk_server_proto",
-    "@com_google_absl//absl/container:flat_hash_map",
-  ]
+    name = "chunk_server_manager",
+    srcs = ["chunk_server_manager.cc"],
+    hdrs = ["chunk_server_manager.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/protos:cc_chunk_server_proto",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/synchronization",
+    ],
 )
 
 cc_binary(
-    name = 'run_master_server_main',
-    srcs = ['run_master_server_main.cc'],
+    name = "run_master_server_main",
+    srcs = ["run_master_server_main.cc"],
     deps = [
-      ":master_metadata_service_impl",
+        ":master_metadata_service_impl",
     ],
 )

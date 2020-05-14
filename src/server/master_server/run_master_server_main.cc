@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
 
   // TODO(tugan): add support to listen on host:port based on configuration
   std::string server_address("0.0.0.0:50051");
-  
+
   // Listen on the given address without any authentication mechanism for now.
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
 
