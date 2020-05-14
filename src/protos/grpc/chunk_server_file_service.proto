@@ -11,7 +11,7 @@ service ChunkServerFileService {
 
   // Read |chunk_handle| of known version |chunk_version| at |offset_start|
   // for |length| number of bytes. Return the data and the actual number of 
-  // bytes read, if the operation is successful; otherwise, return any errors.
+  // bytes read, if the operation is successful; otherwise, return any error.
   //
   // The actual number of bytes read may be smaller than the number of bytes 
   // requested, if EOF has reached: |offset_start| + |length| > chunk size.
@@ -63,6 +63,9 @@ message ReadFileChunkRequest {
   // An immutable and globally unique UUID chunk identifier.
   string chunk_handle = 1;
   // The version of the file chunk that the requester is trying to read
+  // If the chunk server has a stale version compared to what was requested,
+  // chunk server will return an error, and ask the client to send the request
+  // to another chunk server that has the most up-to-date version.
   uint32 chunk_version = 2;
   // The starting offset at which to start reading data from
   uint32 offset_start = 3;
