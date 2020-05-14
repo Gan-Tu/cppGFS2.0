@@ -57,7 +57,7 @@ TEST_F(MetadataManagerUnitTest, CreateMultiFileMetadataInParallel) {
   // Join all threads
   joinAndClearThreads(threads);
 
-  std::set<std::string> uniqie_id;
+  std::set<std::string> unique_id;
   for(int i=0; i<numOfThreads; i++) {
      auto file_name("/"+std::to_string(i));
      // Ensure that the files are created successfully
@@ -69,11 +69,11 @@ TEST_F(MetadataManagerUnitTest, CreateMultiFileMetadataInParallel) {
      auto& chunk_handles(*file_metadata->mutable_chunk_handles());
      // Ensure that chunk handle exists for chunk_index 0 for each file
      EXPECT_EQ(chunk_handles.count(0), 1);
-     uniqie_id.insert(chunk_handles.at(0));
+     unique_id.insert(chunk_handles.at(0));
   }
 
   // Ensure that there are {numOfThreads} number of unique chunk handles assigned
-  EXPECT_EQ(uniqie_id.size(), (unsigned int)numOfThreads);
+  EXPECT_EQ(unique_id.size(), (unsigned int)numOfThreads);
 }
 
 // Multiple threads creating the same file, which is a contentious condition and only
@@ -115,15 +115,15 @@ TEST_F(MetadataManagerUnitTest, CreateSingleFileMultiChunksInParallel) {
   EXPECT_TRUE(file_metadata_or.ok());
   auto file_metadata(file_metadata_or.ValueOrDie());
   EXPECT_EQ(file_metadata->filename(), file_name);
-  std::set<std::string> uniqie_id;
+  std::set<std::string> unique_id;
   EXPECT_EQ(file_metadata->chunk_handles_size(), numOfThreads);
   auto& chunk_handles(*file_metadata->mutable_chunk_handles());
   for(int i=0; i<numOfThreads; i++) {
-     uniqie_id.insert(chunk_handles.at(i));
+     unique_id.insert(chunk_handles.at(i));
   }
 
   // Ensure that all chunk handles created are unique
-  EXPECT_EQ(uniqie_id.size(), numOfThreads);
+  EXPECT_EQ(unique_id.size(), numOfThreads);
 }
 
 // Check error messages for a few different cases 
