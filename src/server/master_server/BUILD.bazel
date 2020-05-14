@@ -37,5 +37,6 @@ cc_binary(
     srcs = ['run_master_server_main.cc'],
     deps = [
       ":master_metadata_service_impl",
+      "//src/common:system_logger",
     ],
 )
