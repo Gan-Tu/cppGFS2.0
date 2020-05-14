@@ -61,3 +61,16 @@ http_archive(
     urls = ["https://github.com/google/leveldb/archive/1.22.tar.gz"],
 )
 
+# Google glog C++ logging library
+# Note: Don't use directly in your code, 
+#       see examples/system_logger_main.cc for how to log.
+# Example Usage: #include "glog/logging.h"
+# Example dependency: "@com_google_glog//:glog"
+http_archive(
+    name = "com_google_glog",
+    strip_prefix = "glog-0.4.0",
+    sha256 = "f28359aeba12f30d73d9e4711ef356dc842886968112162bc73002645139c39c",
+    urls = [
+        "https://github.com/google/glog/archive/v0.4.0.tar.gz",
+    ]
+)
