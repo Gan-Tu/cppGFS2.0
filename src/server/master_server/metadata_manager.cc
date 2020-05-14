@@ -86,13 +86,13 @@ MetadataManager::CreateChunkHandle(const std::string& filename,
       file_metadata_or.ValueOrDie());
 
   // Step 3. writelock the lock for this path
-  auto file_metadata_lock_or(lock_manager_->FetchLock(filename));
-  if (!file_metadata_lock_or.ok()) {
-    return file_metadata_lock_or.status();
+  auto file_path_lock_or(lock_manager_->FetchLock(filename));
+  if (!file_path_lock_or.ok()) {
+    return file_path_lock_or.status();
   }
 
   absl::WriterMutexLock file_metadata_writer_lock_guard(
-      file_metadata_lock_or.ValueOrDie());
+      file_path_lock_or.ValueOrDie());
 
   // Step 4. compute a new chunk handle, and insert the (chunk_index,
   // chunkHandle)
