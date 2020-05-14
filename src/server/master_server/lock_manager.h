@@ -22,7 +22,7 @@ namespace server {
  *
  * The reason for this design is that even though we meant to use the lock
  * objects to lock namespace, these locks are not created ahead of time because
- * we do not now the pathname. So all the creation of locks need to be
+ * we do not now the filename. So all the creation of locks need to be
  * synchronized with the access to them. Without sharding them into multiple
  * maps, this synchronization is a potential bottle neck when concurrent
  * creation and read request are made to the master. We introduce an internal
@@ -35,15 +35,15 @@ class LockManager {
  public:
   /* Methods to check the existence of the lock for a given path, add a lock and
    * access a lock*/
-  bool Exist(const std::string& pathname) const;
+  bool Exist(const std::string& filename) const;
 
   /* Create a lock for a given path, return error if the lock already exists */
   google::protobuf::util::StatusOr<absl::Mutex*>
-    CreateLock(const std::string& pathname);
+    CreateLock(const std::string& filename);
  
   /* Retrieve a lock for a given path, return error if the lock does not exist */
   google::protobuf::util::StatusOr<absl::Mutex*> 
-    FetchLock(const std::string& pathname) const;
+    FetchLock(const std::string& filename) const;
 
   /* Get the instance of the LockManager, which is a singleton */
   static LockManager* GetInstance();
@@ -54,12 +54,12 @@ class LockManager {
   // The size of sharding, set equal to the number of hardware threads
   uint16_t shard_size_;
   // Used to lock the hash map that maps from filepath to locks
-  std::vector<absl::Mutex*> metaLocks_;
+  std::vector<absl::Mutex*> meta_locks_;
   // A sharded hash map that maps from file path to mutexes, which are
   // used to lock per-file metadata, i.e. filePathToMetadata above
-  std::vector<absl::flat_hash_map<std::string, absl::Mutex*>> filePathLocks_;
+  std::vector<absl::flat_hash_map<std::string, absl::Mutex*>> file_path_locks_;
 
-  uint16_t bucket_id(const std::string& pathname) const;
+  uint16_t bucket_id(const std::string& filename) const;
 };
 
 /* A helper class which is an RAII wrapper to automatically acquire reader  
@@ -70,7 +70,7 @@ class LockManager {
  * */
 class ParentLocksAnchor {
   public:
-   ParentLocksAnchor(LockManager* lockManager, const std::string& pathname);
+   ParentLocksAnchor(LockManager* lock_manager, const std::string& filename);
    ~ParentLocksAnchor();
    bool ok() const;
    google::protobuf::util::Status status() const;
