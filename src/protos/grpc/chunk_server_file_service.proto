@@ -104,7 +104,7 @@ message AdvanceFileChunkVersionReply {
   }
   AdvanceFileChunkVersionStatus status = 2;
   // The new chunk version after the version advance
-  uint32 chunk_version = 3;
+  uint32 new_chunk_version = 3;
 }
 
 message WriteFileChunkRequest {
