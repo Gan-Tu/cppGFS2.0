@@ -6,7 +6,6 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
-
 #include "google/protobuf/stubs/statusor.h"
 
 namespace gfs {
@@ -29,7 +28,7 @@ namespace server {
  * vector of "meta locks" to manage the synchronization of each maps.
  *
  * The LockManager supports methods to check whether a path name exists, add a
- * lock for a given path name and get a lock. 
+ * lock for a given path name and get a lock.
  */
 class LockManager {
  public:
@@ -38,12 +37,13 @@ class LockManager {
   bool Exist(const std::string& filename) const;
 
   /* Create a lock for a given path, return error if the lock already exists */
-  google::protobuf::util::StatusOr<absl::Mutex*>
-    CreateLock(const std::string& filename);
- 
-  /* Retrieve a lock for a given path, return error if the lock does not exist */
-  google::protobuf::util::StatusOr<absl::Mutex*> 
-    FetchLock(const std::string& filename) const;
+  google::protobuf::util::StatusOr<absl::Mutex*> CreateLock(
+      const std::string& filename);
+
+  /* Retrieve a lock for a given path, return error if the lock does not exist
+   */
+  google::protobuf::util::StatusOr<absl::Mutex*> FetchLock(
+      const std::string& filename) const;
 
   /* Get the instance of the LockManager, which is a singleton */
   static LockManager* GetInstance();
@@ -62,22 +62,23 @@ class LockManager {
   uint16_t bucket_id(const std::string& filename) const;
 };
 
-/* A helper class which is an RAII wrapper to automatically acquire reader  
+/* A helper class which is an RAII wrapper to automatically acquire reader
  * locks for all the parent directories of a given path name. It stores
- * the relevant locks that are acquired in sequence (from the root one to 
+ * the relevant locks that are acquired in sequence (from the root one to
  * the immediate parent directory) in a stack, and releases these locks upon
- * destruction. 
+ * destruction.
  * */
 class ParentLocksAnchor {
-  public:
-   ParentLocksAnchor(LockManager* lock_manager, const std::string& filename);
-   ~ParentLocksAnchor();
-   bool ok() const;
-   google::protobuf::util::Status status() const;
-   size_t lock_size() const; 
-  private:
-   std::stack<absl::Mutex*> locks_;
-   google::protobuf::util::Status status_;
+ public:
+  ParentLocksAnchor(LockManager* lock_manager, const std::string& filename);
+  ~ParentLocksAnchor();
+  bool ok() const;
+  google::protobuf::util::Status status() const;
+  size_t lock_size() const;
+
+ private:
+  std::stack<absl::Mutex*> locks_;
+  google::protobuf::util::Status status_;
 };
 
 }  // namespace server

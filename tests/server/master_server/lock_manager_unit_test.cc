@@ -8,9 +8,7 @@ using namespace gfs::server;
 
 class LockManagerUnitTest : public ::testing::Test {
  protected:
-  void SetUp() override {
-    lockManager_ = LockManager::GetInstance();
-  }
+  void SetUp() override { lockManager_ = LockManager::GetInstance(); }
 
   LockManager* lockManager_;
 };
@@ -34,9 +32,8 @@ TEST_F(LockManagerUnitTest, AddLockInParallel) {
   auto numOfThreads(10);
   std::vector<std::thread> threads;
   for (int i = 0; i < numOfThreads; i++) {
-    threads.push_back(std::thread([&, i]() {
-      lockManager_->CreateLock("/" + std::to_string(i));
-    }));
+    threads.push_back(std::thread(
+        [&, i]() { lockManager_->CreateLock("/" + std::to_string(i)); }));
   }
 
   // Join all threads
@@ -74,7 +71,7 @@ TEST_F(LockManagerUnitTest, AddSameLockInParallel) {
   EXPECT_EQ(cnt.load(), 1);
 }
 
-// Add lock for /a, /a/b and /a/b/c and test that the ParentLocksAnchor 
+// Add lock for /a, /a/b and /a/b/c and test that the ParentLocksAnchor
 // works as expected by checking the stack size
 TEST_F(LockManagerUnitTest, AcquireLockForParentDir) {
   auto a_lock_or(lockManager_->CreateLock("/a"));
@@ -99,7 +96,7 @@ TEST_F(LockManagerUnitTest, CheckErrorCases) {
   auto create_lock_or(lockManager_->CreateLock("/duplicate"));
   EXPECT_TRUE(create_lock_or.ok());
   auto duplicate_create_lock_or(lockManager_->CreateLock("/duplicate"));
-  EXPECT_EQ(duplicate_create_lock_or.status().error_code(), 
+  EXPECT_EQ(duplicate_create_lock_or.status().error_code(),
             google::protobuf::util::error::ALREADY_EXISTS);
 
   auto non_exist_lock_or(lockManager_->FetchLock("/nonExist"));
