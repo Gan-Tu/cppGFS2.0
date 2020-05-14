@@ -66,32 +66,30 @@ google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
   return google::protobuf::util::Status(error_code, status.error_message());
 }
 
-google::protobuf::util::Status checkPathnameValidity(
-  const std::string& pathname) {
-  if(pathname.empty()) {
+google::protobuf::util::Status CheckFilenameValidity(
+  const std::string& filename) {
+  if(filename.empty()) {
     return google::protobuf::util::Status(
-             google::protobuf::util::error::OUT_OF_RANGE,
-             "Empty pathname is not allowed");
+             google::protobuf::util::error::INVALID_ARGUMENT,
+             "Empty filename is not allowed");
   }
 
-  if(pathname[0]!='/') {
+  if(filename[0]!='/') {
     return google::protobuf::util::Status(
-             google::protobuf::util::error::OUT_OF_RANGE,
+             google::protobuf::util::error::INVALID_ARGUMENT,
              "Relative path is not allowed");
   }
 
-  if(pathname.back()=='/') {
+  if(filename.back()=='/') {
     return google::protobuf::util::Status(
-             google::protobuf::util::error::OUT_OF_RANGE,
+             google::protobuf::util::error::INVALID_ARGUMENT,
              "Trailing slash is not allowed");
   }
 
-  for(unsigned int i=1; i<pathname.size(); i++) {
-    if(pathname[i]=='/' && pathname[i-1]=='/') {
-      return google::protobuf::util::Status(
-               google::protobuf::util::error::OUT_OF_RANGE,
-               "Consecutive slash is not allowed");
-    }
+  if(filename.find("//")!=std::string::npos) {
+    return google::protobuf::util::Status(
+             google::protobuf::util::error::INVALID_ARGUMENT,
+             "Consecutive slash is not allowed");
   }
 
   return google::protobuf::util::Status::OK;

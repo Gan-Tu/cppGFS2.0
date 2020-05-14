@@ -13,7 +13,7 @@ namespace utils {
 google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
     const grpc::Status& status);
 
-// Check the validity of a given pathanem. By validity we mean that a pathname must
+// Check the validity of a given Filename. By validity we mean that a pathname must
 // follow the format /comp1/comp2/.../compn. Specifically a path should have the
 // following properties
 // 
@@ -22,7 +22,8 @@ google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
 // 3. Cannot have trailing slash. (this might seem to restrictive but would offer
 // convenience).
 // 4. Cannot have consecutive slash.
-google::protobuf::util::Status checkPathnameValidity(const std::string& pathname); 
+// [TBD] other constraints if applicable
+google::protobuf::util::Status CheckFilenameValidity(const std::string& filename); 
 
 }  // namespace utils
 }  // namespace common
