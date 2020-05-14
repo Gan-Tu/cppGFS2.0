@@ -26,16 +26,16 @@ void joinAndClearThreads(std::vector<std::thread>& threads) {
 // The simplest case that one creates a file /foo, and add a file chunk
 TEST_F(MetadataManagerUnitTest, CreateSingleFileMetadata) {
    auto createRes(metadataManager_->CreateFileMetadata("/foo"));
-   EXPECT_EQ(createRes.ok(), true);
+   EXPECT_TRUE(createRes.ok());
    
-   EXPECT_EQ(metadataManager_->ExistFileMetadata("/foo"), true);
+   EXPECT_TRUE(metadataManager_->ExistFileMetadata("/foo"));
    auto fooDataRes(metadataManager_->GetFileMetadata("/foo"));
-   EXPECT_EQ(fooDataRes.ok(), true);
+   EXPECT_TRUE(fooDataRes.ok());
    auto fooData(fooDataRes.ValueOrDie());
    EXPECT_EQ(fooData->filename(), "/foo");
    
    auto firstChunkHandleRes(metadataManager_->CreateChunkHandle("/foo", 0));
-   EXPECT_EQ(firstChunkHandleRes.ok(), true);
+   EXPECT_TRUE(firstChunkHandleRes.ok());
    auto firstChunkHandle(firstChunkHandleRes.ValueOrDie());
    EXPECT_EQ(firstChunkHandle,"0");
    EXPECT_EQ(fooData->chunk_handles_size(), (unsigned int)1);
@@ -61,9 +61,9 @@ TEST_F(MetadataManagerUnitTest, CreateMultiFileMetadataInParallel) {
   for(int i=0; i<numOfThreads; i++) {
      auto fileName("/"+std::to_string(i));
      // Ensure that the files are created successfully
-     EXPECT_EQ(metadataManager_->ExistFileMetadata(fileName),true);
+     EXPECT_TRUE(metadataManager_->ExistFileMetadata(fileName));
      auto fDataRes(metadataManager_->GetFileMetadata(fileName));
-     EXPECT_EQ(fDataRes.ok(), true);
+     EXPECT_TRUE(fDataRes.ok());
      auto fData(fDataRes.ValueOrDie());
      EXPECT_EQ(fData->filename(), fileName);
      auto& chunk_handles(*fData->mutable_chunk_handles());
@@ -112,7 +112,7 @@ TEST_F(MetadataManagerUnitTest, CreateSingleFileMultiChunksInParallel) {
   joinAndClearThreads(threads);
 
   auto fDataRes(metadataManager_->GetFileMetadata(fileName));
-  EXPECT_EQ(fDataRes.ok(), true);
+  EXPECT_TRUE(fDataRes.ok());
   auto fData(fDataRes.ValueOrDie());
   EXPECT_EQ(fData->filename(), fileName);
   std::set<std::string> uniqueIds;
@@ -134,7 +134,7 @@ TEST_F(MetadataManagerUnitTest, CreateSingleFileMultiChunksInParallel) {
 TEST_F(MetadataManagerUnitTest, CheckErrorMessages) {
   auto newFileName("/newFile");
   auto createRes(metadataManager_->CreateFileMetadata(newFileName));
-  EXPECT_EQ(createRes.ok(), true);
+  EXPECT_TRUE(createRes.ok());
   auto dupCreateRes(metadataManager_->CreateFileMetadata(newFileName));
   // Note: ideally here we should say file metadata already exists. But before
   // creating a file metadata we always first create a lock. If the lock already

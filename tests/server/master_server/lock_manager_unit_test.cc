@@ -20,11 +20,11 @@ TEST_F(LockManagerUnitTest, AddLock) {
   EXPECT_EQ(lockManager_->Exist("/foo"), false);
   // Successfully add a lock for /foo
   auto fooRes(lockManager_->CreateLock("/foo"));
-  EXPECT_EQ(fooRes.ok(), true);
+  EXPECT_TRUE(fooRes.ok());
   EXPECT_NE(fooRes.ValueOrDie(), nullptr);
   // Successfully add a lock for /foo/bar
   auto barRes(lockManager_->CreateLock("/foo/bar"));
-  EXPECT_EQ(barRes.ok(), true);
+  EXPECT_TRUE(barRes.ok());
   EXPECT_NE(barRes.ValueOrDie(), nullptr);
 }
 
@@ -46,7 +46,7 @@ TEST_F(LockManagerUnitTest, AddLockInParallel) {
 
   // Check that all locks exist
   for (int i = 0; i < numOfThreads; i++) {
-    EXPECT_EQ(lockManager_->Exist("/" + std::to_string(i)), true);
+    EXPECT_TRUE(lockManager_->Exist("/" + std::to_string(i)));
   }
 }
 
@@ -85,7 +85,7 @@ TEST_F(LockManagerUnitTest, AcquireLockForParentDir) {
   EXPECT_NE(cRes.ValueOrDie(), nullptr);
 
   ParentLocksAnchor anchor(lockManager_, "/a/b/c");
-  EXPECT_EQ(anchor.ok(), true);
+  EXPECT_TRUE(anchor.ok());
   EXPECT_EQ(anchor.lock_size(), (unsigned int)2);
 }
 
@@ -97,7 +97,7 @@ TEST_F(LockManagerUnitTest, AcquireLockForParentDir) {
 // exist, this should result in an error saying "Lock for path does not exist"
 TEST_F(LockManagerUnitTest, CheckErrorMessageForLock) {
   auto createRes(lockManager_->CreateLock("/duplicate"));
-  EXPECT_EQ(createRes.ok(), true);
+  EXPECT_TRUE(createRes.ok());
   auto dupCreateRes(lockManager_->CreateLock("/duplicate"));
   EXPECT_EQ(dupCreateRes.status().error_message(), 
             "Lock already exists for /duplicate");
