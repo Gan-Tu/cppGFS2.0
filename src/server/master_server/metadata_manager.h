@@ -79,4 +79,4 @@ class MetadataManager {
 }  // namespace server
 }  // namespace gfs
 
-#endif /* SERVER_MASTER_SERVER_METADATA_MANAGER */
+#endif // GFS_SERVER_MASTER_SERVER_METADATA_MANAGER_H_
