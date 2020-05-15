@@ -7,6 +7,12 @@ cc_binary(
 )
 
 cc_binary(
+    name = "parallel_hashmap_main",
+    srcs = ["parallel_hashmap_main.cc"],
+    deps = ["@parallel_hashmap//:parallel_hashmap"],
+)
+
+cc_binary(
     name = "run_mock_client_main",
     srcs = ["run_mock_client_main.cc"],
     deps = [
