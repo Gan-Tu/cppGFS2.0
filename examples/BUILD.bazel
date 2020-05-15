@@ -9,7 +9,10 @@ cc_binary(
 cc_binary(
     name = "parallel_hashmap_main",
     srcs = ["parallel_hashmap_main.cc"],
-    deps = ["@parallel_hashmap//:parallel_hashmap"],
+    deps = [
+        "@com_google_absl//absl/synchronization",  
+        "@parallel_hashmap//:parallel_hashmap"
+    ],
 )
 
 cc_binary(
