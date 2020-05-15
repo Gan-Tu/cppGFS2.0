@@ -9,19 +9,18 @@
 // The default definition assumes no internal lock and requires users
 // to pragmatically synchronize concurrent read and write to the parallel
 // hashmap. By passing a lock type, e.g. absl::Mutex, the parallel
-// hashmap is intrinsically thread safe. The example below follows the 
-// pattern defined in
+// hashmap is intrinsically thread safe.
+//
+// The example below follows the pattern defined in:
+// https://greg7mdp.github.io/parallel-hashmap/
 // https://github.com/greg7mdp/parallel-hashmap/blob/master/examples/bench.cc
-template <class Key, class Value>
-using thread_safe_flat_hash_map 
-    = phmap::parallel_flat_hash_map<
-        Key, 
-        Value,
-        phmap::container_internal::hash_default_hash<Key>,
-        phmap::container_internal::hash_default_eq<Key>,
-        std::allocator<std::pair<const Key, Value>>,
-        4,
-        absl::Mutex>;
+template <class K, class V>
+class thread_safe_flat_hash_map
+    : public phmap::parallel_flat_hash_map<
+          K, V, phmap::container_internal::hash_default_hash<K>,
+          phmap::container_internal::hash_default_eq<K>,
+          std::allocator<std::pair<const K, V>>, /*submaps=*/4, absl::Mutex> {
+};
 
 // Example Parallel Hashmap usage
 // https://github.com/greg7mdp/parallel-hashmap
@@ -39,11 +38,12 @@ int main(int argc, char const* argv[]) {
   contacts["bill"] = "bg@whatever.com";
   std::cout << "bill's email is: " << contacts["bill"] << "\n";
 
+  // Parallel insert with thread safe hash map.
+  // Note that if you run the following code with the default non-thread-safe
+  // phmap::flat_hash_map, you will run into race condition and likely encounter
+  // a core-dump
   thread_safe_flat_hash_map<std::string, std::string> thread_safe_contact;
-  int num_of_threads(20);
-
-  // Parallel insert. Note that using the default phmap::flat_hash_map you will run
-  // into race condition and likely encounter a core-dump with the following code
+  int num_of_threads(50);
   std::vector<std::thread> threads;
   for (int i = 0; i < num_of_threads; i++) {
     threads.push_back(std::thread([&, i]() {
@@ -53,11 +53,11 @@ int main(int argc, char const* argv[]) {
     }));
   }
 
-  for(int i = 0; i < num_of_threads; i++) {
+  for (int i = 0; i < num_of_threads; i++) {
     threads[i].join();
   }
 
-  for(int i = 0; i < num_of_threads; i++) {
+  for (int i = 0; i < num_of_threads; i++) {
     std::string name(std::to_string(i));
     std::cout << name << ", " << thread_safe_contact[name] << std::endl;
   }

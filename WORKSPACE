@@ -61,7 +61,8 @@ http_archive(
     urls = ["https://github.com/google/leveldb/archive/1.22.tar.gz"],
 )
 
-# Parallel Hashmaap
+# Parallel Hashmap
+# https://greg7mdp.github.io/parallel-hashmap/
 http_archive(
   name = "parallel_hashmap",
   build_file = "//src/third_party/build_rules:parallel_hashmap.BUILD",
