@@ -52,14 +52,15 @@ message GrantLeaseReply {
   GrantLeaseRequest request = 1;
   // The lease acceptance status by the chunk server
   enum GrantLeaseStatus {
+    UNKNOWN = 0;
     // The chunk server accepts the new lease
-    ACCEPTED = 0;
+    ACCEPTED = 1;
     // Request is ignored because it's already expired when received
-    IGNORED_EXPIRED_LEASE = 1;
+    IGNORED_EXPIRED_LEASE = 2;
     // Request is rejected because chunk server doesn't have this chunk handle
-    REJECTED_NOT_FOUND = 2;
+    REJECTED_NOT_FOUND = 3;
     // Request is rejected because chunk server has a stale version of the chunk
-    REJECTED_STALE_VERSION = 3;
+    REJECTED_STALE_VERSION = 4;
   }
   GrantLeaseStatus status = 2;
 }
@@ -76,12 +77,13 @@ message RevokeLeaseReply {
   RevokeLeaseRequest request = 1;
   // The lease revoke status by the chunk server
   enum RevokeLeaseStatus {
+    UNKNOWN = 0;
     // The chunk server has revoked its holding lease
-    REVOKED = 0;
+    REVOKED = 1;
     // Revoke is ignored because chunk server has a newer lease
-    IGNORED_HAS_NEWER_LEASE = 1;
+    IGNORED_HAS_NEWER_LEASE = 2;
     // Request is rejected because chunk server doesn't have this chunk handle
-    REJECTED_NOT_FOUND = 2;
+    REJECTED_NOT_FOUND = 3;
   }
   RevokeLeaseStatus status = 2;
 }

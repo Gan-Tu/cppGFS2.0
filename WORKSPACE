@@ -61,3 +61,26 @@ http_archive(
     urls = ["https://github.com/google/leveldb/archive/1.22.tar.gz"],
 )
 
+# Parallel Hashmap
+# https://greg7mdp.github.io/parallel-hashmap/
+http_archive(
+  name = "parallel_hashmap",
+  build_file = "//src/third_party/build_rules:parallel_hashmap.BUILD",
+  sha256 = "1826589041140837f91ab0e3421abbf7e9184454bb83403b5a0359a0bf87bd68",
+  strip_prefix = "parallel-hashmap-1.31",
+  urls = ["https://github.com/greg7mdp/parallel-hashmap/archive/1.31.tar.gz"]
+)
+
+# Google glog C++ logging library
+# Note: Don't use directly in your code, 
+#       see examples/system_logger_main.cc for how to log.
+# Example Usage: #include "glog/logging.h"
+# Example dependency: "@com_google_glog//:glog"
+http_archive(
+    name = "com_google_glog",
+    strip_prefix = "glog-0.4.0",
+    sha256 = "f28359aeba12f30d73d9e4711ef356dc842886968112162bc73002645139c39c",
+    urls = [
+        "https://github.com/google/glog/archive/v0.4.0.tar.gz",
+    ]
+)

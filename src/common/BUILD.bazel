@@ -10,3 +10,11 @@ cc_library(
         "@com_google_protobuf//:protobuf_lite",
     ],
 )
+
+cc_library(
+  name = "system_logger",
+  srcs = ["system_logger.cc"],
+  hdrs = ["system_logger.h"],
+  visibility = ["//visibility:public"],
+  deps = ["@com_google_glog//:glog"],
+)

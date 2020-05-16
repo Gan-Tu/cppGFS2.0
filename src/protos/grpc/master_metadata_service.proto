@@ -43,9 +43,10 @@ message OpenFileRequest {
   uint32 chunk_index = 2;
   // Open modes
   enum OpenMode {
-    READ = 0;
-    WRITE = 1;
-    APPEND = 2;
+    UNKNOWN = 0;
+    READ = 1;
+    WRITE = 2;
+    APPEND = 3;
   }
   OpenMode mode = 3;
   // Create the file chunk, if it doesn't exist

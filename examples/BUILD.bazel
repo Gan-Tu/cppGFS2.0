@@ -7,6 +7,15 @@ cc_binary(
 )
 
 cc_binary(
+    name = "parallel_hashmap_main",
+    srcs = ["parallel_hashmap_main.cc"],
+    deps = [
+        "@com_google_absl//absl/synchronization",  
+        "@parallel_hashmap//:parallel_hashmap"
+    ],
+)
+
+cc_binary(
     name = "run_mock_client_main",
     srcs = ["run_mock_client_main.cc"],
     deps = [
@@ -15,4 +24,12 @@ cc_binary(
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_protobuf//:protobuf_lite",
     ],
+)
+
+cc_binary(
+  name="system_logger_main",
+  srcs = ["system_logger_main.cc"],
+  deps = [
+    "//src/common:system_logger",
+  ],
 )
