@@ -7,6 +7,15 @@ cc_binary(
 )
 
 cc_binary(
+    name = "parallel_hashmap_main",
+    srcs = ["parallel_hashmap_main.cc"],
+    deps = [
+        "@com_google_absl//absl/synchronization",  
+        "@parallel_hashmap//:parallel_hashmap"
+    ],
+)
+
+cc_binary(
     name = "run_mock_client_main",
     srcs = ["run_mock_client_main.cc"],
     deps = [
