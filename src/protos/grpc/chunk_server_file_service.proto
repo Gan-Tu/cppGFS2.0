@@ -53,8 +53,9 @@ message InitFileChunkReply {
   InitFileChunkRequest request = 1;
   // The status of file chunk creation operation
   enum InitFileChunkStatus {
-    CREATED = 0;
-    ALREADY_EXISTS = 1;
+    UNKNOWN = 0;
+    CREATED = 1;
+    ALREADY_EXISTS = 2;
   }
   InitFileChunkStatus status = 2;
 }
@@ -78,9 +79,10 @@ message ReadFileChunkReply {
   ReadFileChunkRequest request = 1;
   // The status of file chunk read operation
   enum ReadFileChunkStatus {
-    OK = 0;
-    FAILED_NOT_FOUND = 1;
-    FAILED_STALE_VERSION = 2;
+    UNKNOWN = 0;
+    OK = 1;
+    FAILED_NOT_FOUND = 2;
+    FAILED_STALE_VERSION = 3;
   }
   ReadFileChunkStatus status = 2;
   // The read data, if operation is successful
@@ -99,8 +101,9 @@ message AdvanceFileChunkVersionReply {
   AdvanceFileChunkVersionRequest request = 1;
   // The status of file chunk version update operation
   enum AdvanceFileChunkVersionStatus {
-    OK = 0;
-    FAILED_NOT_FOUND = 1;
+    UNKNOWN = 0;
+    OK = 1;
+    FAILED_NOT_FOUND = 2;
   }
   AdvanceFileChunkVersionStatus status = 2;
   // The new chunk version after the version advance
@@ -125,10 +128,11 @@ message WriteFileChunkReply {
   WriteFileChunkRequest request = 1;
   // The status of file chunk write operation
   enum WriteFileChunkStatus {
-    OK = 0;
-    FAILED_NOT_FOUND = 1;
-    FAILED_STALE_VERSION = 2;
-    FAILED_NOT_LEASE_HOLDER = 3;
+    UNKNOWN = 0;
+    OK = 1;
+    FAILED_NOT_FOUND = 2;
+    FAILED_STALE_VERSION = 3;
+    FAILED_NOT_LEASE_HOLDER = 4;
   }
   WriteFileChunkStatus status = 2;
   // The number of bytes that was actually written
