@@ -23,10 +23,12 @@ int main(int argc, char** argv) {
   // Listen on the given address without any authentication mechanism for now.
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
 
-  // Register a synchronous service for handling clients' metadata requests
+  // Register synchronous services for handling clients' metadata requests
+  // Note that gRPC only support providing services through via a single port.
   ChunkServerLeaseServiceImpl lease_service;
-  ChunkServerFileServiceImpl file_service;
   builder.RegisterService(&lease_service);
+
+  ChunkServerFileServiceImpl file_service;
   builder.RegisterService(&file_service);
 
   // Assemble and start the server
