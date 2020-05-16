@@ -12,7 +12,6 @@ using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
 using grpc::ClientContext;
 using protos::grpc::DeleteFileRequest;
-using protos::grpc::MasterMetadataService;
 using protos::grpc::OpenFileReply;
 using protos::grpc::OpenFileRequest;
 

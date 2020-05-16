@@ -1,3 +1,6 @@
+#ifndef GFS_SERVER_MASTER_SERVER_MASTER_METADATA_SERVICE_IMPL_H_
+#define GFS_SERVER_MASTER_SERVER_MASTER_METADATA_SERVICE_IMPL_H_
+
 #include "grpcpp/grpcpp.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
@@ -25,3 +28,5 @@ class MasterMetadataServiceAsyncImpl final
 
 }  // namespace service
 }  // namespace gfs
+
+#endif  // GFS_SERVER_MASTER_SERVER_MASTER_METADATA_SERVICE_IMPL_H_
