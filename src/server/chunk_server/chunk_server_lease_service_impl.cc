@@ -15,7 +15,7 @@ namespace service {
 grpc::Status ChunkServerLeaseServiceImpl::GrantLease(
     ServerContext* context, const GrantLeaseRequest* request,
     GrantLeaseReply* reply) {
-  // TODO(everyone): implement the GFS chunk server logic here
+  // TODO(someone): implement the GFS chunk server logic here
   *reply->mutable_request() = *request;
   reply->set_status(GrantLeaseReply::ACCEPTED);
   return grpc::Status::OK;
@@ -24,8 +24,9 @@ grpc::Status ChunkServerLeaseServiceImpl::GrantLease(
 grpc::Status ChunkServerLeaseServiceImpl::RevokeLease(
     ServerContext* context, const RevokeLeaseRequest* request,
     RevokeLeaseReply* reply) {
-  // TODO(everyone): implement the GFS chunk server logic here
-  return grpc::Status(grpc::StatusCode::NOT_FOUND, "chunk handle doesn't exist");
+  // TODO(someone): implement the GFS chunk server logic here
+  return grpc::Status(grpc::StatusCode::NOT_FOUND,
+                      "chunk handle doesn't exist");
 }
 
 }  // namespace service

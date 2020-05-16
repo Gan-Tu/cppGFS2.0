@@ -19,7 +19,7 @@ namespace service {
 grpc::Status ChunkServerFileServiceImpl::InitFileChunk(
     ServerContext* context, const InitFileChunkRequest* request,
     InitFileChunkReply* reply) {
-  // TODO(everyone): implement the GFS chunk server logic here
+  // TODO(someone): implement the GFS chunk server logic here
   *reply->mutable_request() = *request;
   reply->set_status(InitFileChunkReply::ALREADY_EXISTS);
   return grpc::Status::OK;
@@ -28,21 +28,21 @@ grpc::Status ChunkServerFileServiceImpl::InitFileChunk(
 grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
     ServerContext* context, const ReadFileChunkRequest* request,
     ReadFileChunkReply* reply) {
-  // TODO(everyone): implement the GFS chunk server logic here
+  // TODO(someone): implement the GFS chunk server logic here
   return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
 }
 
 grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
     ServerContext* context, const WriteFileChunkRequest* request,
     WriteFileChunkReply* reply) {
-  // TODO(everyone): implement the GFS chunk server logic here
+  // TODO(someone): implement the GFS chunk server logic here
   return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
 }
 
 grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
     ServerContext* context, const AdvanceFileChunkVersionRequest* request,
     AdvanceFileChunkVersionReply* reply) {
-  // TODO(everyone): implement the GFS chunk server logic here
+  // TODO(someone): implement the GFS chunk server logic here
   return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
 }
 
