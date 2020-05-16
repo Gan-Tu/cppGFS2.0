@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
 cc_library(
     name = "chunk_server_lease_service_impl",
@@ -7,5 +7,13 @@ cc_library(
     deps = [
         "//src/protos/grpc:cc_chunk_server_lease_service_grpc",
         "@com_github_grpc_grpc//:grpc++",
+    ],
+)
+
+cc_binary(
+    name = "run_chunk_server_main",
+    srcs = ["run_chunk_server_main.cc"],
+    deps = [
+        ":chunk_server_lease_service_impl",
     ],
 )
