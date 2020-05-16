@@ -2,6 +2,7 @@
 #define GFS_COMMON_UTILS_H_
 
 #include "google/protobuf/stubs/status.h"
+#include "google/protobuf/stubs/statusor.h"
 #include "grpcpp/grpcpp.h"
 
 namespace gfs {
@@ -25,6 +26,18 @@ google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
 // [TBD] other constraints if applicable
 google::protobuf::util::Status CheckFilenameValidity(
     const std::string& filename);
+
+// Return a StatusOr with |value| if the |status| is OK; otherwise, convert the
+// gRPC |status| to protobuf status, so it can be used in the returned StatusOr.
+template <typename T>
+inline google::protobuf::util::StatusOr<T> ReturnStatusOrFromGrpcStatus(
+    T value, grpc::Status status) {
+  if (status.ok()) {
+    return value;
+  } else {
+    return ConvertGrpcStatusToProtobufStatus(status);
+  }
+}
 
 }  // namespace utils
 }  // namespace common
