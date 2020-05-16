@@ -21,7 +21,6 @@ grpc::Status ChunkServerLeaseServiceImpl::GrantLease(
   return grpc::Status::OK;
 }
 
-// Handle a RevokeLeaseRequest request sent by the client.
 grpc::Status ChunkServerLeaseServiceImpl::RevokeLease(
     ServerContext* context, const RevokeLeaseRequest* request,
     RevokeLeaseReply* reply) {

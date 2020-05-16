@@ -12,6 +12,7 @@ cc_binary(
     deps = [
         "//src/common/protocol_client:master_metadata_service_client",
         "//src/common/protocol_client:chunk_server_lease_service_client",
+        "//src/common/protocol_client:chunk_server_file_service_client",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_protobuf//:protobuf_lite",
     ],

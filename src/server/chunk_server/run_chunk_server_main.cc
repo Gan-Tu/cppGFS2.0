@@ -4,8 +4,10 @@
 
 #include "grpcpp/grpcpp.h"
 #include "src/server/chunk_server/chunk_server_lease_service_impl.h"
+#include "src/server/chunk_server/chunk_server_file_service_impl.h"
 
 using gfs::service::ChunkServerLeaseServiceImpl;
+using gfs::service::ChunkServerFileServiceImpl;
 using grpc::Server;
 using grpc::ServerBuilder;
 
@@ -20,7 +22,9 @@ int main(int argc, char** argv) {
 
   // Register a synchronous service for handling clients' metadata requests
   ChunkServerLeaseServiceImpl lease_service;
+  ChunkServerFileServiceImpl file_service;
   builder.RegisterService(&lease_service);
+  builder.RegisterService(&file_service);
 
   // Assemble and start the server
   std::unique_ptr<Server> server(builder.BuildAndStart());

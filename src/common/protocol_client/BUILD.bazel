@@ -25,3 +25,16 @@ cc_library(
         "@com_google_protobuf//:protobuf_lite",
     ],
 )
+
+cc_library(
+    name = "chunk_server_file_service_client",
+    srcs = ["chunk_server_file_service_client.cc"],
+    hdrs = ["chunk_server_file_service_client.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/common:utils",
+        "//src/protos/grpc:cc_chunk_server_file_service_grpc",
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_google_protobuf//:protobuf_lite",
+    ],
+)

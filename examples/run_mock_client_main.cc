@@ -4,11 +4,14 @@
 
 #include "google/protobuf/timestamp.pb.h"
 #include "grpcpp/grpcpp.h"
+#include "src/common/protocol_client/chunk_server_file_service_client.h"
 #include "src/common/protocol_client/chunk_server_lease_service_client.h"
 #include "src/common/protocol_client/master_metadata_service_client.h"
+#include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
 #include "src/protos/grpc/chunk_server_lease_service.grpc.pb.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
+using gfs::service::ChunkServerFileServiceClient;
 using gfs::service::ChunkServerLeaseServiceClient;
 using gfs::service::MasterMetadataServiceClient;
 using google::protobuf::util::Status;
@@ -16,6 +19,8 @@ using google::protobuf::util::StatusOr;
 using protos::grpc::DeleteFileRequest;
 using protos::grpc::GrantLeaseReply;
 using protos::grpc::GrantLeaseRequest;
+using protos::grpc::InitFileChunkReply;
+using protos::grpc::InitFileChunkRequest;
 using protos::grpc::OpenFileReply;
 using protos::grpc::OpenFileRequest;
 using protos::grpc::RevokeLeaseReply;
@@ -33,6 +38,7 @@ int main(int argc, char** argv) {
       grpc::CreateChannel(lease_service_address, credentials);
   MasterMetadataServiceClient metadata_client(master_channel);
   ChunkServerLeaseServiceClient lease_client(chunk_server_lease_channel);
+  ChunkServerFileServiceClient file_client(chunk_server_lease_channel);
 
   // Prepare a mock gRPC request and client context
   OpenFileRequest open_request;
@@ -105,6 +111,24 @@ int main(int argc, char** argv) {
   } else {
     std::cout << "Request #4 failed: \n"
               << revoke_lease_or.status().ToString() << std::endl;
+  }
+
+  std::cout << "\n\n" << std::endl;
+
+  InitFileChunkRequest init_file_request;
+  init_file_request.set_chunk_handle("/tmp/test_init_file");
+  grpc::ClientContext client_context5;
+  StatusOr<InitFileChunkReply> init_file_or =
+      file_client.SendRequest(init_file_request, client_context5);
+  std::cout << "Request #4 sent: \n"
+            << init_file_request.DebugString() << std::endl;
+
+  if (init_file_or.ok()) {
+    std::cout << "Response #4 received: \n"
+              << init_file_or.ValueOrDie().DebugString() << std::endl;
+  } else {
+    std::cout << "Request #4 failed: \n"
+              << init_file_or.status().ToString() << std::endl;
   }
 
   return 0;
