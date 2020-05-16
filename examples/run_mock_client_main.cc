@@ -45,26 +45,30 @@ int main(int argc, char** argv) {
   // Send the request and print the response to screen
   StatusOr<OpenFileReply> metadata_or =
       metadata_client.SendRequest(open_request, client_context1);
-  std::cout << "Request sent: \n" << open_request.DebugString() << std::endl;
+  std::cout << "Request #1 sent: \n" << open_request.DebugString() << std::endl;
 
   if (metadata_or.ok()) {
-    std::cout << "Response received: \n"
+    std::cout << "Response #1 received: \n"
               << metadata_or.ValueOrDie().DebugString() << std::endl;
   } else {
-    std::cout << "Request failed: \n"
+    std::cout << "Request #1 failed: \n"
               << metadata_or.status().ToString() << std::endl;
   }
+
+  std::cout << "\n\n" << std::endl;
 
   DeleteFileRequest delete_request;
   delete_request.set_filename("/tmp/test_delete_file");
   grpc::ClientContext client_context2;
   Status status = metadata_client.SendRequest(delete_request, client_context2);
-  std::cout << "Request sent: \n" << delete_request.DebugString() << std::endl;
-  std::cout << "Request status: \n" << status.ToString() << std::endl;
+  std::cout << "Request #2 sent: \n"
+            << delete_request.DebugString() << std::endl;
+  std::cout << "Request #2 status: \n" << status.ToString() << std::endl;
+
+  std::cout << "\n\n" << std::endl;
 
   google::protobuf::Timestamp lease_expiration_time;
   lease_expiration_time.set_seconds(1000);
-
   GrantLeaseRequest grant_lease_request;
   grant_lease_request.set_chunk_handle("/tmp/test_grant_lease");
   grant_lease_request.set_chunk_version(1);
@@ -72,15 +76,35 @@ int main(int argc, char** argv) {
   grpc::ClientContext client_context3;
   StatusOr<GrantLeaseReply> grant_lease_or =
       lease_client.SendRequest(grant_lease_request, client_context3);
-  std::cout << "Request sent: \n"
+  std::cout << "Request #3 sent: \n"
             << grant_lease_request.DebugString() << std::endl;
 
   if (grant_lease_or.ok()) {
-    std::cout << "Response received: \n"
+    std::cout << "Response #3 received: \n"
               << grant_lease_or.ValueOrDie().DebugString() << std::endl;
   } else {
-    std::cout << "Request failed: \n"
+    std::cout << "Request #3 failed: \n"
               << grant_lease_or.status().ToString() << std::endl;
+  }
+
+  std::cout << "\n\n" << std::endl;
+
+  RevokeLeaseRequest revoke_lease_request;
+  revoke_lease_request.set_chunk_handle("/tmp/test_revoke_lease");
+  *revoke_lease_request.mutable_original_lease_expiration_time() =
+      lease_expiration_time;
+  grpc::ClientContext client_context4;
+  StatusOr<RevokeLeaseReply> revoke_lease_or =
+      lease_client.SendRequest(revoke_lease_request, client_context4);
+  std::cout << "Request #4 sent: \n"
+            << revoke_lease_request.DebugString() << std::endl;
+
+  if (revoke_lease_or.ok()) {
+    std::cout << "Response #4 received: \n"
+              << revoke_lease_or.ValueOrDie().DebugString() << std::endl;
+  } else {
+    std::cout << "Request #4 failed: \n"
+              << revoke_lease_or.status().ToString() << std::endl;
   }
 
   return 0;

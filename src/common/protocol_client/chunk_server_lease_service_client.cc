@@ -40,7 +40,7 @@ StatusOr<RevokeLeaseReply> ChunkServerLeaseServiceClient::SendRequest(
   grpc::Status status = stub_->RevokeLease(&context, request, &reply);
 
   if (status.ok()) {
-    return Status::OK;
+    return reply;
   } else {
     return ConvertGrpcStatusToProtobufStatus(status);
   }

@@ -28,7 +28,7 @@ grpc::Status ChunkServerLeaseServiceImpl::RevokeLease(
   // TODO(everyone): implement the GFS chunk server logic here
   *reply->mutable_request() = *request;
   reply->set_status(RevokeLeaseReply::REJECTED_NOT_FOUND);
-  return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+  return grpc::Status::OK;
 }
 
 }  // namespace service
