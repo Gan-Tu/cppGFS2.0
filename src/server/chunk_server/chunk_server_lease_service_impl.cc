@@ -26,9 +26,7 @@ grpc::Status ChunkServerLeaseServiceImpl::RevokeLease(
     ServerContext* context, const RevokeLeaseRequest* request,
     RevokeLeaseReply* reply) {
   // TODO(everyone): implement the GFS chunk server logic here
-  *reply->mutable_request() = *request;
-  reply->set_status(RevokeLeaseReply::REJECTED_NOT_FOUND);
-  return grpc::Status::OK;
+  return grpc::Status(grpc::StatusCode::NOT_FOUND, "chunk handle doesn't exist");
 }
 
 }  // namespace service
