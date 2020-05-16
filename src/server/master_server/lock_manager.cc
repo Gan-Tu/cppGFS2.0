@@ -18,7 +18,7 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
     const std::string& filename) {
   // The emplace method returns a pair, where the first field corresponds 
   // to the item for this key, and the second field is true if this 
-  // this call successfully inserts an item, and is false if there
+  // call successfully inserts an item, and is false if there
   // is already an item existed for the given key. We use the second field
   // to detect whether a lock has been created already (or there is another
   // racing thread that inserted one before this call). 
@@ -46,7 +46,7 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
 google::protobuf::util::StatusOr<absl::Mutex*> LockManager::FetchLock(
     const std::string& filename) const {
   // Again, note that we do not fully support crazy schemes like 
-  // concurrent create and delete. Otherwise, the following pattern
+  // concurrent create and delete locks. Otherwise, the following pattern
   // may seem to have a time-of-check-time-of-use bug, namely the lock
   // got removed in the two lines between. Furthermore, it may seem
   // tempting to just use the operator [] and a null check to 
