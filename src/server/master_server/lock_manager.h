@@ -7,6 +7,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
 #include "google/protobuf/stubs/statusor.h"
+#include "src/common/utils.h"
 
 namespace gfs {
 namespace server {
@@ -49,17 +50,10 @@ class LockManager {
   static LockManager* GetInstance();
 
  private:
-  LockManager();
-
-  // The size of sharding, set equal to the number of hardware threads
-  uint16_t shard_size_;
-  // Used to lock the hash map that maps from filepath to locks
-  std::vector<absl::Mutex*> meta_locks_;
-  // A sharded hash map that maps from file path to mutexes, which are
-  // used to lock per-file metadata, i.e. filePathToMetadata above
-  std::vector<absl::flat_hash_map<std::string, absl::Mutex*>> file_path_locks_;
-
-  uint16_t bucket_id(const std::string& filename) const;
+  // A parallel hash map that maps from file path to mutexes, which are
+  // used to synchronize read and write operations to FileMetadata
+  gfs::common::thread_safe_flat_hash_map<
+      std::string, std::shared_ptr<absl::Mutex>> file_path_locks_;
 };
 
 /* A helper class which is an RAII wrapper to automatically acquire reader
