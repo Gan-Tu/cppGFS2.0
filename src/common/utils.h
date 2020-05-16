@@ -26,6 +26,15 @@ class thread_safe_flat_hash_map
           std::allocator<std::pair<const K, V>>, /*submaps=*/4, absl::Mutex> {
 };
 
+// Similar as above, define an intrinsically thread-safe flat hash set
+template <class V>
+class thread_safe_flat_hash_set
+    : public phmap::parallel_flat_hash_set<
+          V, phmap::container_internal::hash_default_hash<V>,
+          phmap::container_internal::hash_default_eq<V>,
+          std::allocator<V>, /*submaps=*/4, absl::Mutex> {
+};
+
 namespace utils {
 
 // Convert a grpc::Status to protocol buffer's Status, so it's compatible with

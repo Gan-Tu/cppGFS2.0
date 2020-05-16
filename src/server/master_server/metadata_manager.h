@@ -3,6 +3,7 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "google/protobuf/stubs/statusor.h"
+#include "src/common/utils.h"
 #include "src/protos/metadata.pb.h"
 #include "src/server/master_server/lock_manager.h"
 
@@ -66,14 +67,12 @@ class MetadataManager {
   /* An atomic uint64 used to assign UUID for each chunk */
   std::atomic<uint64_t> global_chunk_id_{0};
   /* Store all deleted chunk handles in a hashset  */
-  absl::flat_hash_set<std::string> deleted_chunk_handles_;
+  gfs::common::thread_safe_flat_hash_set<std::string> deleted_chunk_handles_;
   /* Map from file path to FileMetadata */
-  absl::flat_hash_map<std::string, std::shared_ptr<protos::FileMetadata>>
-      file_metadata_;
+  gfs::common::thread_safe_flat_hash_map<
+      std::string, std::shared_ptr<protos::FileMetadata>> file_metadata_;
   /* Lock manager to manager the synchronization of operations */
   LockManager* lock_manager_;
-  /* A lock to lock file_metadata_ */
-  absl::Mutex* file_metadata_lock_;
 };
 
 }  // namespace server
