@@ -24,7 +24,8 @@ cc_binary(
     name = "run_chunk_server_main",
     srcs = ["run_chunk_server_main.cc"],
     deps = [
-        ":chunk_server_lease_service_impl",
         ":chunk_server_file_service_impl",
+        ":chunk_server_lease_service_impl",
+        "//src/common:system_logger",
     ],
 )

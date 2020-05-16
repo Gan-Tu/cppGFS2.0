@@ -3,15 +3,18 @@
 #include <string>
 
 #include "grpcpp/grpcpp.h"
-#include "src/server/chunk_server/chunk_server_lease_service_impl.h"
+#include "src/common/system_logger.h"
 #include "src/server/chunk_server/chunk_server_file_service_impl.h"
+#include "src/server/chunk_server/chunk_server_lease_service_impl.h"
 
-using gfs::service::ChunkServerLeaseServiceImpl;
 using gfs::service::ChunkServerFileServiceImpl;
+using gfs::service::ChunkServerLeaseServiceImpl;
 using grpc::Server;
 using grpc::ServerBuilder;
 
 int main(int argc, char** argv) {
+  gfs::common::SystemLogger::GetInstance().Initialize(/*program_name=*/argv[0]);
+
   ServerBuilder builder;
 
   // TODO(tugan): add support to listen on host:port based on configuration
@@ -28,7 +31,7 @@ int main(int argc, char** argv) {
 
   // Assemble and start the server
   std::unique_ptr<Server> server(builder.BuildAndStart());
-  std::cout << "Server listening on " << server_address << std::endl;
+  LOG(INFO) << "Server listening on " << server_address << std::endl;
 
   // Wait for the server to shutdown. Note that some other thread must be
   // responsible for shutting down the server for this call to ever return.
