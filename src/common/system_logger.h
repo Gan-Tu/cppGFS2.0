@@ -48,7 +48,7 @@ class SystemLogger {
 }  // namespace common
 }  // namespace gfs
 
-// The macros you should use for logging. only use the SYS_* macros. Please see
+// Macros for logging. Please see
 // examples/system_logger_main.cc on how to use.
 //
 // SEVERITY LEVELS: You can specify one of the following severity levels (in
@@ -57,35 +57,35 @@ class SystemLogger {
 // messages of a given severity are logged not only in the logfile for that
 // severity, but also in all logfiles of lower severity. E.g., a message of
 // severity FATAL will be logged to the logfiles of severity FATAL, ERROR,
-// WARNING, and INFO.
+// WARNING, and INFO. Currently logging to only console and the macros work
+// both console and file logging. The macros are thread safe.
 // Further reading about glog:
 // https://github.com/google/glog/blob/master/doc/glog.html
 
 // Log with the specified severity.
-#define SYS_LOG(severity) LOG(severity)
+// LOG(severity)
 
-// The *_ASSERT_* macro provides the ability to abort the application when a
+// The *ASSERT* macro provides the ability to abort the application when a
 // condition is not met.
-#define SYS_LOG_ASSERT(condition) LOG_ASSERT(condition)
 
-#define SYS_ASSERT_EQ(val1, val2) CHECK_EQ(val1, val2)
-#define SYS_ASSERT_NE(val1, val2) CHECK_NE(val1, val2)
-#define SYS_ASSERT_LE(val1, val2) CHECK_LE(val1, val2)
-#define SYS_ASSERT_LT(val1, val2) CHECK_LT(val1, val2)
-#define SYS_ASSERT_GE(val1, val2) CHECK_GE(val1, val2)
-#define SYS_ASSERT_GT(val1, val2) CHECK_GT(val1, val2)
+// LOG_ASSERT(condition)
+#define ASSERT_EQ(val1, val2) CHECK_EQ(val1, val2)
+#define ASSERT_NE(val1, val2) CHECK_NE(val1, val2)
+#define ASSERT_LE(val1, val2) CHECK_LE(val1, val2)
+#define ASSERT_LT(val1, val2) CHECK_LT(val1, val2)
+#define ASSERT_GE(val1, val2) CHECK_GE(val1, val2)
+#define ASSERT_GT(val1, val2) CHECK_GT(val1, val2)
 
-#define SYS_ASSERT_NOTNULL(val) CHECK_NOTNULL(val)
-#define SYS_ASSERT_ERR(invocation) CHECK_ERR(invocation)
+#define ASSERT_NOTNULL(val) CHECK_NOTNULL(val)
+#define ASSERT_ERR(invocation) CHECK_ERR(invocation)
 
 // Conditional / Occasional Logging. Log only when the condition is met.
-#define SYS_LOG_IF(severity, condition) LOG_IF(severity, condition)
-#define SYS_LOG_FIRST_N(severity, n) LOG_FIRST_N(severity, n)
-#define SYS_LOG_IF_EVERY_N(severity, condition, n) \
-  LOG_IF_EVERY_N(severity, condition, n)
-#define SYS_LOG_EVERY_N(severity, n) LOG_EVERY_N(severity, n)
+// LOG_IF(severity, condition)
+// LOG_FIRST_N(severity, n)
+// LOG_IF_EVERY_N(severity, condition, n)
+// LOG_EVERY_N(severity, n)
 
 // STL logging
-#define SYS_LOG_STRING_VECTOR(severity, outvec) LOG_STRING(severity, outvec)
+// LOG_STRING(severity, outvec)
 
 #endif  // GFS_COMMON_SYSTEM_LOGGER_H_

@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
   // Initialize logger, must do this first before logging
   gfs::common::SystemLogger::GetInstance().Initialize(/*program_name=*/argv[0]);
 
-  SYS_LOG(INFO) << "Server starting...";
+  LOG(INFO) << "Server starting...";
 
   ServerBuilder builder;
 
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
   // Assemble and start the server
   std::unique_ptr<Server> server(builder.BuildAndStart());
 
-  SYS_LOG(INFO) << "Server listening on " << server_address;
+  LOG(INFO) << "Server listening on " << server_address;
 
   // Wait for the server to shutdown. Note that some other thread must be
   // responsible for shutting down the server for this call to ever return.
