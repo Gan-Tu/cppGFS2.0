@@ -24,3 +24,11 @@ cc_binary(
         "@com_google_protobuf//:protobuf_lite",
     ],
 )
+
+cc_binary(
+  name="system_logger_main",
+  srcs = ["system_logger_main.cc"],
+  deps = [
+    "//src/common:system_logger",
+  ],
+)
