@@ -32,23 +32,11 @@ StatusOr<GrantLeaseReply> ChunkServerServiceClient::SendRequest(
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
-StatusOr<GrantLeaseReply> ChunkServerServiceClient::SendRequest(
-    const GrantLeaseRequest& request) {
-  ClientContext default_context;
-  return SendRequest(request, default_context);
-}
-
 StatusOr<RevokeLeaseReply> ChunkServerServiceClient::SendRequest(
     const RevokeLeaseRequest& request, ClientContext& context) {
   RevokeLeaseReply reply;
   grpc::Status status = lease_stub_->RevokeLease(&context, request, &reply);
   return ReturnStatusOrFromGrpcStatus(reply, status);
-}
-
-StatusOr<RevokeLeaseReply> ChunkServerServiceClient::SendRequest(
-    const RevokeLeaseRequest& request) {
-  ClientContext default_context;
-  return SendRequest(request, default_context);
 }
 
 StatusOr<InitFileChunkReply> ChunkServerServiceClient::SendRequest(
@@ -58,23 +46,11 @@ StatusOr<InitFileChunkReply> ChunkServerServiceClient::SendRequest(
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
-StatusOr<InitFileChunkReply> ChunkServerServiceClient::SendRequest(
-    const InitFileChunkRequest& request) {
-  ClientContext default_context;
-  return SendRequest(request, default_context);
-}
-
 StatusOr<ReadFileChunkReply> ChunkServerServiceClient::SendRequest(
     const ReadFileChunkRequest& request, ClientContext& context) {
   ReadFileChunkReply reply;
   grpc::Status status = file_stub_->ReadFileChunk(&context, request, &reply);
   return ReturnStatusOrFromGrpcStatus(reply, status);
-}
-
-StatusOr<ReadFileChunkReply> ChunkServerServiceClient::SendRequest(
-    const ReadFileChunkRequest& request) {
-  ClientContext default_context;
-  return SendRequest(request, default_context);
 }
 
 StatusOr<AdvanceFileChunkVersionReply> ChunkServerServiceClient::SendRequest(
@@ -85,17 +61,45 @@ StatusOr<AdvanceFileChunkVersionReply> ChunkServerServiceClient::SendRequest(
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
-StatusOr<AdvanceFileChunkVersionReply> ChunkServerServiceClient::SendRequest(
-    const AdvanceFileChunkVersionRequest& request) {
-  ClientContext default_context;
-  return SendRequest(request, default_context);
-}
-
 StatusOr<WriteFileChunkReply> ChunkServerServiceClient::SendRequest(
     const WriteFileChunkRequest& request, ClientContext& context) {
   WriteFileChunkReply reply;
   grpc::Status status = file_stub_->WriteFileChunk(&context, request, &reply);
   return ReturnStatusOrFromGrpcStatus(reply, status);
+}
+
+//
+// Overloaded functions using default mutable client context
+//
+
+StatusOr<GrantLeaseReply> ChunkServerServiceClient::SendRequest(
+    const GrantLeaseRequest& request) {
+  ClientContext default_context;
+  return SendRequest(request, default_context);
+}
+
+StatusOr<RevokeLeaseReply> ChunkServerServiceClient::SendRequest(
+    const RevokeLeaseRequest& request) {
+  ClientContext default_context;
+  return SendRequest(request, default_context);
+}
+
+StatusOr<InitFileChunkReply> ChunkServerServiceClient::SendRequest(
+    const InitFileChunkRequest& request) {
+  ClientContext default_context;
+  return SendRequest(request, default_context);
+}
+
+StatusOr<ReadFileChunkReply> ChunkServerServiceClient::SendRequest(
+    const ReadFileChunkRequest& request) {
+  ClientContext default_context;
+  return SendRequest(request, default_context);
+}
+
+StatusOr<AdvanceFileChunkVersionReply> ChunkServerServiceClient::SendRequest(
+    const AdvanceFileChunkVersionRequest& request) {
+  ClientContext default_context;
+  return SendRequest(request, default_context);
 }
 
 StatusOr<WriteFileChunkReply> ChunkServerServiceClient::SendRequest(
