@@ -7,7 +7,9 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/synchronization",  
         "@com_google_protobuf//:protobuf_lite",
+        "@parallel_hashmap//:parallel_hashmap"
     ],
 )
 
