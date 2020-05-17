@@ -12,9 +12,20 @@ cc_library(
 )
 
 cc_library(
-  name = "system_logger",
-  srcs = ["system_logger.cc"],
-  hdrs = ["system_logger.h"],
-  visibility = ["//visibility:public"],
-  deps = ["@com_google_glog//:glog"],
+    name = "system_logger",
+    srcs = ["system_logger.cc"],
+    hdrs = ["system_logger.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@com_google_glog//:glog"],
+)
+
+cc_library(
+    name = "config_manager",
+    srcs = ["config_manager.cc"],
+    hdrs = ["config_manager.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+         "@com_google_protobuf//:protobuf_lite",
+        "@yaml_cpp//:yaml-cpp",
+    ],
 )

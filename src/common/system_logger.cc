@@ -19,7 +19,7 @@ void SystemLogger::Initialize(const std::string& program_name) {
 
   // Enables us to dump useful information when the program crashes on certain
   // signals such as SIGSEGV, SIGILL, SIGFPE, SIGABRT, SIGBUS, and SIGTERM.
-  google::InstallFailureSignalHandler();
+  // google::InstallFailureSignalHandler();
 
   this->is_initialized_ = true;
 }
