@@ -117,16 +117,130 @@ MetadataManager::CreateChunkHandle(const std::string& filename,
   }
 
   chunk_handle_map[chunk_index] = new_chunk_handle;
+  
+  protos::FileChunkMetadata new_chunk_metadata;
+  // Initialize chunk handle field and leave other fields default
+  new_chunk_metadata.set_chunk_handle(new_chunk_handle);
+  chunk_metadata_[new_chunk_handle] = new_chunk_metadata;
+
   return new_chunk_handle;
+}
+
+google::protobuf::util::StatusOr<std::string>
+MetadataManager::GetChunkHandle(
+    const std::string& filename, uint32_t chunk_index) const {
+  // Step 1. readlock the parent directories
+  ParentLocksAnchor parentLockAnchor(lock_manager_, filename);
+  if (!parentLockAnchor.ok()) {
+    // If this operation fails, which means some of the parent directory does
+    // not exist, we return false
+    return parentLockAnchor.status();
+  }
+
+  // Step 2. fetch the file metadata
+  auto file_metadata_or(GetFileMetadata(filename));
+  if (!file_metadata_or.ok()) {
+    return file_metadata_or.status();
+  }
+  std::shared_ptr<protos::FileMetadata> file_metadata(
+      file_metadata_or.ValueOrDie());
+
+  // Step 3. readerlock the lock for this path
+  auto file_path_lock_or(lock_manager_->FetchLock(filename));
+  if (!file_path_lock_or.ok()) {
+    return file_path_lock_or.status();
+  }
+
+  absl::ReaderMutexLock file_metadata_writer_lock_guard(
+      file_path_lock_or.ValueOrDie());
+  
+  // Step 4. fetch the chunk handle
+  auto const& chunk_handle_map(file_metadata->chunk_handles());
+
+  // If chunk_inde does not exist, return error
+  if (!chunk_handle_map.contains(chunk_index)) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::NOT_FOUND,
+        "Chunk " + std::to_string(chunk_index) + "not found in file " + 
+            filename);
+  }
+
+  return chunk_handle_map.at(chunk_index);
+}
+
+google::protobuf::util::Status
+MetadataManager::AdvanceChunkHandle(const std::string& chunk_handle) {
+  auto chunk_data_or(GetFileChunkMetadata(chunk_handle));
+  if (!chunk_data_or.ok()) {
+    return chunk_data_or.status();
+  }
+
+  // Note that we do not fully support concurrent advancement of the same
+  // chunk's version number, as GFS does not support arbitrary concurrent
+  // write. Therefore, here we simply increment the chunk's version number
+  // and update the FileChunkMetadata
+  protos::FileChunkMetadata chunk_data(chunk_data_or.ValueOrDie());
+  chunk_data.set_version(chunk_data.version() + 1);
+  SetFileChunkMetadata(chunk_handle, chunk_data);
+
+  return google::protobuf::util::Status::OK;
+}
+
+google::protobuf::util::StatusOr<protos::FileChunkMetadata>
+MetadataManager::GetFileChunkMetadata(const std::string& chunk_handle) const {
+  if (!chunk_metadata_.contains(chunk_handle)) { 
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::NOT_FOUND,
+        "Chunk handle " + chunk_handle + "'s metadata not found.");
+  }
+
+  return chunk_metadata_.at(chunk_handle); 
+}
+
+void
+MetadataManager::SetFileChunkMetadata(
+    const std::string& chunk_handle, 
+    const protos::FileChunkMetadata& chunk_data) {
+  chunk_metadata_[chunk_handle] = chunk_data;
+}
+
+google::protobuf::util::Status
+MetadataManager::SetPrimaryChunkServerLocation(
+    const std::string& chunk_handle, const std::string& server_location) {
+  auto chunk_data_or(GetFileChunkMetadata(chunk_handle));
+  if (!chunk_data_or.ok()) {
+    return chunk_data_or.status();
+  }
+
+  protos::FileChunkMetadata chunk_data(chunk_data_or.ValueOrDie());
+  chunk_data.set_primary_location(server_location);
+  SetFileChunkMetadata(chunk_handle, chunk_data);
+
+  return google::protobuf::util::Status::OK;
+}
+
+google::protobuf::util::Status
+MetadataManager::RemovePrimaryChunkServerLocation(
+    const std::string& chunk_handle) {
+  // Remove the primary chunk server location by setting it to an empty string
+  return SetPrimaryChunkServerLocation(chunk_handle,""); 
 }
 
 // TODO(Xi): In phase 1 the deletion of file is not fully supported but
 // it would be good to lay out a plan as deletion involves removing items
-// from the shared states. For Filemetadata, the proposed plan here is 
-// to replace the File metadata with a default shared_ptr, and defer
-// the final cleanup to the point when the chunks have been garbage
-// collected. 
-void MetadataManager::DeleteFile(const std::string& filename) {
+// from the shared states. When DeleteFileMetadata is called, the following
+// steps should be taken:
+// 1) Loop over all chunk handles for a file, and mark them as deleted 
+// by inserting them to deleted_chunk_handles
+// 2) Mark their entries in chunk_metadata_ as default 
+//
+// We defer the removal of these entries from the above collections to
+// when the chunks have been garbage collected. By then we
+// 1) Remove the entry in file_metadata_ (TODO) there is stil a bit of 
+// detailed quesiton here as to how to detect the filename when garbage
+// collection occurs on chunk level
+// 2) Remove the entry in chunk_version_ and chunk_metadata_
+void MetadataManager::DeleteFileMetadata(const std::string& filename) {
   // [TODO]: phase 2
 }
 

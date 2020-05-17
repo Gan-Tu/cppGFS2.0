@@ -34,16 +34,20 @@ class MetadataManager {
 
   // Create the file metadata (and a lock associated with this file) for a
   // given file path. This function returns error if the file path already
-  // exists or if any of the intermediate parent directory does not exist.
+  // exists or if any of the intermediate parent directory not found.
   google::protobuf::util::Status CreateFileMetadata(
       const std::string& filename);
 
   // Check if metadata file a file exists
   bool ExistFileMetadata(const std::string& filename) const;
 
+  // Delete a file metadata, and delete all chunk handles associated with 
+  // this file
+  void DeleteFileMetadata(const std::string& filename);
+
   // Access the file metadata for a given file path. The caller of this
   // function needs to ensure the lock for this file is properly used.
-  // return error if fileMetadata does not exist
+  // return error if fileMetadata not found
   google::protobuf::util::StatusOr<std::shared_ptr<protos::FileMetadata>>
       GetFileMetadata(const std::string& filename) const;
 
@@ -51,8 +55,35 @@ class MetadataManager {
   google::protobuf::util::StatusOr<std::string> CreateChunkHandle(
       const std::string& filename, uint32_t chunk_index);
 
-  // Delete a file, and delete all chunk handles associated with this file
-  void DeleteFile(const std::string& filename);
+  // Retrieve a chunk handle for a given filename and chunk index. Return 
+  // error if filename or chunk not found
+  google::protobuf::util::StatusOr<std::string> GetChunkHandle(
+      const std::string& filename, uint32_t chunk_index) const;
+
+  // Advance the chunk version number for a chunk handle, return error if
+  // chunk handle not found
+  google::protobuf::util::Status AdvanceChunkHandle(
+      const std::string& chunk_handle);
+
+  // Get the chunk metadata for a given chunk handle, return error if 
+  // chunk handle not found 
+  google::protobuf::util::StatusOr<protos::FileChunkMetadata> 
+      GetFileChunkMetadata(const std::string& chunk_handle) const;
+
+  // Set the chunk metadata for a given chunk handle
+  void SetFileChunkMetadata(
+      const std::string& chunk_handle, 
+      const protos::FileChunkMetadata& chunk_data);
+
+  // Set the primary chunk location for a given chunk handle, return error
+  // if chunk handle not found
+  google::protobuf::util::Status SetPrimaryChunkServerLocation(
+      const std::string& chunk_handle, const std::string& server_location);
+
+  // Unset the primary chunk location for a given chunk handle, 
+  // this happens when a lease expires / gets revoked
+  google::protobuf::util::Status RemovePrimaryChunkServerLocation(
+      const std::string& chunk_handle);
 
   // Assign a new chunk handle. This function returns a unique chunk handle
   // everytime when it gets called
@@ -69,6 +100,25 @@ class MetadataManager {
   // Map from file path to FileMetadata using a thread-safe hashmap
   gfs::common::thread_safe_flat_hash_map<
       std::string, std::shared_ptr<protos::FileMetadata>> file_metadata_;
+  
+  // Map from chunk handle to FileChunkMetadata, which includes all 
+  // the chunk server (replica) locations 
+  gfs::common::thread_safe_flat_hash_map<
+      std::string, protos::FileChunkMetadata> chunk_metadata_; 
+
+  // Note that the file_metadata_ maps to the reference of the actual
+  // FileMetadata, but file_chunk_metadata_ maps to actual copy of
+  // FileChunkMetadata. This is a design decision. Because FileMetadata can
+  // be much bigger as a file can be made of hundres / thousands of chunks,
+  // mapping to the reference offers us flexibility when updating
+  // filemetadata as copying would be expensive (one may think about
+  // accessing the value by reference and do the update upon the reference,
+  // but it is unclear if any concurrent operation can invalidate such
+  // a reference). On the other hande, FileChunkMetadata is relatively
+  // small as we do not expect a chunk to have say more than 10
+  // replications. Therefore, we simply map to the actual copy of such
+  // a data.  
+
   // Lock manager to manager the synchronization of operations
   LockManager* lock_manager_;
 };
