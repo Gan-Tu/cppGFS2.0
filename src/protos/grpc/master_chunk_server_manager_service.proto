@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package protos.grpc;
+
+import "src/protos/chunk_server.proto";
+
+// This is a service that runs on the master server that handles 
+// master coordination with chunk servers. This is different from the
+// heartbeat service which is used to send light messages to check the
+// health of the chunkserver.
+service MasterChunkServerManagerService {
+  // Each chunkserver periodically reports the chunks it has, 
+  // and the master replies with the identity of all chunks that are
+  // no longer present in the master’s metadata, as well as the reported 
+  // chunks with stale version. Chunkserver can have stale version for a chunk 
+  // if it crash and miss some mutations on the chunk. 
+  // Once the chunkserver receives the reply, it is free to delete its replicas
+  // of such chunks.
+  // The master also uses this to update itself on the location of each chunk.
+  // Chunkserver has the final word over what chunks it does or does not have on 
+  // its own disks. Because errors on a chunkserver may cause chunks to vanish 
+  // spontaneously.
+  // This chunkserver report call will be less frequent compared to the heartbeat
+  // call (which is used to see if the chunkserver is still running), due to the
+  // potential size of the messages. Since there can be a very large number of chunks
+  // on each chunkserver.
+  rpc ReportChunkServer(ReportChunkServerRequest) returns (ReportChunkServerReply) {}
+}
+
+message ReportChunkServerRequest {
+  // The chunkserver making this request.
+  protos.ChunkServer chunk_server = 1;
+
+  // Represents the reported chunk
+  message Chunk {
+    string handle = 1;  
+    // The version of the chunk that the chunkserver has.
+    uint32 version = 2;
+  }
+
+  // All the chunks stored on the chunkserver.
+  repeated Chunk stored_chunks = 2;
+}
+
+message ReportChunkServerReply {
+  // The original request associated with this reply.
+  ReportChunkServerRequest request = 1;
+
+  // The chunks reported by the chunkserver that the master considers to be stale.
+  // This allows the chunkserver to delete them.
+  repeated string stale_chunk_handles = 2;
+}
