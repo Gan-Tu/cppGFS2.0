@@ -37,7 +37,21 @@ class SystemLogger {
   // configurations. Currently logging to console only. Must be called before
   // using any of the logging macros. This isn't thread safe and must be done
   // from a single thread.
-  void Initialize(const std::string& program_name);
+  //
+  // If |use_failure_signal_handler| is true, also install the
+  // "InstallFailureSignalHandler" provided by glog, which enables us to dump
+  // useful information when the program crashes on certain signals such as
+  // SIGSEGV, SIGILL, SIGFPE, SIGABRT, SIGBUS, and SIGTERM.
+  //
+  // However, the glibc built-in stack-unwinder on 64-bit systems has some
+  // problem with the glog libraries, and is known to cause terminal to hang
+  // and be in deadlock:
+  //    https://github.com/google/glog/blob/master/INSTALL#L15
+  // To solve this, you need to install libunwind first:
+  //    https://www.nongnu.org/libunwind/
+  // Note that it doesn't work with new MacOS systems yet.
+  void Initialize(const std::string& program_name,
+                  const bool use_failure_signal_handler = false);
 
  private:
   bool is_initialized_;
