@@ -34,6 +34,9 @@ google::protobuf::util::Status MetadataManager::CreateFileMetadata(
   // to detect if the creation took place (as there can be concurrent
   // creation in rare cases, and only one succeeds). 
   auto new_file_metadata(std::make_shared<FileMetadata>());
+  // Initialize filename
+  new_file_metadata->set_filename(filename);
+  
   auto new_file_metadata_and_if_took_place(
            file_metadata_.emplace(filename, new_file_metadata));
   auto has_create_taken_place(new_file_metadata_and_if_took_place.second);
@@ -44,8 +47,6 @@ google::protobuf::util::Status MetadataManager::CreateFileMetadata(
         "File metadata already exists for " + filename);
   }
 
-  // Initialize the filename
-  new_file_metadata->set_filename(filename);
   return google::protobuf::util::Status::OK;
 }
 
