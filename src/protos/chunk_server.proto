@@ -14,3 +14,12 @@ message ChunkServer {
   // Amount of memory in megabytes available on the server
   uint32 available_memory_mb = 2;
 }
+
+// Information about a chunk on a chunkserver.
+// This shouldn't include the chunk data.
+// Can be renamed to something better later.
+message FileChunk {
+  string handle = 1;  
+  // The version of the chunk on the chunkserver.
+  uint32 version = 2;
+}

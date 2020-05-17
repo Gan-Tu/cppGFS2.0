@@ -31,15 +31,8 @@ message ReportChunkServerRequest {
   // The chunkserver making this request.
   protos.ChunkServer chunk_server = 1;
 
-  // Represents the reported chunk
-  message Chunk {
-    string handle = 1;  
-    // The version of the chunk that the chunkserver has.
-    uint32 version = 2;
-  }
-
   // All the chunks stored on the chunkserver.
-  repeated Chunk stored_chunks = 2;
+  repeated protos.FileChunk stored_chunks = 2;
 }
 
 message ReportChunkServerReply {
