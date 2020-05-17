@@ -69,12 +69,10 @@ int main(int argc, char** argv) {
   LOG(INFO) << "Request status: " << status.ToString();
 
   // Prepare a mock gRPC: GrantLease
-  google::protobuf::Timestamp lease_expiration_time;
-  lease_expiration_time.set_seconds(1000);
   GrantLeaseRequest grant_lease_request;
-  grant_lease_request.set_chunk_handle("/tmp/test_grant_lease");
+  grant_lease_request.set_chunk_handle("9d2a2342-97f9-11ea");
   grant_lease_request.set_chunk_version(1);
-  *grant_lease_request.mutable_lease_expiration_time() = lease_expiration_time;
+  grant_lease_request.mutable_lease_expiration_time()->set_seconds(1000);
 
   grpc::ClientContext client_context3;
   LogRequestAndResponse(
@@ -83,9 +81,9 @@ int main(int argc, char** argv) {
 
   // Prepare a mock gRPC: RevokeLease
   RevokeLeaseRequest revoke_lease_request;
-  revoke_lease_request.set_chunk_handle("/tmp/test_revoke_lease");
-  *revoke_lease_request.mutable_original_lease_expiration_time() =
-      lease_expiration_time;
+  revoke_lease_request.set_chunk_handle("9d2a2342-97f9-11ea");
+  revoke_lease_request.mutable_original_lease_expiration_time()->set_seconds(
+      1000);
 
   grpc::ClientContext client_context4;
   LogRequestAndResponse(
@@ -94,7 +92,7 @@ int main(int argc, char** argv) {
 
   // Prepare a mock gRPC: InitFileChunk
   InitFileChunkRequest init_file_request;
-  init_file_request.set_chunk_handle("/tmp/test_init_file");
+  init_file_request.set_chunk_handle("9d2a2342-97f9-11ea");
 
   grpc::ClientContext client_context5;
   LogRequestAndResponse(
@@ -103,7 +101,7 @@ int main(int argc, char** argv) {
 
   // Prepare a mock gRPC: ReadFileChunk
   ReadFileChunkRequest read_file_request;
-  read_file_request.set_chunk_handle("/tmp/test_read_file");
+  read_file_request.set_chunk_handle("9d2a2342-97f9-11ea");
 
   grpc::ClientContext client_context6;
   LogRequestAndResponse(
@@ -112,7 +110,7 @@ int main(int argc, char** argv) {
 
   // Prepare a mock gRPC: WriteFileChunk
   WriteFileChunkRequest write_file_request;
-  write_file_request.set_chunk_handle("/tmp/test_write_file");
+  write_file_request.set_chunk_handle("9d2a2342-97f9-11ea");
   write_file_request.set_chunk_version(10);
   write_file_request.set_offset_start(100);
   write_file_request.set_length(50);
@@ -126,7 +124,7 @@ int main(int argc, char** argv) {
 
   // Prepare a mock gRPC: AdvanceFileChunkVersion
   AdvanceFileChunkVersionRequest advance_version_request;
-  advance_version_request.set_chunk_handle("/tmp/test_advance_version");
+  advance_version_request.set_chunk_handle("9d2a2342-97f9-11ea");
 
   grpc::ClientContext client_context9;
   LogRequestAndResponse(advance_version_request,

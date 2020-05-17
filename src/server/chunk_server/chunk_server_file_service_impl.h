@@ -15,7 +15,7 @@ class ChunkServerFileServiceImpl final
                              const protos::grpc::InitFileChunkRequest* request,
                              protos::grpc::InitFileChunkReply* reply) override;
 
-  // Handle an ReadFileChunkRequest request by anyone.
+  // Handle an ReadFileChunkRequest request by client or another chunk server.
   grpc::Status ReadFileChunk(grpc::ServerContext* context,
                              const protos::grpc::ReadFileChunkRequest* request,
                              protos::grpc::ReadFileChunkReply* reply) override;
