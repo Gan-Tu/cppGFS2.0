@@ -16,8 +16,8 @@ cc_binary(
 )
 
 cc_binary(
-    name = "run_mock_client_main",
-    srcs = ["run_mock_client_main.cc"],
+    name = "run_mock_protocol_client_main",
+    srcs = ["run_mock_protocol_client_main.cc"],
     deps = [
         "//src/common:system_logger",
         "//src/common/protocol_client:chunk_server_service_client",
