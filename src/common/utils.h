@@ -1,11 +1,40 @@
 #ifndef GFS_COMMON_UTILS_H_
 #define GFS_COMMON_UTILS_H_
 
+#include "absl/synchronization/mutex.h"
 #include "google/protobuf/stubs/status.h"
 #include "grpcpp/grpcpp.h"
+#include "parallel_hashmap/phmap.h"
 
 namespace gfs {
 namespace common {
+
+// Define an intrinsically thread-safe flat hash map by parallel hashmap
+// The default definition assumes no internal lock and requires users
+// to pragmatically synchronize concurrent read and write to the parallel
+// hashmap. By passing a lock type, e.g. absl::Mutex, the parallel
+// hashmap is intrinsically thread safe.
+//
+// The example below follows the pattern defined in:
+// https://greg7mdp.github.io/parallel-hashmap/
+// https://github.com/greg7mdp/parallel-hashmap/blob/master/examples/bench.cc
+template <class K, class V>
+class thread_safe_flat_hash_map
+    : public phmap::parallel_flat_hash_map<
+          K, V, phmap::container_internal::hash_default_hash<K>,
+          phmap::container_internal::hash_default_eq<K>,
+          std::allocator<std::pair<const K, V>>, /*submaps=*/4, absl::Mutex> {
+};
+
+// Similar as above, define an intrinsically thread-safe flat hash set
+template <class V>
+class thread_safe_flat_hash_set
+    : public phmap::parallel_flat_hash_set<
+          V, phmap::container_internal::hash_default_hash<V>,
+          phmap::container_internal::hash_default_eq<V>,
+          std::allocator<V>, /*submaps=*/4, absl::Mutex> {
+};
+
 namespace utils {
 
 // Convert a grpc::Status to protocol buffer's Status, so it's compatible with
