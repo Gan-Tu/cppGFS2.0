@@ -34,6 +34,38 @@ std::string ComputeNestedFileName(const std::string& base,
   return filename;
 }
 
+// Helper function to easily construct a protos::ChunkServerLocation object
+// by passing the host name and port number. In a sense, this function 
+// serves as a constructor for the designated type with non-trivial
+// parameters, since proto generates only a default constructor
+protos::ChunkServerLocation ChunkServerLocationBuilder(
+    const std::string& hostname, const uint32_t port) {
+  protos::ChunkServerLocation location;
+  location.set_server_hostname(hostname);
+  location.set_server_port(port);
+  return location; 
+}
+
+// Helper function to initialize a FileChunkMetadata from data in 
+// primitive std format. The location below is expressed as a 
+// std::pair<string, uint32_t> where the first field is hostname 
+// and the second the port number
+void InitializeChunkMetadata(
+         protos::FileChunkMetadata& chunk_metadata, 
+         const std::string& chunk_handle, uint32_t version,
+         const std::pair<std::string, uint32_t>& primary_location,
+         const std::vector<std::pair<std::string, uint32_t>>& locations) {
+  chunk_metadata.set_chunk_handle(chunk_handle);
+  chunk_metadata.set_version(version);
+  *chunk_metadata.mutable_primary_location() =
+      ChunkServerLocationBuilder(primary_location.first, 
+                                 primary_location.second);
+ 
+  for(auto& location : locations) {
+    chunk_metadata.mutable_locations()->Add(
+        ChunkServerLocationBuilder(location.first, location.second));
+  }
+}
 
 // The simplest case that one creates a file /foo, and add a file chunk
 TEST_F(MetadataManagerUnitTest, CreateSingleFileMetadata) {
@@ -259,11 +291,20 @@ TEST_F(MetadataManagerUnitTest, ConcurrentFileCreationStressTest) {
 // and create a {num_of_chunk_per_file} number of chunks concurrent.
 // Verify that all assitned chunk handles are unique, and each file metadata
 // contains an expected number of chunk handles
+// In this test, we have two groups of threads, namely writer threads and 
+// reader threads. Writer threads create the chunks as described above,
+// and reader threads read the chunks. Because the read / write operations
+// occur concurrently, some of the read actions may fail if run only once
+// so the reader threads retry until succeeds
 TEST_F(MetadataManagerUnitTest, ConcurrentFileChunkCreationStressTest) {
   int num_of_threads(24);
   int num_of_chunk_per_file(100);
-  gfs::common::thread_safe_flat_hash_set<std::string> assigned_chunk_handles;
-  std::vector<std::thread> threads;
+  // assigned_chunk_handles are the set of chunk handles that are generated
+  // by the writer threads, and observed_chunk_handles are the ones that 
+  // are observed by the reader threads. Their equality gets checked later
+  gfs::common::thread_safe_flat_hash_set<std::string> 
+      assigned_chunk_handles, observed_chunk_handles;
+  std::vector<std::thread> writer_threads, reader_threads;
   std::string filename_base("n");
 
   // Create nested files
@@ -275,8 +316,9 @@ TEST_F(MetadataManagerUnitTest, ConcurrentFileChunkCreationStressTest) {
     EXPECT_TRUE(create_file_metadata_status.ok());
   }
 
+  // Writer threads generate chunks
   for (int i = 0; i < num_of_threads; i++) {
-    threads.push_back(std::thread([&, i]() {
+    writer_threads.push_back(std::thread([&, i]() {
       std::string filename(ComputeNestedFileName(filename_base, i+1));
       for (int chunk_id = 0; chunk_id < num_of_chunk_per_file; chunk_id++) {
         auto create_chunk_handle_or(
@@ -288,12 +330,36 @@ TEST_F(MetadataManagerUnitTest, ConcurrentFileChunkCreationStressTest) {
     }));
   }
 
-  JoinAndClearThreads(threads);
+  // Reader threads keep retrying to read all expected chunks until suceed
+  for (int i = 0; i < num_of_threads; i++) {
+    reader_threads.push_back(std::thread([&, i]() {
+      std::string filename(ComputeNestedFileName(filename_base, i+1));
+      for (int chunk_id = 0; chunk_id < num_of_chunk_per_file; chunk_id++) {
+        auto get_chunk_handle_or(
+                 metadata_manager_->GetChunkHandle(filename, chunk_id));
+        // Retry if read operation is unsuccessful, which can happen if 
+        // a read is ahead of the corresponding chunk creation
+        while(!get_chunk_handle_or.ok()) {
+            get_chunk_handle_or = 
+                metadata_manager_->GetChunkHandle(filename, chunk_id); 
+        }
+        
+        std::string chunk_handle(get_chunk_handle_or.ValueOrDie());
+        observed_chunk_handles.insert(chunk_handle);
+      }
+    }));
+  }
+
+  JoinAndClearThreads(writer_threads);
+  JoinAndClearThreads(reader_threads);
 
   // Verify that there are num_of_chunk_per_file * num_of_threads number of 
   // chunk handles assigned in this test
   EXPECT_EQ(assigned_chunk_handles.size(), 
             num_of_chunk_per_file * num_of_threads);
+  // Veriy that the assigned and observed chunk handle are the same
+  EXPECT_EQ(assigned_chunk_handles, observed_chunk_handles);
+
 
   // Verify that each nested file has expected number of chunk handles
   for (int i = 0; i < nested_level; i++) {
@@ -304,4 +370,36 @@ TEST_F(MetadataManagerUnitTest, ConcurrentFileChunkCreationStressTest) {
     auto file_metadata(file_metadata_or.ValueOrDie());
     EXPECT_EQ(file_metadata->chunk_handles_size(), num_of_chunk_per_file);
   }
+}
+
+// Simple case to verify that Get/SetFileChunkMetadata work as intended
+TEST_F(MetadataManagerUnitTest, SingleSetAndGetFileChunkMetadata) {
+  std::string filename("/SingleSetAndGetFileChunkMetadata");
+  metadata_manager_->CreateFileMetadata(filename);
+  auto create_chunk_handle_or(
+           metadata_manager_->CreateChunkHandle(filename, 0));
+  EXPECT_TRUE(create_chunk_handle_or.ok());
+  auto chunk_handle(create_chunk_handle_or.ValueOrDie());
+  // Set a chunk metadata entry with the following:
+  // chunk_handle : value assigned above
+  // version : default (0)
+  // primary_location : localhost:5000
+  // locations: localhost:5000, localhost:5001, localhost:5002
+  protos::FileChunkMetadata chunk_data;
+  InitializeChunkMetadata(
+      chunk_data, chunk_handle, 0, std::make_pair("localhost", 5000),
+      {std::make_pair("localhost", 5000), std::make_pair("localhost", 5001),
+           std::make_pair("localhost", 5002)});
+
+  metadata_manager_->SetFileChunkMetadata(chunk_data);
+
+  auto chunk_data2_or(metadata_manager_->GetFileChunkMetadata(chunk_handle));
+  EXPECT_TRUE(chunk_data2_or.ok());
+  auto chunk_data2(chunk_data2_or.ValueOrDie());
+
+  EXPECT_EQ(chunk_data2.chunk_handle(), chunk_data.chunk_handle());
+  EXPECT_EQ(chunk_data2.version(), 0);
+  EXPECT_EQ(chunk_data2.primary_location().server_port(), 5000);
+  EXPECT_EQ(chunk_data2.locations(1).server_port(), 5001);
+  EXPECT_EQ(chunk_data2.locations(2).server_port(), 5002);
 }

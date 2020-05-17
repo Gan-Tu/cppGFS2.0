@@ -181,7 +181,7 @@ MetadataManager::AdvanceChunkHandle(const std::string& chunk_handle) {
   // and update the FileChunkMetadata
   protos::FileChunkMetadata chunk_data(chunk_data_or.ValueOrDie());
   chunk_data.set_version(chunk_data.version() + 1);
-  SetFileChunkMetadata(chunk_handle, chunk_data);
+  SetFileChunkMetadata(chunk_data);
 
   return google::protobuf::util::Status::OK;
 }
@@ -199,22 +199,26 @@ MetadataManager::GetFileChunkMetadata(const std::string& chunk_handle) const {
 
 void
 MetadataManager::SetFileChunkMetadata(
-    const std::string& chunk_handle, 
     const protos::FileChunkMetadata& chunk_data) {
+  const std::string& chunk_handle(chunk_data.chunk_handle());
   chunk_metadata_[chunk_handle] = chunk_data;
 }
 
 google::protobuf::util::Status
 MetadataManager::SetPrimaryChunkServerLocation(
-    const std::string& chunk_handle, const std::string& server_location) {
+    const std::string& chunk_handle, 
+    const protos::ChunkServerLocation& server_location) {
   auto chunk_data_or(GetFileChunkMetadata(chunk_handle));
   if (!chunk_data_or.ok()) {
     return chunk_data_or.status();
   }
 
   protos::FileChunkMetadata chunk_data(chunk_data_or.ValueOrDie());
-  chunk_data.set_primary_location(server_location);
-  SetFileChunkMetadata(chunk_handle, chunk_data);
+  // Note: no set_primary_location function is generated as proto treats
+  // ChunkServerLocation as a non-trivial type and uses pointer to store
+  // it underneath, this type of syntax will likely occur frequently
+  (*chunk_data.mutable_primary_location()) = server_location;
+  SetFileChunkMetadata(chunk_data);
 
   return google::protobuf::util::Status::OK;
 }
@@ -222,8 +226,10 @@ MetadataManager::SetPrimaryChunkServerLocation(
 google::protobuf::util::Status
 MetadataManager::RemovePrimaryChunkServerLocation(
     const std::string& chunk_handle) {
-  // Remove the primary chunk server location by setting it to an empty string
-  return SetPrimaryChunkServerLocation(chunk_handle,""); 
+  // Remove the primary chunk server location by setting it to a default 
+  // loation, which has a null server host
+  return SetPrimaryChunkServerLocation(
+             chunk_handle, protos::ChunkServerLocation()); 
 }
 
 // TODO(Xi): In phase 1 the deletion of file is not fully supported but

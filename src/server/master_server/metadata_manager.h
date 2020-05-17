@@ -71,14 +71,13 @@ class MetadataManager {
       GetFileChunkMetadata(const std::string& chunk_handle) const;
 
   // Set the chunk metadata for a given chunk handle
-  void SetFileChunkMetadata(
-      const std::string& chunk_handle, 
-      const protos::FileChunkMetadata& chunk_data);
+  void SetFileChunkMetadata(const protos::FileChunkMetadata& chunk_data);
 
   // Set the primary chunk location for a given chunk handle, return error
   // if chunk handle not found
   google::protobuf::util::Status SetPrimaryChunkServerLocation(
-      const std::string& chunk_handle, const std::string& server_location);
+      const std::string& chunk_handle, 
+      const protos::ChunkServerLocation& server_location);
 
   // Unset the primary chunk location for a given chunk handle, 
   // this happens when a lease expires / gets revoked

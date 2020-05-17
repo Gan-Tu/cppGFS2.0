@@ -26,7 +26,7 @@ message FileChunkMetadata {
 
   // The primary chunk server selected for a given chunk. The primary dicates
   // mutation order among replicas and other replicas follo.
-  string primary_location = 3;
+  ChunkServerLocation primary_location = 3;
   
   // All the replica locations for this particular file chunk
   repeated ChunkServerLocation locations = 4;
