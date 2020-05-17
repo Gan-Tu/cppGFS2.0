@@ -7,6 +7,7 @@
 #include "src/common/utils.h"
 
 using gfs::common::utils::ConvertGrpcStatusToProtobufStatus;
+using gfs::common::utils::ReturnStatusOrFromGrpcStatus;
 using google::protobuf::Empty;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
@@ -22,12 +23,7 @@ StatusOr<OpenFileReply> MasterMetadataServiceClient::SendRequest(
     const OpenFileRequest& request, ClientContext& context) {
   OpenFileReply reply;
   grpc::Status status = stub_->OpenFile(&context, request, &reply);
-
-  if (status.ok()) {
-    return reply;
-  } else {
-    return ConvertGrpcStatusToProtobufStatus(status);
-  }
+  return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
 StatusOr<OpenFileReply> MasterMetadataServiceClient::SendRequest(
@@ -40,12 +36,7 @@ Status MasterMetadataServiceClient::SendRequest(
     const DeleteFileRequest& request, ClientContext& context) {
   google::protobuf::Empty reply;
   grpc::Status status = stub_->DeleteFile(&context, request, &reply);
-
-  if (status.ok()) {
-    return Status::OK;
-  } else {
-    return ConvertGrpcStatusToProtobufStatus(status);
-  }
+  return ConvertGrpcStatusToProtobufStatus(status);
 }
 
 Status MasterMetadataServiceClient::SendRequest(
