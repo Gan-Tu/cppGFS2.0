@@ -9,7 +9,6 @@ namespace server {
 
 MetadataManager::MetadataManager() {
   lock_manager_ = LockManager::GetInstance();
-  file_metadata_lock_ = new absl::Mutex();
 }
 
 google::protobuf::util::Status MetadataManager::CreateFileMetadata(
@@ -26,39 +25,48 @@ google::protobuf::util::Status MetadataManager::CreateFileMetadata(
   // Step 2. Add a new lock for this new file, and writeLock it
   auto path_lock_or(lock_manager_->CreateLock(filename));
   if (!path_lock_or.ok()) {
-    // We still need to check whether the return is NULL because another thread
-    // could well successfully created a new lock for the same path
     return path_lock_or.status();
   }
 
   absl::WriterMutexLock path_writer_lock_guard(path_lock_or.ValueOrDie());
-  // Step 3. writeLock the global lock, instantiate a FileMetadata object
-  absl::WriterMutexLock file_metadata_writer_lock_guard(file_metadata_lock_);
-  // The reason that we acquire the global lock is that we need to
-  // synchronization between write and read from the fileMetadata collection.
-  if (file_metadata_.contains(filename)) {
+  
+  // Step 3. Instantiate a FileMetadata object. Use the emplace function 
+  // to detect if the creation took place (as there can be concurrent
+  // creation in rare cases, and only one succeeds). 
+  auto new_file_metadata(std::make_shared<FileMetadata>());
+  // Initialize filename
+  new_file_metadata->set_filename(filename);
+  
+  auto new_file_metadata_and_if_took_place(
+           file_metadata_.emplace(filename, new_file_metadata));
+  auto has_create_taken_place(new_file_metadata_and_if_took_place.second);
+
+  if (!has_create_taken_place) {
     return google::protobuf::util::Status(
         google::protobuf::util::error::ALREADY_EXISTS,
         "File metadata already exists for " + filename);
   }
 
-  file_metadata_[filename] = std::make_shared<FileMetadata>();
-  // Initialize the filename
-  file_metadata_[filename]->set_filename(filename);
   return google::protobuf::util::Status::OK;
 }
 
 bool MetadataManager::ExistFileMetadata(const std::string& filename) const {
-  absl::ReaderMutexLock reader_lock_guard(file_metadata_lock_);
   return file_metadata_.contains(filename);
 }
 
 google::protobuf::util::StatusOr<std::shared_ptr<FileMetadata>>
 MetadataManager::GetFileMetadata(const std::string& filename) const {
-  // readLock the global lock and retrieve the filemetadata. The reason for a
-  // readLock is because we are not mutating anything in the file_metadata_.
-  absl::ReaderMutexLock reader_lock_guard(file_metadata_lock_);
-  if (!file_metadata_.contains(filename)) {
+  // Note that there is a null check for the filemetadata below. See 
+  // comments in the DeleteFile function. This is to deal with deletion,
+  // if we simply remove the item from file_metadata_ when we delete,
+  // we may run into time-of-check-time-of-use issue (though rare) 
+  // in this function because you can check it and find it exists but
+  // then access it and find it not. What we can do instead is to
+  // replace the share_ptr with a default one (with a null raw ptr
+  // underneath) upon deletion. This way, the .at() function succeeds. 
+  // Regarding to the final removal of this filename, we defer it 
+  // until the final garbage collection of the file chunks. 
+  if (!file_metadata_.contains(filename) || !file_metadata_.at(filename)) {
     return google::protobuf::util::Status(
         google::protobuf::util::error::NOT_FOUND,
         "File metadata does not exist: " + filename);
@@ -77,7 +85,7 @@ MetadataManager::CreateChunkHandle(const std::string& filename,
     return parentLockAnchor.status();
   }
 
-  // Step 2. readlock the global lock, fetch the data and unlock readerlock
+  // Step 2. fetch the file metadata
   auto file_metadata_or(GetFileMetadata(filename));
   if (!file_metadata_or.ok()) {
     return file_metadata_or.status();
@@ -96,7 +104,6 @@ MetadataManager::CreateChunkHandle(const std::string& filename,
 
   // Step 4. compute a new chunk handle, and insert the (chunk_index,
   // chunkHandle)
-  //         pair to file_metadata_
   std::string new_chunk_handle(AllocateNewChunkHandle());
   file_metadata->set_filename(filename);
   auto& chunk_handle_map(*file_metadata->mutable_chunk_handles());
@@ -113,6 +120,12 @@ MetadataManager::CreateChunkHandle(const std::string& filename,
   return new_chunk_handle;
 }
 
+// TODO(Xi): In phase 1 the deletion of file is not fully supported but
+// it would be good to lay out a plan as deletion involves removing items
+// from the shared states. For Filemetadata, the proposed plan here is 
+// to replace the File metadata with a default shared_ptr, and defer
+// the final cleanup to the point when the chunks have been garbage
+// collected. 
 void MetadataManager::DeleteFile(const std::string& filename) {
   // [TODO]: phase 2
 }
