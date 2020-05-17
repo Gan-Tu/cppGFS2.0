@@ -13,9 +13,9 @@ ConfigManager* ConfigManager::ParseConfigFile(
   try {
     node = YAML::LoadFile(config_filename);
     return new ConfigManager(node);
-  } catch (YAML::ParserException e) {
+  } catch (YAML::ParserException& e) {
     return NULL;
-  } catch (YAML::BadFile e) {
+  } catch (YAML::BadFile& e) {
     return NULL;
   }
 }
