@@ -94,6 +94,8 @@ message ReadFileChunkReply {
 message AdvanceFileChunkVersionRequest {
   // An immutable and globally unique UUID chunk identifier.
   string chunk_handle = 1;
+  // The expected chunk version after version advance.
+  uint32 new_chunk_version = 2;
 }
 
 message AdvanceFileChunkVersionReply {
@@ -104,10 +106,16 @@ message AdvanceFileChunkVersionReply {
     UNKNOWN = 0;
     OK = 1;
     FAILED_NOT_FOUND = 2;
+    FAILED_VERSION_OUT_OF_SYNC = 3;
   }
   AdvanceFileChunkVersionStatus status = 2;
-  // The new chunk version after the version advance
-  uint32 new_chunk_version = 3;
+  // The chunk version on the chunk server after the reply
+  // If reply status is OK, this should match the `new_chunk_version`
+  // sent by the request. If reply status is failure, no version has
+  // been advanced on the chunk server, and this is the existing version
+  // for the requested chunk handle on the chunk server. This helps
+  // master to become aware of either itself or chunk server is out of sync
+  uint32 chunk_version = 3;
 }
 
 message WriteFileChunkRequest {
