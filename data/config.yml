@@ -1,0 +1,46 @@
+version: 1.0
+servers:
+  # A list of all servers available in the cluster, at GFS startup time
+  # All server specific metadata in other sections should be key'd using
+  # the server name defined here.
+  master_servers:
+    - master_server_01
+  chunk_servers:
+    - chunk_server_01
+    - chunk_server_02
+    - chunk_server_03
+# Network Information for each server
+# Feel free to change hostname to match Docker config, when applicable
+network:
+  master_server_01:
+    hostname: master_server_01
+    port: 50051
+  chunk_server_01:
+    hostname: chunk_server_01
+    port: 50052
+  chunk_server_02:
+    hostname: chunk_server_02
+    port: 50053
+  chunk_server_03:
+    hostname: chunk_server_03
+    port: 50054
+  dns_lookup_table: # Hostname -> IP address mapping
+    # These values should only be used, if no DNS server is available
+    # for translating hostname to IP address. If using Docker, docker
+    # provides built-in DNS service for container networking:
+    #  https://docs.docker.com/config/containers/container-networking/
+    master_server_01: 0.0.0.0
+    chunk_server_01: 0.0.0.0
+    chunk_server_02: 0.0.0.0
+    chunk_server_03: 0.0.0.0
+disk:
+  # The block size (MB) for each GFS file chunk
+  block_size_mb: 64
+  # The minimum disk space (MB) that a chunk server has to maintain
+  min_free_disk_space_mb: 100
+timeout:
+  # The valid suffixes are "ns", "us" "ms", "s", "m", and "h".
+  grpc: 10s
+  lease: 60s
+  heartbeat: 30s
+  client_cache: 10m
