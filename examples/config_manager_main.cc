@@ -6,7 +6,7 @@
 using gfs::common::ConfigManager;
 using google::protobuf::util::StatusOr;
 
-ABSL_FLAG(std::string, config_path, "./examples/config.yml",
+ABSL_FLAG(std::string, config_path, "./data/config.yml",
           "/absolute/path/to/config.yml");
 
 int main(int argc, char* argv[]) {
@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
 
   for (std::string& server_name : config->GetAllMasterServers()) {
     LOG(INFO) << "Master server: " << server_name
-              << ": (hostname =" << config->GetServerHostname(server_name)
+              << ": (hostname=" << config->GetServerHostname(server_name)
               << ", port=" << config->GetServerPort(server_name)
               << ", server_address=" << config->GetServerAddress(server_name)
               << ", server_ip_address="
