@@ -7,9 +7,8 @@ using gfs::common::ConfigManager;
 class ConfigManagerTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    config_ = ConfigManager::GetConfig(
-                  "./tests/common/config_manager_test_config.yml")
-                  .ValueOrDie();
+    config_ =
+        ConfigManager::GetConfig("./tests/common/test_config.yml").ValueOrDie();
   }
   ConfigManager* config_ = nullptr;
 };
