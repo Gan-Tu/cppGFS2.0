@@ -1,6 +1,7 @@
 #include "metadata_manager.h"
 
 #include <stack>
+#include <thread>
 
 using protos::FileMetadata;
 
@@ -9,10 +10,33 @@ namespace server {
 
 MetadataManager::MetadataManager() {
   lock_manager_ = LockManager::GetInstance();
+  // Set the submap number and initialize locks and each submap
+  num_of_submap_ = std::max(std::thread ::hardware_concurrency(),
+                       (unsigned int)1);
+  file_metadata_lock_ = std::vector<absl::Mutex*>(num_of_submap_, 
+                            new absl::Mutex());
+  file_metadata_ = std::vector<absl::flat_hash_map<std::string,
+                       std::shared_ptr<protos::FileMetadata>>>(num_of_submap_);
+  chunk_metadata_lock_ = std::vector<absl::Mutex*>(num_of_submap_,
+                            new absl::Mutex());
+  chunk_metadata_ = std::vector<absl::flat_hash_map<std::string,
+                        protos::FileChunkMetadata>>(num_of_submap_);
+}
+
+inline size_t MetadataManager::submap_id(const std::string& filename) const {
+  // Compute the hash of given string, and mod the number of submaps
+  return std::hash<std::string>{}(filename) % num_of_submap_;
 }
 
 google::protobuf::util::Status MetadataManager::CreateFileMetadata(
     const std::string& filename) {
+  // There is a series of lock operations in this function and the 
+  // CreateChunkHandle below, and it is important to have a consisten
+  // sequence of lock acquisition. See below
+  // 1) acquire read locks for all parent directories
+  // 2) acquire write lock for the current file
+  // 3) acquire write lock in for file_metadata_lock's submap
+   
   // Step 1. Lock (readerlock underneath) the parent directory first
   ParentLocksAnchor parentLockAnchor(lock_manager_, filename);
 
@@ -30,98 +54,120 @@ google::protobuf::util::Status MetadataManager::CreateFileMetadata(
 
   absl::WriterMutexLock path_writer_lock_guard(path_lock_or.ValueOrDie());
   
-  // Step 3. Instantiate a FileMetadata object. Use the emplace function 
-  // to detect if the creation took place (as there can be concurrent
-  // creation in rare cases, and only one succeeds). 
-  auto new_file_metadata(std::make_shared<FileMetadata>());
-  // Initialize filename
-  new_file_metadata->set_filename(filename);
-  
-  auto new_file_metadata_and_if_took_place(
-           file_metadata_.emplace(filename, new_file_metadata));
-  auto has_create_taken_place(new_file_metadata_and_if_took_place.second);
+  // Step 3. Instantiate a FileMetadata object.
+  auto map_id(submap_id(filename));
+  absl::Mutex* file_lock(file_metadata_lock_[map_id]);
+  // Acquire a writer lock as we are creating a file metadata in the 
+  // submap underneath
+  absl::WriterMutexLock file_write_lock_guard(file_lock);
 
-  if (!has_create_taken_place) {
+  if (file_metadata_[map_id].contains(filename)) {
     return google::protobuf::util::Status(
         google::protobuf::util::error::ALREADY_EXISTS,
         "File metadata already exists for " + filename);
   }
 
+  auto new_file_metadata(std::make_shared<FileMetadata>());
+  // Initialize filename
+  new_file_metadata->set_filename(filename);
+  // Create the new file metadata in the submap
+  file_metadata_[map_id][filename] = new_file_metadata;  
+
   return google::protobuf::util::Status::OK;
 }
 
 bool MetadataManager::ExistFileMetadata(const std::string& filename) const {
-  return file_metadata_.contains(filename);
+  auto map_id(submap_id(filename));
+  absl::Mutex* file_lock(file_metadata_lock_[map_id]);
+  // Acquire a reader lock for lookup
+  absl::ReaderMutexLock file_read_lock_guard(file_lock);
+  return file_metadata_[map_id].contains(filename);
 }
 
 google::protobuf::util::StatusOr<std::shared_ptr<FileMetadata>>
 MetadataManager::GetFileMetadata(const std::string& filename) const {
-  // Note that there is a null check for the filemetadata below. See 
-  // comments in the DeleteFile function. This is to deal with deletion,
-  // if we simply remove the item from file_metadata_ when we delete,
-  // we may run into time-of-check-time-of-use issue (though rare) 
-  // in this function because you can check it and find it exists but
-  // then access it and find it not. What we can do instead is to
-  // replace the share_ptr with a default one (with a null raw ptr
-  // underneath) upon deletion. This way, the .at() function succeeds. 
-  // Regarding to the final removal of this filename, we defer it 
-  // until the final garbage collection of the file chunks. 
-  if (!file_metadata_.contains(filename) || !file_metadata_.at(filename)) {
+  auto map_id(submap_id(filename));
+  absl::Mutex* file_lock(file_metadata_lock_[map_id]);
+  // Acquire a reader lock for lookup
+  absl::ReaderMutexLock file_read_lock_guard(file_lock);
+  if (!file_metadata_[map_id].contains(filename)) {
     return google::protobuf::util::Status(
         google::protobuf::util::error::NOT_FOUND,
         "File metadata does not exist: " + filename);
   }
-  return file_metadata_.at(filename);
+  return file_metadata_[map_id].at(filename);
 }
 
 google::protobuf::util::StatusOr<std::string>
 MetadataManager::CreateChunkHandle(const std::string& filename,
                                    uint32_t chunk_index) {
-  // Step 1. readlock the parent directories
-  ParentLocksAnchor parentLockAnchor(lock_manager_, filename);
-  if (!parentLockAnchor.ok()) {
-    // If this operation fails, which means some of the parent directory does
-    // not exist, we return false
-    return parentLockAnchor.status();
-  }
-
-  // Step 2. fetch the file metadata
-  auto file_metadata_or(GetFileMetadata(filename));
-  if (!file_metadata_or.ok()) {
-    return file_metadata_or.status();
-  }
-  std::shared_ptr<protos::FileMetadata> file_metadata(
-      file_metadata_or.ValueOrDie());
-
-  // Step 3. writelock the lock for this path
-  auto file_path_lock_or(lock_manager_->FetchLock(filename));
-  if (!file_path_lock_or.ok()) {
-    return file_path_lock_or.status();
-  }
-
-  absl::WriterMutexLock file_metadata_writer_lock_guard(
-      file_path_lock_or.ValueOrDie());
-
-  // Step 4. compute a new chunk handle, and insert the (chunk_index,
-  // chunkHandle)
-  std::string new_chunk_handle(AllocateNewChunkHandle());
-  file_metadata->set_filename(filename);
-  auto& chunk_handle_map(*file_metadata->mutable_chunk_handles());
-
-  // Return null UIDD if this chunk_index exists
-  if (chunk_handle_map.contains(chunk_index)) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::ALREADY_EXISTS,
-        "Chunk " + std::to_string(chunk_index) + "already exists in file " +
-            filename);
-  }
-
-  chunk_handle_map[chunk_index] = new_chunk_handle;
+  std::string new_chunk_handle;
   
+  // Note that we introduce a sub-scope below so that a series of locks 
+  // can be released. The first step of this function is to add a new
+  // chunk handle to the designated file metadata. After this step,
+  // we release all the locks that have been acquired. Then in the second
+  // step, we initialize the chunk metadata and add it to the chunk 
+  // metadata collection. The second step purely operates on the chunk
+  // level and no file-level locks are needed. 
+  {
+    // Step 1. readlock the parent directories
+    ParentLocksAnchor parentLockAnchor(lock_manager_, filename);
+    if (!parentLockAnchor.ok()) {
+      // If this operation fails, which means some of the parent directory 
+      // does not exist, we return false
+      return parentLockAnchor.status();
+    }
+
+    // Step 2. writelock the lock for this path
+    auto path_lock_or(lock_manager_->FetchLock(filename));
+    if (!path_lock_or.ok()) {
+      return path_lock_or.status();
+    }
+
+    // This writer lock is to protect the creation of a chunk handle for
+    // the given file
+    absl::WriterMutexLock path_writer_lock_guard(path_lock_or.ValueOrDie());
+
+    // Step 3. fetch the file metadata
+    auto map_id(submap_id(filename));
+    absl::Mutex* file_lock(file_metadata_lock_[map_id]);
+    // Acquire a reader lock as we are fetching the reference for filename
+    absl::ReaderMutexLock file_read_lock_guard(file_lock);
+
+    if (!file_metadata_[map_id].contains(filename)) {
+      return google::protobuf::util::Status(
+          google::protobuf::util::error::NOT_FOUND,
+          "File metadata does not exist: " + filename);
+    }
+
+    // Note that it may be tempting to just call GetFileMetadata here, but
+    // the nuance is that this changes the life time of the lock acquisition
+    // It is a bit unclear whether such operation can cause issue, and 
+    // to play safe, we keep file_read_lock_guard around for a bit. 
+    auto file_metadata(file_metadata_[map_id].at(filename)); 
+
+    // Step 4. compute a new chunk handle, and insert the (chunk_index,
+    // chunkHandle)
+    new_chunk_handle = AllocateNewChunkHandle();
+    file_metadata->set_filename(filename);
+    auto& chunk_handle_map(*file_metadata->mutable_chunk_handles());
+
+    // Return null UIDD if this chunk_index exists
+    if (chunk_handle_map.contains(chunk_index)) {
+      return google::protobuf::util::Status(
+          google::protobuf::util::error::ALREADY_EXISTS,
+          "Chunk " + std::to_string(chunk_index) + "already exists in file " 
+              + filename);
+    }
+
+    chunk_handle_map[chunk_index] = new_chunk_handle;
+  } 
+
   protos::FileChunkMetadata new_chunk_metadata;
   // Initialize chunk handle field and leave other fields default
   new_chunk_metadata.set_chunk_handle(new_chunk_handle);
-  chunk_metadata_[new_chunk_handle] = new_chunk_metadata;
+  SetFileChunkMetadata(new_chunk_metadata);
 
   return new_chunk_handle;
 }
@@ -137,23 +183,27 @@ MetadataManager::GetChunkHandle(
     return parentLockAnchor.status();
   }
 
-  // Step 2. fetch the file metadata
-  auto file_metadata_or(GetFileMetadata(filename));
-  if (!file_metadata_or.ok()) {
-    return file_metadata_or.status();
-  }
-  std::shared_ptr<protos::FileMetadata> file_metadata(
-      file_metadata_or.ValueOrDie());
-
-  // Step 3. readerlock the lock for this path
-  auto file_path_lock_or(lock_manager_->FetchLock(filename));
-  if (!file_path_lock_or.ok()) {
-    return file_path_lock_or.status();
+  // Step 2. readerlock the lock for this path
+  auto path_lock_or(lock_manager_->FetchLock(filename));
+  if (!path_lock_or.ok()) {
+    return path_lock_or.status();
   }
 
-  absl::ReaderMutexLock file_metadata_writer_lock_guard(
-      file_path_lock_or.ValueOrDie());
+  absl::ReaderMutexLock path_reader_lock_guard(path_lock_or.ValueOrDie());
   
+  // Step 3. fetch the file metadata
+  auto map_id(submap_id(filename));
+  absl::Mutex* file_lock(file_metadata_lock_[map_id]);
+  // Acquire a reader lock as we are fetching the reference for filename
+  absl::ReaderMutexLock file_read_lock_guard(file_lock);
+
+  if (!file_metadata_[map_id].contains(filename)) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::NOT_FOUND,
+        "File metadata does not exist: " + filename);
+  }
+  auto file_metadata(file_metadata_[map_id].at(filename)); 
+
   // Step 4. fetch the chunk handle
   auto const& chunk_handle_map(file_metadata->chunk_handles());
 
@@ -188,20 +238,30 @@ MetadataManager::AdvanceChunkVersion(const std::string& chunk_handle) {
 
 google::protobuf::util::StatusOr<protos::FileChunkMetadata>
 MetadataManager::GetFileChunkMetadata(const std::string& chunk_handle) const {
-  if (!chunk_metadata_.contains(chunk_handle)) { 
+  auto map_id(submap_id(chunk_handle));
+  absl::Mutex* chunk_lock(chunk_metadata_lock_[map_id]);
+  // Acquire a reader lock for lookup
+  absl::ReaderMutexLock chunk_read_lock_guard(chunk_lock);
+
+  if (!chunk_metadata_[map_id].contains(chunk_handle)) { 
     return google::protobuf::util::Status(
         google::protobuf::util::error::NOT_FOUND,
         "Chunk handle " + chunk_handle + "'s metadata not found.");
   }
 
-  return chunk_metadata_.at(chunk_handle); 
+  return chunk_metadata_[map_id].at(chunk_handle); 
 }
 
 void
 MetadataManager::SetFileChunkMetadata(
     const protos::FileChunkMetadata& chunk_data) {
   const std::string& chunk_handle(chunk_data.chunk_handle());
-  chunk_metadata_[chunk_handle] = chunk_data;
+  auto map_id(submap_id(chunk_handle));
+  absl::Mutex* chunk_lock(chunk_metadata_lock_[map_id]);
+  // Acquire a writer lock for updates
+  absl::WriterMutexLock chunk_write_lock_guard(chunk_lock);
+
+  chunk_metadata_[map_id][chunk_handle] = chunk_data;
 }
 
 google::protobuf::util::Status

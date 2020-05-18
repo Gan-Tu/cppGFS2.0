@@ -30,8 +30,6 @@ namespace server {
 // MetadataManager
 class MetadataManager {
  public:
-  MetadataManager();
-
   // Create the file metadata (and a lock associated with this file) for a
   // given file path. This function returns error if the file path already
   // exists or if any of the intermediate parent directory not found.
@@ -93,18 +91,41 @@ class MetadataManager {
   static MetadataManager* GetInstance();
 
  private:
+  MetadataManager();
+
   // An atomic uint64 used to assign UUID for each chunk
   std::atomic<uint64_t> global_chunk_id_{0};
-  // Store all deleted chunk handles in a thread-safe hashset
-  gfs::common::thread_safe_flat_hash_set<std::string> deleted_chunk_handles_;
-  // Map from file path to FileMetadata using a thread-safe hashmap
-  gfs::common::thread_safe_flat_hash_map<
-      std::string, std::shared_ptr<protos::FileMetadata>> file_metadata_;
   
+  // The number of submaps used for lookup data structure file_metadata_ 
+  // and chunk_metadata_ defined below. Arguably, one can say we should 
+  // allow configurations for different submaps for each data structure.
+  // But for simplicity we simply use one and this should suffice in this
+  // work. 
+  size_t num_of_submap_;  
+  
+  // Store all deleted chunk handles in a thread-safe hashset
+  absl::flat_hash_set<std::string> deleted_chunk_handles_;
+  // TODO: add a lock for deleted_chunk_handles_ once starting implementing
+  // the deletion logic
+  
+  // Map from file path to FileMetadata using a thread-safe hashmap.
+  // This is a collection of submaps and each is associated with a 
+  // designated lock 
+  std::vector<absl::flat_hash_map<std::string, 
+      std::shared_ptr<protos::FileMetadata>>> file_metadata_;
+ 
+  // An array of locks designated for the file_metadata_ submap
+  std::vector<absl::Mutex*> file_metadata_lock_;
+
   // Map from chunk handle to FileChunkMetadata, which includes all 
-  // the chunk server (replica) locations 
-  gfs::common::thread_safe_flat_hash_map<
-      std::string, protos::FileChunkMetadata> chunk_metadata_; 
+  // the chunk server (replica) locations. Similar to file_metadata_
+  // this is a collection of submaps and each is associated with 
+  // a designated lock
+  std::vector<absl::flat_hash_map<std::string, 
+      protos::FileChunkMetadata>> chunk_metadata_; 
+
+  // An array of locks designated for the chunk_metadata submap
+  std::vector<absl::Mutex*> chunk_metadata_lock_;
 
   // Note that the file_metadata_ maps to the reference of the actual
   // FileMetadata, but file_chunk_metadata_ maps to actual copy of
@@ -120,6 +141,12 @@ class MetadataManager {
   // a data. Last but not least, we do not expect the chunk metadata
   // gets updated frequently, as failure of chunk replica occurs rarely,
   // so some copy operation here is presumbaly tolerable. 
+
+  // Helper function to compute submap id for a given file name
+  // Note that there is a minimal amount of duplicated code (same
+  // has shown in LockManager). One can consider moving them into a 
+  // common place.
+  size_t submap_id(const std::string& filename) const;
 
   // Lock manager to manager the synchronization of operations
   LockManager* lock_manager_;

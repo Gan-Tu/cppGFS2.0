@@ -47,10 +47,30 @@ class LockManager {
   static LockManager* GetInstance();
 
  private:
+  LockManager();
+
+  // Design: to improve throughput for concurrent fetch / creation of locks,
+  // we define a parallel look up table by defining an array of sub maps 
+  // with each managed by a designated lock. We decided to do this our own
+  // as opposed to use some parallel hashmap library because having explicit
+  // control of locks offers advantages when we need to keep certain 
+  // operations atomic, for instance "creation or return error when item 
+  // already exists".
+
+  // The number of submaps used for concurrent lookup for the file_path_locks_ 
+  // defined below. 
+  size_t num_of_submap_;
+
+  // An array of locks defined for each submap
+  std::vector<absl::Mutex*> submap_lock_;
+
   // A parallel hash map that maps from file path to mutexes, which are
   // used to synchronize read and write operations to FileMetadata
-  gfs::common::thread_safe_flat_hash_map<
-      std::string, std::shared_ptr<absl::Mutex>> file_path_locks_;
+  std::vector<absl::flat_hash_map<
+      std::string, absl::Mutex*>> file_path_locks_;
+
+  // Helper function to compute submap id for a given file name
+  size_t submap_id(const std::string& filename) const;
 };
 
 // A helper class which is an RAII wrapper to automatically acquire reader

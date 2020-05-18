@@ -88,7 +88,7 @@ TEST_F(MetadataManagerUnitTest, CreateSingleFileMetadata) {
 // Create multiple files in parallel, the file names are /1, /2, /3...
 // and file each file, create a chunkHandle at index 0
 TEST_F(MetadataManagerUnitTest, CreateMultiFileMetadataInParallel) {
-  auto numOfThreads(10);
+  auto numOfThreads(100);
   std::vector<std::thread> threads;
   for (int i = 0; i < numOfThreads; i++) {
     threads.push_back(std::thread([&, i]() {
