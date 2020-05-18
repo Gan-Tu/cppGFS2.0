@@ -6,7 +6,6 @@
 using google::protobuf::Empty;
 using grpc::ServerContext;
 using protos::grpc::DeleteFileRequest;
-using protos::grpc::MasterMetadataService;
 using protos::grpc::OpenFileReply;
 using protos::grpc::OpenFileRequest;
 

@@ -29,4 +29,4 @@ class MasterMetadataServiceAsyncImpl final
 }  // namespace service
 }  // namespace gfs
 
-#endif  // GFS_SERVER_MASTER_SERVER_MASTER_METADATA_SERVICE_IMPL_H_
+#endif // GFS_SERVER_MASTER_SERVER_MASTER_METADATA_SERVICE_IMPL_H_

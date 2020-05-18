@@ -71,3 +71,26 @@ cc_grpc_library(
     visibility = ["//visibility:public"],
     deps = [":cc_chunk_server_file_service_proto"],
 )
+
+proto_library(
+    name = "master_chunk_server_manager_service_proto",
+    srcs = ["master_chunk_server_manager_service.proto"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/protos:chunk_server_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "cc_master_chunk_server_manager_service_proto",
+    visibility = ["//visibility:public"],
+    deps = [":master_chunk_server_manager_service_proto"],
+)
+
+cc_grpc_library(
+    name = "cc_master_chunk_server_manager_service_grpc",
+    srcs = [":master_chunk_server_manager_service_proto"],
+    grpc_only = True,
+    visibility = ["//visibility:public"],
+    deps = [":cc_master_chunk_server_manager_service_proto"],
+)
