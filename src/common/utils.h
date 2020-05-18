@@ -6,6 +6,7 @@
 #include "google/protobuf/stubs/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "parallel_hashmap/phmap.h"
+#include "yaml-cpp/yaml.h"
 
 namespace gfs {
 namespace common {
@@ -24,17 +25,15 @@ class thread_safe_flat_hash_map
     : public phmap::parallel_flat_hash_map<
           K, V, phmap::container_internal::hash_default_hash<K>,
           phmap::container_internal::hash_default_eq<K>,
-          std::allocator<std::pair<const K, V>>, /*submaps=*/4, absl::Mutex> {
-};
+          std::allocator<std::pair<const K, V>>, /*submaps=*/4, absl::Mutex> {};
 
 // Similar as above, define an intrinsically thread-safe flat hash set
 template <class V>
 class thread_safe_flat_hash_set
     : public phmap::parallel_flat_hash_set<
           V, phmap::container_internal::hash_default_hash<V>,
-          phmap::container_internal::hash_default_eq<V>,
-          std::allocator<V>, /*submaps=*/4, absl::Mutex> {
-};
+          phmap::container_internal::hash_default_eq<V>, std::allocator<V>,
+          /*submaps=*/4, absl::Mutex> {};
 
 namespace utils {
 
@@ -67,6 +66,10 @@ inline google::protobuf::util::StatusOr<T> ReturnStatusOrFromGrpcStatus(
     return ConvertGrpcStatusToProtobufStatus(status);
   }
 }
+
+// Validate a parsed configuration YAML node for required fields/schema.
+// Return Status::OK, if successful; otherwise, any validation error.
+google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node);
 
 }  // namespace utils
 }  // namespace common
