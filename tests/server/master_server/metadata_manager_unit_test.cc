@@ -403,3 +403,136 @@ TEST_F(MetadataManagerUnitTest, SingleSetAndGetFileChunkMetadata) {
   EXPECT_EQ(chunk_data2.locations(1).server_port(), 5001);
   EXPECT_EQ(chunk_data2.locations(2).server_port(), 5002);
 }
+
+// Simple test case to verify that advance chunk version number, set primary
+// location and unset primary location work as intended
+TEST_F(MetadataManagerUnitTest, AdvanceChunkVersionAndSetPrimaryLocationTest) {
+  std::string filename("/AdvanceChunkVersionAndSetPrimaryLocationTest");
+  metadata_manager_->CreateFileMetadata(filename);
+  auto create_chunk_handle_or(
+           metadata_manager_->CreateChunkHandle(filename, 0));
+  EXPECT_TRUE(create_chunk_handle_or.ok());
+  auto chunk_handle(create_chunk_handle_or.ValueOrDie());
+  // Set a chunk metadata entry with the following:
+  // chunk_handle : value assigned above
+  // version : default (0)
+  // primary_location : localhost:5000
+  // locations: localhost:5000, localhost:5001, localhost:5002
+  protos::FileChunkMetadata chunk_data;
+  InitializeChunkMetadata(
+      chunk_data, chunk_handle, 0, std::make_pair("localhost", 5000),
+      {std::make_pair("localhost", 5000)});
+
+  EXPECT_EQ(chunk_data.version(), 0);
+  metadata_manager_->SetFileChunkMetadata(chunk_data);
+
+  // Test that advance chunk version indeed works
+  int num_of_version_advancement(10);
+  for (int i = 0; i < num_of_version_advancement; i++) {
+    metadata_manager_->AdvanceChunkVersion(chunk_handle);
+  }
+  
+  auto chunk_data_read_or(metadata_manager_->GetFileChunkMetadata(chunk_handle));
+  EXPECT_TRUE(chunk_data_read_or.ok());
+  auto chunk_data_read(chunk_data_read_or.ValueOrDie());
+  EXPECT_EQ(chunk_data_read.version(), num_of_version_advancement);
+
+  // Test set / remove primary location works as intended
+  auto new_primary_location(ChunkServerLocationBuilder("localhost", 5001)); 
+  // Set a new primary chunk location, this effectively extends the locations
+  // list, which gets checked below
+  metadata_manager_->SetPrimaryChunkServerLocation(
+      chunk_handle, new_primary_location);
+  chunk_data_read_or = metadata_manager_->GetFileChunkMetadata(chunk_handle);
+  chunk_data_read = chunk_data_read_or.ValueOrDie();
+  EXPECT_EQ(chunk_data_read.primary_location().server_port(), 5001); 
+  EXPECT_EQ(chunk_data_read.locations_size(), 2);
+
+  // Update to another new one
+  new_primary_location = ChunkServerLocationBuilder("localhost", 5002);
+  metadata_manager_->SetPrimaryChunkServerLocation(
+      chunk_handle, new_primary_location);
+  chunk_data_read_or = metadata_manager_->GetFileChunkMetadata(chunk_handle);
+  chunk_data_read = chunk_data_read_or.ValueOrDie();
+  EXPECT_EQ(chunk_data_read.primary_location().server_port(), 5002); 
+  EXPECT_EQ(chunk_data_read.locations_size(), 3);
+
+  // Unset a primary location
+  metadata_manager_->RemovePrimaryChunkServerLocation(chunk_handle);
+  chunk_data_read_or = metadata_manager_->GetFileChunkMetadata(chunk_handle);
+  chunk_data_read = chunk_data_read_or.ValueOrDie();
+  EXPECT_EQ(chunk_data_read.primary_location().server_hostname(),""); 
+
+  // Update a primary location to be the one that exists in the list
+  // verify that the list size unchanged
+  new_primary_location = ChunkServerLocationBuilder("localhost", 5001);
+  metadata_manager_->SetPrimaryChunkServerLocation(
+      chunk_handle, new_primary_location);
+  chunk_data_read_or = metadata_manager_->GetFileChunkMetadata(chunk_handle);
+  chunk_data_read = chunk_data_read_or.ValueOrDie();
+  EXPECT_EQ(chunk_data_read.primary_location().server_port(),5001); 
+  EXPECT_EQ(chunk_data_read.locations_size(), 3);  
+}
+
+// Test parallel writes to different chunks for one file. First we create 
+// a file, and each thread write to a {num_of_chunks_per_thread} chunks
+// to that file in parallel. So for the thread i, it writes to 
+// [i * num_of_chunks_per_thread, ..., (i+1) * num_of_chunks_per_thread)
+// chunk range, and for the j-th chunk in this range, it advances its
+// version number j-times, and sets three locations, namely
+// localhost:5000, localhost:5001, localhost:5002, and set its 
+// primary location to be localhost:5002
+TEST_F(MetadataManagerUnitTest, UpdateChunkMetadataInParallelTest) {
+  int num_of_threads(24);
+  int num_of_chunk_per_file(100);
+  std::vector<std::thread> threads;
+  std::string filename("/UpdateChunkMetadataInParallelTest");
+  metadata_manager_->CreateFileMetadata(filename);
+
+  for (int i = 0; i < num_of_threads; i++) {
+    threads.push_back(std::thread([&, i]() {
+      // Each thread creates a set of chunks that are disjoint with 
+      // one another
+      for (int chunk_id = 0; chunk_id < num_of_chunk_per_file; chunk_id++) {
+        int chunk_index = i * num_of_chunk_per_file + chunk_id;
+        auto chunk_handle(metadata_manager_->CreateChunkHandle(
+                              filename, chunk_index).ValueOrDie());
+     
+        protos::FileChunkMetadata chunk_data;
+        InitializeChunkMetadata(
+            chunk_data, chunk_handle, 0, std::make_pair("localhost", 5000),
+            {std::make_pair("localhost", 5000), 
+             std::make_pair("localhost", 5001),
+             std::make_pair("localhost", 5002)});
+        metadata_manager_->SetFileChunkMetadata(chunk_data); 
+      
+        // Advance the chunk version {chunk_id} number of times
+        for (int j = 0; j < chunk_id; j++) {
+          metadata_manager_->AdvanceChunkVersion(chunk_handle);
+        }
+
+        // Set the primary location
+        auto new_primary_location(ChunkServerLocationBuilder(
+                                      "localhost", 5002));
+        metadata_manager_->SetPrimaryChunkServerLocation(
+                               chunk_handle, new_primary_location);
+      }
+    }));
+  }
+
+  JoinAndClearThreads(threads);
+
+  // Verify the chunk metadata
+  for (int i = 0; i < num_of_threads; i++) {
+    for (int chunk_id = 0; chunk_id < num_of_chunk_per_file; chunk_id++) {
+      int chunk_index = i * num_of_chunk_per_file + chunk_id;
+      auto chunk_handle(metadata_manager_->GetChunkHandle(
+                            filename, chunk_index).ValueOrDie());
+      auto chunk_data(metadata_manager_->GetFileChunkMetadata(
+                          chunk_handle).ValueOrDie());
+      EXPECT_EQ(chunk_data.version(), chunk_id);
+      EXPECT_EQ(chunk_data.primary_location().server_port(), 5002);
+      EXPECT_EQ(chunk_data.locations_size(), 3);
+    }
+  }
+}

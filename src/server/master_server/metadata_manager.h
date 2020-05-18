@@ -62,7 +62,7 @@ class MetadataManager {
 
   // Advance the chunk version number for a chunk handle, return error if
   // chunk handle not found
-  google::protobuf::util::Status AdvanceChunkHandle(
+  google::protobuf::util::Status AdvanceChunkVersion(
       const std::string& chunk_handle);
 
   // Get the chunk metadata for a given chunk handle, return error if 
@@ -74,13 +74,14 @@ class MetadataManager {
   void SetFileChunkMetadata(const protos::FileChunkMetadata& chunk_data);
 
   // Set the primary chunk location for a given chunk handle, return error
-  // if chunk handle not found
+  // if chunk handle not found. If the new primary location does not 
+  // exist in the "locations", then append it to that list. 
   google::protobuf::util::Status SetPrimaryChunkServerLocation(
       const std::string& chunk_handle, 
       const protos::ChunkServerLocation& server_location);
 
   // Unset the primary chunk location for a given chunk handle, 
-  // this happens when a lease expires / gets revoked
+  // this happens when a lease expires / gets revoked. 
   google::protobuf::util::Status RemovePrimaryChunkServerLocation(
       const std::string& chunk_handle);
 
