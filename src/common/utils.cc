@@ -154,7 +154,7 @@ google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node) {
 
   std::vector<std::string> server_types = {"master_servers", "chunk_servers"};
   for (std::string& server_type : server_types) {
-    for (int i = 0; i < node["servers"][server_type].size(); i++) {
+    for (size_t i = 0; i < node["servers"][server_type].size(); i++) {
       std::string server_name =
           node["servers"][server_type][i].as<std::string>();
       if (!node["network"][server_name].IsDefined()) {

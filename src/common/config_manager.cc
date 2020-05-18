@@ -33,11 +33,11 @@ StatusOr<ConfigManager*> ConfigManager::GetConfig(
 
 ConfigManager::ConfigManager(const YAML::Node& node) {
   config_ = node;
-  for (int i = 0; i < config_["servers"]["master_servers"].size(); i++) {
+  for (size_t i = 0; i < config_["servers"]["master_servers"].size(); i++) {
     master_servers_names_.insert(
         config_["servers"]["master_servers"][i].as<std::string>());
   }
-  for (int i = 0; i < config_["servers"]["chunk_servers"].size(); i++) {
+  for (size_t i = 0; i < config_["servers"]["chunk_servers"].size(); i++) {
     chunk_servers_names_.insert(
         config_["servers"]["chunk_servers"][i].as<std::string>());
   }
