@@ -95,6 +95,93 @@ google::protobuf::util::Status CheckFilenameValidity(
   return google::protobuf::util::Status::OK;
 }
 
+google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node) {
+  if (!node.IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT, "empty config");
+  } else if (!node["servers"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: servers");
+  } else if (!node["network"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: network");
+  } else if (!node["disk"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT, "missing: disk");
+  } else if (!node["timeout"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: timeout");
+  } else if (!node["servers"]["master_servers"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: servers.master_servers");
+  } else if (!node["servers"]["chunk_servers"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: servers.chunk_servers");
+  } else if (!node["network"]["dns_lookup_table"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: network.dns_lookup_table");
+  } else if (!node["disk"]["block_size_mb"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: disk.block_size_mb");
+  } else if (!node["disk"]["min_free_disk_space_mb"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: disk.min_free_disk_space_mb");
+  } else if (!node["timeout"]["grpc"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: timeout.grpc");
+  } else if (!node["timeout"]["lease"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: timeout.lease");
+  } else if (!node["timeout"]["heartbeat"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: timeout.heartbeat");
+  } else if (!node["timeout"]["client_cache"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: timeout.client_cache");
+  }
+
+  std::vector<std::string> server_types = {"master_servers", "chunk_servers"};
+  for (std::string& server_type : server_types) {
+    for (int i = 0; i < node["servers"][server_type].size(); i++) {
+      std::string server_name =
+          node["servers"][server_type][i].as<std::string>();
+      if (!node["network"][server_name].IsDefined()) {
+        return google::protobuf::util::Status(
+            google::protobuf::util::error::Code::INVALID_ARGUMENT,
+            "missing: network definition for " + server_name);
+      } else if (!node["network"][server_name]["hostname"].IsDefined()) {
+        return google::protobuf::util::Status(
+            google::protobuf::util::error::Code::INVALID_ARGUMENT,
+            "missing: hostname for " + server_name);
+      } else if (!node["network"][server_name]["port"].IsDefined()) {
+        return google::protobuf::util::Status(
+            google::protobuf::util::error::Code::INVALID_ARGUMENT,
+            "missing: port for " + server_name);
+      }
+      std::string hostname =
+          node["network"][server_name]["hostname"].as<std::string>();
+      if (!node["network"]["dns_lookup_table"][hostname].IsDefined()) {
+        return google::protobuf::util::Status(
+            google::protobuf::util::error::Code::INVALID_ARGUMENT,
+            "missing: dns lookup for " + hostname);
+      }
+    }
+  }
+  return google::protobuf::util::Status::OK;
+}
+
 }  // namespace utils
 }  // namespace common
 }  // namespace gfs

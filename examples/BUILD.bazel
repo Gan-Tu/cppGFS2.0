@@ -11,7 +11,7 @@ cc_binary(
     srcs = ["parallel_hashmap_main.cc"],
     deps = [
         "@com_google_absl//absl/synchronization",
-        "@parallel_hashmap//:parallel_hashmap",
+        "@parallel_hashmap",
     ],
 )
 
@@ -38,7 +38,7 @@ cc_binary(
 cc_binary(
     name = "config_manager_main",
     srcs = ["config_manager_main.cc"],
-    data = ["config.yaml"],
+    data = ["config.yml"],
     deps = [
         "//src/common:config_manager",
         "//src/common:system_logger",
