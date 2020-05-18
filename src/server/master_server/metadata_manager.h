@@ -117,7 +117,9 @@ class MetadataManager {
   // a reference). On the other hande, FileChunkMetadata is relatively
   // small as we do not expect a chunk to have say more than 10
   // replications. Therefore, we simply map to the actual copy of such
-  // a data.  
+  // a data. Last but not least, we do not expect the chunk metadata
+  // gets updated frequently, as failure of chunk replica occurs rarely,
+  // so some copy operation here is presumbaly tolerable. 
 
   // Lock manager to manager the synchronization of operations
   LockManager* lock_manager_;
