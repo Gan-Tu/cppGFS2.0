@@ -6,7 +6,7 @@
 using gfs::common::ConfigManager;
 using google::protobuf::util::StatusOr;
 
-ABSL_FLAG(std::string, config_path, "./data/config.yml",
+ABSL_FLAG(std::string, config_path, "data/config.yml",
           "/absolute/path/to/config.yml");
 
 int main(int argc, char* argv[]) {
