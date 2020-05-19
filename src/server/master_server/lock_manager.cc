@@ -8,51 +8,22 @@ using google::protobuf::util::StatusOr;
 namespace gfs {
 namespace server {
 
-LockManager::LockManager() {
-  num_of_submap_ = std::max(std::thread ::hardware_concurrency(), 
-                            (unsigned int)1);
-  // TODO(Xi): advanced usage may require tuning the submap number so 
-  // to configure the above number
-  
-  // Initialize the locks and submaps
-  submap_lock_ = std::vector<absl::Mutex*>(num_of_submap_, new absl::Mutex());
-  file_path_locks_ = std::vector<absl::flat_hash_map<
-                         std::string, absl::Mutex*>>(num_of_submap_);
-}
-
-inline size_t LockManager::submap_id(const std::string& filename) const {
-  // Compute the hash of given string, and mod the number of submaps
-  return std::hash<std::string>{}(filename) % num_of_submap_;
-}
-
-bool LockManager::Exist(const std::string& filename) const {
-  auto map_id(submap_id(filename));
-  absl::Mutex* submap_lock(submap_lock_[map_id]);
-  // Only a ReaderLock action is needed here as we perform lookup only
-  absl::ReaderMutexLock lock_guard(submap_lock); 
-  return file_path_locks_[map_id].contains(filename);
+bool LockManager::Exist(const std::string& filename) {
+  return file_path_locks_.Contains(filename);
 }
 
 google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
     const std::string& filename) {
-  auto map_id(submap_id(filename));
-  absl::Mutex* submap_lock(submap_lock_[map_id]);
-  // Use the RAII wrapper to automatically lock a lock and unlock it 
-  // when returning. This saves us from explicitly writing unlock()
-  // and from making mistakes when missing these unlock() operations
-  // when returning early
-  absl::WriterMutexLock lock_guard(submap_lock); 
+  std::shared_ptr<absl::Mutex> new_lock(new absl::Mutex());  
  
   // If the filename exists, that means another thread has created this
   // lock, or this thread has been created previously by the current
   // thread
-  if(file_path_locks_[map_id].contains(filename)) {
+  if (!file_path_locks_.TryInsert(filename, new_lock)) {
     return Status(google::protobuf::util::error::ALREADY_EXISTS,
                   "Lock already exists for " + filename);
   }
  
-  file_path_locks_[map_id][filename] = new absl::Mutex();
-  
   // TODO: We have not finalized the plan regarding to the removal of locks.
   // The simplest approach is to say we don't remove locks (note that not 
   // removing locks doesn't equate to not removing files) so we won't have 
@@ -64,24 +35,22 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
   // and say, let's remove the lock resources only after the actual chunk 
   // resources got garbage collected. Let's see how far we can go with this 
   // project and see if we get a chance to improve the design here. 
-  return file_path_locks_[map_id][filename];
+  return new_lock.get();
 }
 
 google::protobuf::util::StatusOr<absl::Mutex*> LockManager::FetchLock(
-    const std::string& filename) const {
-  auto map_id(submap_id(filename));
-  absl::Mutex* submap_lock(submap_lock_[map_id]);
-  // Only a ReaderLock action is needed here as we perform lookup only
-  absl::ReaderMutexLock lock_guard(submap_lock); 
-    
-  if (!file_path_locks_[map_id].contains(filename)) {
+    const std::string& filename) {
+  // The second item of the TryGetValue return indicates whether the item 
+  // exists in the collection, and the first item corresponds to the item
+  // the second item is true 
+  auto try_get_lock(file_path_locks_.TryGetValue(filename));
+  bool lock_exist(try_get_lock.second);
+
+  if (!lock_exist) {
     return Status(google::protobuf::util::error::NOT_FOUND,
                   "Lock does not exist for " + filename);
   }
-  // Note that this is a const method (no mutations take place), so we have
-  // to use the const .at() method as opposed to [] operator, which 
-  // could end up inserting an entry to map
-  return file_path_locks_[map_id].at(filename);
+  return try_get_lock.first.get();
 }
 
 LockManager* LockManager::GetInstance() {

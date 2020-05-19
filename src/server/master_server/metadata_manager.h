@@ -37,7 +37,7 @@ class MetadataManager {
       const std::string& filename);
 
   // Check if metadata file a file exists
-  bool ExistFileMetadata(const std::string& filename) const;
+  bool ExistFileMetadata(const std::string& filename);
 
   // Delete a file metadata, and delete all chunk handles associated with 
   // this file
@@ -47,7 +47,7 @@ class MetadataManager {
   // function needs to ensure the lock for this file is properly used.
   // return error if fileMetadata not found
   google::protobuf::util::StatusOr<std::shared_ptr<protos::FileMetadata>>
-      GetFileMetadata(const std::string& filename) const;
+      GetFileMetadata(const std::string& filename);
 
   // Create a file chunk for a given filename and a chunk index.
   google::protobuf::util::StatusOr<std::string> CreateChunkHandle(
@@ -56,7 +56,7 @@ class MetadataManager {
   // Retrieve a chunk handle for a given filename and chunk index. Return 
   // error if filename or chunk not found
   google::protobuf::util::StatusOr<std::string> GetChunkHandle(
-      const std::string& filename, uint32_t chunk_index) const;
+      const std::string& filename, uint32_t chunk_index);
 
   // Advance the chunk version number for a chunk handle, return error if
   // chunk handle not found
@@ -66,7 +66,7 @@ class MetadataManager {
   // Get the chunk metadata for a given chunk handle, return error if 
   // chunk handle not found 
   google::protobuf::util::StatusOr<protos::FileChunkMetadata> 
-      GetFileChunkMetadata(const std::string& chunk_handle) const;
+      GetFileChunkMetadata(const std::string& chunk_handle);
 
   // Set the chunk metadata for a given chunk handle
   void SetFileChunkMetadata(const protos::FileChunkMetadata& chunk_data);
@@ -96,36 +96,20 @@ class MetadataManager {
   // An atomic uint64 used to assign UUID for each chunk
   std::atomic<uint64_t> global_chunk_id_{0};
   
-  // The number of submaps used for lookup data structure file_metadata_ 
-  // and chunk_metadata_ defined below. Arguably, one can say we should 
-  // allow configurations for different submaps for each data structure.
-  // But for simplicity we simply use one and this should suffice in this
-  // work. 
-  size_t num_of_submap_;  
-  
   // Store all deleted chunk handles in a thread-safe hashset
   absl::flat_hash_set<std::string> deleted_chunk_handles_;
   // TODO: add a lock for deleted_chunk_handles_ once starting implementing
   // the deletion logic
-  
-  // Map from file path to FileMetadata using a thread-safe hashmap.
-  // This is a collection of submaps and each is associated with a 
-  // designated lock 
-  std::vector<absl::flat_hash_map<std::string, 
-      std::shared_ptr<protos::FileMetadata>>> file_metadata_;
  
-  // An array of locks designated for the file_metadata_ submap
-  std::vector<absl::Mutex*> file_metadata_lock_;
-
+  // Parallel hash map for file metadata
+  gfs::common::parallel_hash_map<std::string, 
+      std::shared_ptr<protos::FileMetadata>> file_metadata_;
+ 
   // Map from chunk handle to FileChunkMetadata, which includes all 
   // the chunk server (replica) locations. Similar to file_metadata_
-  // this is a collection of submaps and each is associated with 
-  // a designated lock
-  std::vector<absl::flat_hash_map<std::string, 
-      protos::FileChunkMetadata>> chunk_metadata_; 
-
-  // An array of locks designated for the chunk_metadata submap
-  std::vector<absl::Mutex*> chunk_metadata_lock_;
+  // this is a parallel hash map
+  gfs::common::parallel_hash_map<std::string, 
+      protos::FileChunkMetadata> chunk_metadata_; 
 
   // Note that the file_metadata_ maps to the reference of the actual
   // FileMetadata, but file_chunk_metadata_ maps to actual copy of
@@ -141,12 +125,6 @@ class MetadataManager {
   // a data. Last but not least, we do not expect the chunk metadata
   // gets updated frequently, as failure of chunk replica occurs rarely,
   // so some copy operation here is presumbaly tolerable. 
-
-  // Helper function to compute submap id for a given file name
-  // Note that there is a minimal amount of duplicated code (same
-  // has shown in LockManager). One can consider moving them into a 
-  // common place.
-  size_t submap_id(const std::string& filename) const;
 
   // Lock manager to manager the synchronization of operations
   LockManager* lock_manager_;
