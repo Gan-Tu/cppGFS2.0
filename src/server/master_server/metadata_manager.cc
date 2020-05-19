@@ -131,6 +131,9 @@ MetadataManager::CreateChunkHandle(const std::string& filename,
   new_chunk_metadata.set_chunk_handle(new_chunk_handle);
   SetFileChunkMetadata(new_chunk_metadata);
 
+  // TODO(Xi,Michael): Call ChunkServerManager::AllocateChunkServers to 
+  // allocate chunk servers for this new chunk handle
+
   return new_chunk_handle;
 }
 
@@ -226,30 +229,7 @@ MetadataManager::SetPrimaryChunkServerLocation(
   // ChunkServerLocation as a non-trivial type and uses pointer to store
   // it underneath, this type of syntax will likely occur frequently
   (*chunk_data.mutable_primary_location()) = server_location;
-  
-  // If the server_location is non-null (null corresponds to a removal), 
-  // loop over the locations field and append the new server location
-  // if it is not in that list
-  if (!server_location.server_hostname().empty()) {
-    bool append_to_locations(true);
-    for (int i = 0; i < chunk_data.locations_size(); i++) {
-      if (chunk_data.locations(i).server_hostname() == 
-          server_location.server_hostname() && 
-          chunk_data.locations(i).server_port() == 
-          server_location.server_port()) {
-        append_to_locations = false;
-        break;
-      }
-    }
-  
-    if (append_to_locations) {
-      // Note that there is a rvalue binding issue if you just pass 
-      // "server_location" as is below. 
-      chunk_data.mutable_locations()->Add(
-          protos::ChunkServerLocation(server_location));
-    }
-  }
-  
+ 
   SetFileChunkMetadata(chunk_data);
   return google::protobuf::util::Status::OK;
 }
