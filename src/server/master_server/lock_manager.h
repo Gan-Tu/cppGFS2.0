@@ -33,7 +33,7 @@ namespace server {
 class LockManager {
  public:
   // Check the existence of a lock given a filename
-  bool Exist(const std::string& filename) const;
+  bool Exist(const std::string& filename);
 
   // Create a lock for a given path, return error if the lock already exists
   google::protobuf::util::StatusOr<absl::Mutex*> CreateLock(
@@ -41,7 +41,7 @@ class LockManager {
 
   // Retrieve a lock for a given path, return error if the lock does not exist
   google::protobuf::util::StatusOr<absl::Mutex*> FetchLock(
-      const std::string& filename) const;
+      const std::string& filename);
 
   // Get the instance of the LockManager, which is a singleton
   static LockManager* GetInstance();
@@ -49,7 +49,7 @@ class LockManager {
  private:
   // A parallel hash map that maps from file path to mutexes, which are
   // used to synchronize read and write operations to FileMetadata
-  gfs::common::thread_safe_flat_hash_map<
+  gfs::common::parallel_hash_map<
       std::string, std::shared_ptr<absl::Mutex>> file_path_locks_;
 };
 
