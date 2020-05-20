@@ -19,6 +19,12 @@ message FileChunkMetadata {
   // An immutable and globally unique UUID chunk identifier.
   // This is assigned by the master at the time of chunk creation.
   string chunk_handle = 1;
-  // All the replica locations for this particular file chunk
-  repeated ChunkServerLocation locations = 2;
+
+  // A version number associated with each chunk to distinguish between 
+  // up-to-date and stale replica
+  uint32 version = 2;
+
+  // The primary chunk server selected for a given chunk. The primary dicates
+  // mutation order among replicas and other replicas follo.
+  ChunkServerLocation primary_location = 3;
 }
