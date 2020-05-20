@@ -1,0 +1,11 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+    name = "client_cache_manager_unit_test",
+    srcs = ["client_cache_manager_unit_test.cc"],
+    deps = [
+        "//src/client:client_cache_manager",
+        "@com_google_test//:gtest_main",
+    ],
+)
+
