@@ -152,7 +152,7 @@ TEST_F(ClientCacheManagerUnitTest, ChunkServerLocationTest) {
   // Re-insert an entry again and verify that we can still access it
   CacheManager::ChunkServerLocationEntry chunk_server_location_entry;
   chunk_server_location_entry.primary_location = 
-      ChunkServerLocationBuilder("localhost", 5003);
+      ChunkServerLocationBuilder("localhost", 5002);
   chunk_server_location_entry.locations.push_back(
       ChunkServerLocationBuilder("localhost", 5000));
   chunk_server_location_entry.locations.push_back(
@@ -165,8 +165,11 @@ TEST_F(ClientCacheManagerUnitTest, ChunkServerLocationTest) {
   auto get_chunk_location_or(manager->GetChunkServerLocation("0"));
   EXPECT_TRUE(get_chunk_location_or.ok()); 
   auto cache_entry = get_chunk_location_or.ValueOrDie();
-  EXPECT_EQ(cache_entry.primary_location.server_port(), 5003);
+  EXPECT_EQ(cache_entry.primary_location.server_port(), 5002);
   EXPECT_EQ(cache_entry.locations.size(), 3);
-  
+  EXPECT_EQ(cache_entry.locations[0].server_port(), 5000);
+  EXPECT_EQ(cache_entry.locations[1].server_port(), 5001);
+  EXPECT_EQ(cache_entry.locations[2].server_port(), 5002);
+
   delete manager;
 }
