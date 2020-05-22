@@ -16,7 +16,7 @@ google::protobuf::util::Status open(const char* pathname, unsigned int flags) {
   }
 
   // Write mode
-  if (flags | OpenFlag::Read) {
+  if (flags | OpenFlag::Write) {
   }
 
   return google::protobuf::util::Status::OK;

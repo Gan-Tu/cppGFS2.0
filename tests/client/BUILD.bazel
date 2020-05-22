@@ -5,6 +5,7 @@ cc_test(
     srcs = ["client_cache_manager_unit_test.cc"],
     deps = [
         "//src/client:client_cache_manager",
+        "//tests:utils",
         "@com_google_test//:gtest_main",
     ],
 )

@@ -2,20 +2,10 @@
 
 #include "absl/time/time.h"
 #include "src/client/client_cache_manager.h"
+#include "tests/utils.h"
 
 using namespace gfs::client;
-
-// Helper function to easily construct a protos::ChunkServerLocation object
-// by passing the host name and port number. In a sense, this function 
-// serves as a constructor for the designated type with non-trivial
-// parameters, since proto generates only a default constructor
-protos::ChunkServerLocation ChunkServerLocationBuilder(
-    const std::string& hostname, const uint32_t port) {
-  protos::ChunkServerLocation location;
-  location.set_server_hostname(hostname);
-  location.set_server_port(port);
-  return location; 
-}
+using namespace tests;
 
 class ClientCacheManagerUnitTest : public ::testing::Test {
 };
