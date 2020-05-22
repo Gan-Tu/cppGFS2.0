@@ -20,7 +20,8 @@ cc_binary(
     srcs = ["run_mock_protocol_client_main.cc"],
     deps = [
         "//src/common:system_logger",
-        "//src/common/protocol_client:chunk_server_service_client",
+        "//src/common/protocol_client:chunk_server_service_client_client",
+        "//src/common/protocol_client:chunk_server_service_master_client",
         "//src/common/protocol_client:master_metadata_service_client",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_protobuf//:protobuf_lite",

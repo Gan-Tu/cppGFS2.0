@@ -4,14 +4,16 @@
 
 #include "google/protobuf/timestamp.pb.h"
 #include "grpcpp/grpcpp.h"
-#include "src/common/protocol_client/chunk_server_service_client.h"
+#include "src/common/protocol_client/chunk_server_service_client_client.h"
+#include "src/common/protocol_client/chunk_server_service_master_client.h"
 #include "src/common/protocol_client/master_metadata_service_client.h"
 #include "src/common/system_logger.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
 #include "src/protos/grpc/chunk_server_lease_service.grpc.pb.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
-using gfs::service::ChunkServerServiceClient;
+using gfs::service::ChunkServerServiceClientClient;
+using gfs::service::ChunkServerServiceMasterClient;
 using gfs::service::MasterMetadataServiceClient;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
@@ -45,8 +47,15 @@ int main(int argc, char** argv) {
   auto master_channel = grpc::CreateChannel(master_address, credentials);
   auto chunk_server_lease_channel =
       grpc::CreateChannel(chunk_server_address, credentials);
+  auto chunk_server_file_channel = 
+      grpc::CreateChannel(chunk_server_address, credentials);
   MasterMetadataServiceClient metadata_client(master_channel);
-  ChunkServerServiceClient chunk_server_client(chunk_server_lease_channel);
+  // Master-side client wrapper to issue requests to chunk server
+  ChunkServerServiceMasterClient chunk_server_master_client(
+      chunk_server_lease_channel);
+  // Client-side client wrapper to issue requests to chunk server
+  ChunkServerServiceClientClient chunk_server_client_client(
+      chunk_server_file_channel);
 
   // Prepare a mock gRPC: OpenFile
   OpenFileRequest open_request;
@@ -77,7 +86,8 @@ int main(int argc, char** argv) {
   grpc::ClientContext client_context3;
   LogRequestAndResponse(
       grant_lease_request,
-      chunk_server_client.SendRequest(grant_lease_request, client_context3));
+      chunk_server_master_client.SendRequest(grant_lease_request, 
+                                             client_context3));
 
   // Prepare a mock gRPC: RevokeLease
   RevokeLeaseRequest revoke_lease_request;
@@ -88,7 +98,8 @@ int main(int argc, char** argv) {
   grpc::ClientContext client_context4;
   LogRequestAndResponse(
       revoke_lease_request,
-      chunk_server_client.SendRequest(revoke_lease_request, client_context4));
+      chunk_server_master_client.SendRequest(revoke_lease_request, 
+                                             client_context4));
 
   // Prepare a mock gRPC: InitFileChunk
   InitFileChunkRequest init_file_request;
@@ -97,7 +108,8 @@ int main(int argc, char** argv) {
   grpc::ClientContext client_context5;
   LogRequestAndResponse(
       init_file_request,
-      chunk_server_client.SendRequest(init_file_request, client_context5));
+      chunk_server_master_client.SendRequest(init_file_request, 
+                                             client_context5));
 
   // Prepare a mock gRPC: ReadFileChunk
   ReadFileChunkRequest read_file_request;
@@ -106,7 +118,8 @@ int main(int argc, char** argv) {
   grpc::ClientContext client_context6;
   LogRequestAndResponse(
       read_file_request,
-      chunk_server_client.SendRequest(read_file_request, client_context6));
+      chunk_server_client_client.SendRequest(read_file_request, 
+                                             client_context6));
 
   // Prepare a mock gRPC: WriteFileChunk
   WriteFileChunkRequest write_file_request;
@@ -120,7 +133,8 @@ int main(int argc, char** argv) {
   grpc::ClientContext client_context8;
   LogRequestAndResponse(
       write_file_request,
-      chunk_server_client.SendRequest(write_file_request, client_context8));
+      chunk_server_client_client.SendRequest(write_file_request, 
+                                             client_context8));
 
   // Prepare a mock gRPC: AdvanceFileChunkVersion
   AdvanceFileChunkVersionRequest advance_version_request;
@@ -128,8 +142,9 @@ int main(int argc, char** argv) {
 
   grpc::ClientContext client_context9;
   LogRequestAndResponse(advance_version_request,
-                        chunk_server_client.SendRequest(advance_version_request,
-                                                        client_context9));
+                        chunk_server_master_client.SendRequest(
+                            advance_version_request,
+                            client_context9));
 
   return 0;
 }
