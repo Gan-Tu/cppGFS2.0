@@ -5,6 +5,7 @@ cc_test(
     srcs = ["lock_manager_unit_test.cc"],
     deps = [
         "//src/server/master_server:lock_manager",
+        "//tests:utils",
         "@com_google_test//:gtest_main",
     ],
 )
@@ -14,6 +15,7 @@ cc_test(
     srcs = ["metadata_manager_unit_test.cc"],
     deps = [
         "//src/server/master_server:metadata_manager",
+        "//tests:utils",
         "@com_google_test//:gtest_main",
     ],
 )
@@ -24,6 +26,7 @@ cc_test(
     deps = [
         "//src/protos:cc_chunk_server_proto",
         "//src/server/master_server:chunk_server_manager",
+        "//tests:utils",
         "@com_google_test//:gtest_main",
     ],
 )

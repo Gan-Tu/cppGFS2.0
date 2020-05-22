@@ -7,3 +7,16 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = ["@com_google_protobuf//:protobuf_lite"],
 )
+
+cc_library(
+    name = "client_cache_manager",
+    srcs = ["client_cache_manager.cc"],
+    hdrs = ["client_cache_manager.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/protos:cc_chunk_server_proto",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_protobuf//:protobuf_lite"
+    ]
+)

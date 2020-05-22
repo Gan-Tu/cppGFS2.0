@@ -3,8 +3,10 @@
 
 #include "gtest/gtest.h"
 #include "src/server/master_server/lock_manager.h"
+#include "tests/utils.h"
 
 using namespace gfs::server;
+using namespace tests;
 
 class LockManagerUnitTest : public ::testing::Test {
  protected:
@@ -36,10 +38,7 @@ TEST_F(LockManagerUnitTest, AddLockInParallel) {
         [&, i]() { lockManager_->CreateLock("/" + std::to_string(i)); }));
   }
 
-  // Join all threads
-  for (int i = 0; i < numOfThreads; i++) {
-    threads[i].join();
-  }
+  JoinAndClearThreads(threads);
 
   // Check that all locks exist
   for (int i = 0; i < numOfThreads; i++) {
@@ -62,10 +61,7 @@ TEST_F(LockManagerUnitTest, AddSameLockInParallel) {
     }));
   }
 
-  // Join all threads
-  for (int i = 0; i < numOfThreads; i++) {
-    threads[i].join();
-  }
+  JoinAndClearThreads(threads);
 
   // Only one of the above calls returns successfully
   EXPECT_EQ(cnt.load(), 1);

@@ -3,8 +3,10 @@
 
 #include "gtest/gtest.h"
 #include "src/server/master_server/metadata_manager.h"
+#include "tests/utils.h"
 
 using namespace gfs::server;
+using namespace tests;
 
 class MetadataManagerUnitTest : public ::testing::Test {
  protected:
@@ -12,54 +14,6 @@ class MetadataManagerUnitTest : public ::testing::Test {
 
   MetadataManager* metadata_manager_;
 };
-
-// Helper function to join a colletion of threads and cleanup the container for
-// these threads
-void JoinAndClearThreads(std::vector<std::thread>& threads) {
-  for (auto& t : threads) {
-    t.join();
-  }
-  threads.clear();
-}
-
-// Helper function to compute a filename given a base string and a nested 
-// level. The name scheme takes the following form:
-// "/{base}0/{base}1/..../{base}{nested_level-1}"
-std::string ComputeNestedFileName(const std::string& base, 
-                                  const int nested_level) {
-  std::string filename;
-  for (int i = 0; i < nested_level; i++) {
-    filename += ("/" + base + std::to_string(i));
-  }
-  return filename;
-}
-
-// Helper function to easily construct a protos::ChunkServerLocation object
-// by passing the host name and port number. In a sense, this function 
-// serves as a constructor for the designated type with non-trivial
-// parameters, since proto generates only a default constructor
-protos::ChunkServerLocation ChunkServerLocationBuilder(
-    const std::string& hostname, const uint32_t port) {
-  protos::ChunkServerLocation location;
-  location.set_server_hostname(hostname);
-  location.set_server_port(port);
-  return location; 
-}
-
-// Helper function to initialize a FileChunkMetadata from data in 
-// primitive std format. The location below is expressed as a 
-// std::pair<string, uint32_t> where the first field is hostname 
-// and the second the port number
-void InitializeChunkMetadata(
-         protos::FileChunkMetadata& chunk_metadata, 
-         const std::string& chunk_handle, uint32_t version,
-         const std::pair<std::string, uint32_t>& primary_location) {
-  chunk_metadata.set_chunk_handle(chunk_handle);
-  chunk_metadata.set_version(version);
-  *chunk_metadata.mutable_primary_location() =
-      ChunkServerLocationBuilder(primary_location.first, 
-                                 primary_location.second);
-}
 
 // The simplest case that one creates a file /foo, and add a file chunk
 TEST_F(MetadataManagerUnitTest, CreateSingleFileMetadata) {
