@@ -6,10 +6,14 @@
 using grpc::ServerContext;
 using protos::grpc::AdvanceFileChunkVersionReply;
 using protos::grpc::AdvanceFileChunkVersionRequest;
+using protos::grpc::ApplyMutationsReply;
+using protos::grpc::ApplyMutationsRequest;
 using protos::grpc::InitFileChunkReply;
 using protos::grpc::InitFileChunkRequest;
 using protos::grpc::ReadFileChunkReply;
 using protos::grpc::ReadFileChunkRequest;
+using protos::grpc::SendChunkDataReply;
+using protos::grpc::SendChunkDataRequest;
 using protos::grpc::WriteFileChunkReply;
 using protos::grpc::WriteFileChunkRequest;
 
@@ -42,6 +46,22 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
 grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
     ServerContext* context, const AdvanceFileChunkVersionRequest* request,
     AdvanceFileChunkVersionReply* reply) {
+  // TODO(someone): implement the GFS chunk server logic here
+  return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+}
+
+grpc::Status ChunkServerFileServiceImpl::ApplyMutations(
+    grpc::ServerContext* context,
+    const protos::grpc::ApplyMutationsRequest* request,
+    protos::grpc::ApplyMutationsReply* reply) {
+  // TODO(someone): implement the GFS chunk server logic here
+  return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+}
+
+grpc::Status ChunkServerFileServiceImpl::SendChunkData(
+    grpc::ServerContext* context,
+    const protos::grpc::SendChunkDataRequest* request,
+    protos::grpc::SendChunkDataReply* reply) {
   // TODO(someone): implement the GFS chunk server logic here
   return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
 }
