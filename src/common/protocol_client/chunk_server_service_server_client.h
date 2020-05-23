@@ -1,5 +1,5 @@
-#ifndef GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_MASTER_SERVER_CLIENT_H_
-#define GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_MASTER_SERVER_CLIENT_H_
+#ifndef GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_SERVER_CLIENT_H_
+#define GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_SERVER_CLIENT_H_
 
 #include <memory>
 
@@ -11,8 +11,8 @@
 namespace gfs {
 namespace service {
 
-// Communication manager for the master node acting as a client to send gRPC 
-// requests to the chunk server to perform file operations and 
+// Communication manager for the master node acting as a client to send gRPC
+// requests to the chunk server to perform file operations and
 // lease operations.
 //
 // If you need to customize the gRPC behavior, such as sending extra metadata
@@ -81,7 +81,43 @@ class ChunkServerServiceMasterServerClient {
   std::unique_ptr<protos::grpc::ChunkServerFileService::Stub> file_stub_;
 };
 
+
+
+// Communication manager for fellow chunk servers to send gRPC amongst
+// themselves doing file related, and replication related operations.
+//
+// If you need to customize the gRPC behavior, such as sending extra metadata
+// or set a timeout for the gRPC call, pass an extra gRPC |context| object.
+// Otherwise, default client context is used. For more, see:
+// https://github.com/grpc/grpc/blob/master/include/grpcpp/impl/codegen/client_context_impl.h
+//
+// Note that you should NOT reuse client context, as they are call-specific.
+//
+// TODO(tugan): support sending asynchronous client requests
+class ChunkServerServiceChunkServerClient {
+ public:
+  // Initialize a protocol manager for talking to a gRPC server listening on
+  // the specified gRPC |channel|, which handles gRPCs defined in both the
+  // ChunkServerLeaseService and ChunkServerFileService.
+  ChunkServerServiceChunkServerClient(std::shared_ptr<grpc::Channel> channel)
+      : file_stub_(protos::grpc::ChunkServerFileService::NewStub(channel)) {}
+
+  // Send an ApplyMutations gRPC |request| to the chunk server, and return chunk
+  // server's corresponding reply if successful; otherwise a Status with error
+  // message. This method is synchronous and will block until it hears from the
+  // chunk server. This gRPC is only sent by master to the chunk server.
+  google::protobuf::util::StatusOr<protos::grpc::ApplyMutationsReply>
+  SendRequest(const protos::grpc::ApplyMutationsRequest& request);
+  google::protobuf::util::StatusOr<protos::grpc::ApplyMutationsReply>
+  SendRequest(const protos::grpc::ApplyMutationsRequest& request,
+              grpc::ClientContext& context);
+
+ private:
+  // The gRPC client for managing protocols defined in ChunkServerFileService
+  std::unique_ptr<protos::grpc::ChunkServerFileService::Stub> file_stub_;
+};
+
 }  // namespace service
 }  // namespace gfs
 
-#endif  // GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_MASTER_SERVER_CLIENT_H_
+#endif  // GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_SERVER_CLIENT_H_

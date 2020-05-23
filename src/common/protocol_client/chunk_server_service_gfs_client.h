@@ -10,8 +10,8 @@
 namespace gfs {
 namespace service {
 
-// Communication manager for a GFS client / chunk server to send gRPC requests 
-// to the chunk server to perform file operations.
+// Communication manager for a GFS client to send gRPC requests to the chunk
+// server to perform file operations.
 //
 // If you need to customize the gRPC behavior, such as sending extra metadata
 // or set a timeout for the gRPC call, pass an extra gRPC |context| object.
@@ -39,20 +39,21 @@ class ChunkServerServiceGfsClient {
   SendRequest(const protos::grpc::ReadFileChunkRequest& request,
               grpc::ClientContext& context);
 
-  // Send an SendFileChunkRequest gRPC |request| to the chunk server, and
+  // Send an SendChunkDataRequest gRPC |request| to the chunk server, and
   // return chunk server's corresponding reply if successful; otherwise a Status
   // with error message. This method is synchronous and will block until it
   // hears from the chunk server.
-  google::protobuf::util::StatusOr<protos::grpc::SendFileChunkReply>
-  SendRequest(const protos::grpc::SendFileChunkRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::SendFileChunkReply>
-  SendRequest(const protos::grpc::SendFileChunkRequest& request,
+  google::protobuf::util::StatusOr<protos::grpc::SendChunkDataReply>
+  SendRequest(const protos::grpc::SendChunkDataRequest& request);
+  google::protobuf::util::StatusOr<protos::grpc::SendChunkDataReply>
+  SendRequest(const protos::grpc::SendChunkDataRequest& request,
               grpc::ClientContext& context);
 
   // Send an WriteFileChunkRequest gRPC |request| to the chunk server, and
   // return chunk server's corresponding reply if successful; otherwise a Status
-  // with error message. This method is synchronous and will block until it
-  // hears from the chunk server.
+  // with error message, as well as all other statuses from secondary replica.
+  // This method is synchronous and will block until it hears from the chunk
+  // server.
   google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
   SendRequest(const protos::grpc::WriteFileChunkRequest& request);
   google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
