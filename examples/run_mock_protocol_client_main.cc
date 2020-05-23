@@ -73,7 +73,6 @@ int main(int argc, char** argv) {
   }
 
   // Initialize an instance of communication manager
-  // TODO(tugan): add support to listen on host:port based on configuration
   std::string master_address(config->GetServerAddress(
       master_name, /*resolve_hostname=*/!use_docker_dns_server));
   std::string chunk_server_address(config->GetServerAddress(
