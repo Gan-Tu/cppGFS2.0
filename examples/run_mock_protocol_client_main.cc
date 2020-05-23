@@ -77,6 +77,7 @@ int main(int argc, char** argv) {
       config->GetServerAddress(master_name, resolve_hostname));
   std::string chunk_server_address(
       config->GetServerAddress(chunk_server_name, resolve_hostname));
+
   auto credentials = grpc::InsecureChannelCredentials();
 
   LOG(INFO) << "Connecting to master server at " << master_address;

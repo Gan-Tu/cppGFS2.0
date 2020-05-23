@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
 
   std::string server_address(
       config->GetServerAddress(chunk_server_name, resolve_hostname));
-
+  
   // Listen on the given address without any authentication mechanism for now.
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
 
