@@ -5,8 +5,10 @@ cc_library(
     srcs = ["master_metadata_service_impl.cc"],
     hdrs = ["master_metadata_service_impl.h"],
     deps = [
+        "//src/common/protocol_client:chunk_server_service_client",
         "//src/protos/grpc:cc_master_metadata_service_grpc",
         "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
 
