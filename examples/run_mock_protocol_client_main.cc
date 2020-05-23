@@ -2,8 +2,11 @@
 #include <memory>
 #include <string>
 
+#include "absl/flags/flag.h"
+#include "absl/flags/parse.h"
 #include "google/protobuf/timestamp.pb.h"
 #include "grpcpp/grpcpp.h"
+#include "src/common/config_manager.h"
 #include "src/common/protocol_client/chunk_server_service_gfs_client.h"
 #include "src/common/protocol_client/chunk_server_service_server_client.h"
 #include "src/common/protocol_client/master_metadata_service_client.h"
@@ -12,6 +15,7 @@
 #include "src/protos/grpc/chunk_server_lease_service.grpc.pb.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
+using gfs::common::ConfigManager;
 using gfs::service::ChunkServerServiceChunkServerClient;
 using gfs::service::ChunkServerServiceGfsClient;
 using gfs::service::ChunkServerServiceMasterServerClient;
@@ -30,6 +34,13 @@ using protos::grpc::SendChunkDataRequest;
 using protos::grpc::WriteFileChunkRequest;
 using protos::grpc::WriteFileChunkRequestHeader;
 
+ABSL_FLAG(std::string, config_path, "data/config.yml", "/path/to/config.yml");
+ABSL_FLAG(std::string, master_name, "master_server_01",
+          "connect to the given master server, as defined in the config");
+ABSL_FLAG(std::string, chunk_server_name, "chunk_server_01",
+          "connect to the given chunk server, as defined in the config");
+ABSL_FLAG(bool, use_docker_dns_server, false, "use docker's DNS server");
+
 template <typename T, typename U>
 void LogRequestAndResponse(T request, StatusOr<U> reply_or) {
   LOG(INFO) << "Request sent: \n" << request.DebugString();
@@ -43,14 +54,38 @@ void LogRequestAndResponse(T request, StatusOr<U> reply_or) {
 int main(int argc, char** argv) {
   gfs::common::SystemLogger::GetInstance().Initialize(/*program_name=*/argv[0]);
 
+  // Parse command line arguments
+  absl::ParseCommandLine(argc, argv);
+  const std::string config_path = absl::GetFlag(FLAGS_config_path);
+  const std::string master_name = absl::GetFlag(FLAGS_master_name);
+  const std::string chunk_server_name = absl::GetFlag(FLAGS_chunk_server_name);
+  const bool use_docker_dns_server = absl::GetFlag(FLAGS_use_docker_dns_server);
+
+  // Initialize configurations
+  LOG(INFO) << "Reading GFS configuration: " << config_path;
+  ConfigManager* config = ConfigManager::GetConfig(config_path).ValueOrDie();
+  if (!config->HasMasterServer(master_name)) {
+    LOG(ERROR) << "No master server found in config: " << master_name;
+    return 1;
+  } else if (!config->HasChunkServer(chunk_server_name)) {
+    LOG(ERROR) << "No chunk server found in config: " << chunk_server_name;
+    return 1;
+  }
+
   // Initialize an instance of communication manager
-  // TODO(tugan): add support to listen on host:port based on configuration
-  std::string master_address("0.0.0.0:50051");
-  std::string chunk_server_address("0.0.0.0:50052");
+  std::string master_address(config->GetServerAddress(
+      master_name, /*resolve_hostname=*/!use_docker_dns_server));
+  std::string chunk_server_address(config->GetServerAddress(
+      chunk_server_name, /*resolve_hostname=*/!use_docker_dns_server));
   auto credentials = grpc::InsecureChannelCredentials();
+
+  LOG(INFO) << "Connecting to master server at " << master_address;
   auto master_channel = grpc::CreateChannel(master_address, credentials);
+
+  LOG(INFO) << "Connecting to chunk server at " << chunk_server_address;
   auto chunk_server_channel =
       grpc::CreateChannel(chunk_server_address, credentials);
+
   MasterMetadataServiceClient metadata_client(master_channel);
   // Master-side client wrapper to issue requests to chunk server
   ChunkServerServiceMasterServerClient chunk_server_master_client(

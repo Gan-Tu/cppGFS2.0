@@ -18,12 +18,16 @@ cc_binary(
 cc_binary(
     name = "run_mock_protocol_client_main",
     srcs = ["run_mock_protocol_client_main.cc"],
+    data = ["//data:config.yml"],
     deps = [
+        "//src/common:config_manager",
         "//src/common:system_logger",
         "//src/common/protocol_client:chunk_server_service_gfs_client",
         "//src/common/protocol_client:chunk_server_service_server_client",
         "//src/common/protocol_client:master_metadata_service_client",
         "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/flags:parse",
         "@com_google_protobuf//:protobuf_lite",
     ],
 )
