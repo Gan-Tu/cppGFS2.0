@@ -41,7 +41,6 @@ int main(int argc, char** argv) {
   LOG(INFO) << "Server starting...";
   ServerBuilder builder;
 
-  // TODO(tugan): add support to listen on host:port based on configuration
   std::string server_address(config->GetServerAddress(
       master_name, /*resolve_hostname=*/!use_docker_dns_server));
 
