@@ -27,8 +27,7 @@ int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
   const std::string config_path = absl::GetFlag(FLAGS_config_path);
   const std::string master_name = absl::GetFlag(FLAGS_master_name);
-  const bool use_docker_dns_server = absl::GetFlag(FLAGS_use_docker_dns_server);
-  const bool resolve_hostname = !use_docker_dns_server;
+  const bool resolve_hostname = !absl::GetFlag(FLAGS_use_docker_dns_server);
 
   // Initialize configurations
   LOG(INFO) << "Reading GFS configuration: " << config_path;
