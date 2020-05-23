@@ -4,16 +4,16 @@
 
 #include "google/protobuf/timestamp.pb.h"
 #include "grpcpp/grpcpp.h"
-#include "src/common/protocol_client/chunk_server_service_client_client.h"
-#include "src/common/protocol_client/chunk_server_service_master_client.h"
+#include "src/common/protocol_client/chunk_server_service_gfs_client.h"
+#include "src/common/protocol_client/chunk_server_service_master_server_client.h"
 #include "src/common/protocol_client/master_metadata_service_client.h"
 #include "src/common/system_logger.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
 #include "src/protos/grpc/chunk_server_lease_service.grpc.pb.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
-using gfs::service::ChunkServerServiceClientClient;
-using gfs::service::ChunkServerServiceMasterClient;
+using gfs::service::ChunkServerServiceGfsClient;
+using gfs::service::ChunkServerServiceMasterServerClient;
 using gfs::service::MasterMetadataServiceClient;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
@@ -24,7 +24,10 @@ using protos::grpc::InitFileChunkRequest;
 using protos::grpc::OpenFileRequest;
 using protos::grpc::ReadFileChunkRequest;
 using protos::grpc::RevokeLeaseRequest;
+using protos::grpc::SendFileChunkRequest;
 using protos::grpc::WriteFileChunkRequest;
+using protos::grpc::WriteFileChunkRequestHeader;
+
 
 template <typename T, typename U>
 void LogRequestAndResponse(T request, StatusOr<U> reply_or) {
@@ -51,10 +54,10 @@ int main(int argc, char** argv) {
       grpc::CreateChannel(chunk_server_address, credentials);
   MasterMetadataServiceClient metadata_client(master_channel);
   // Master-side client wrapper to issue requests to chunk server
-  ChunkServerServiceMasterClient chunk_server_master_client(
+  ChunkServerServiceMasterServerClient chunk_server_master_client(
       chunk_server_lease_channel);
-  // Client-side client wrapper to issue requests to chunk server
-  ChunkServerServiceClientClient chunk_server_client_client(
+  // Client / Chunk server-side client wrapper to issue requests to chunk server
+  ChunkServerServiceGfsClient chunk_server_client_client(
       chunk_server_file_channel);
 
   // Prepare a mock gRPC: OpenFile
@@ -122,18 +125,20 @@ int main(int argc, char** argv) {
                                              client_context6));
 
   // Prepare a mock gRPC: WriteFileChunk
-  WriteFileChunkRequest write_file_request;
-  write_file_request.set_chunk_handle("9d2a2342-97f9-11ea");
-  write_file_request.set_chunk_version(10);
-  write_file_request.set_offset_start(100);
-  write_file_request.set_length(50);
+  WriteFileChunkRequestHeader write_file_request_header;
+  SendFileChunkRequest send_file_request;
+  write_file_request_header.set_chunk_handle("9d2a2342-97f9-11ea");
+  write_file_request_header.set_chunk_version(10);
+  write_file_request_header.set_offset_start(100);
+  write_file_request_header.set_length(50);
   std::string payload = "Hello World";
-  write_file_request.set_data(payload.c_str());
+  *send_file_request.mutable_header() = write_file_request_header;
+  send_file_request.set_data(payload.c_str());
 
   grpc::ClientContext client_context8;
   LogRequestAndResponse(
-      write_file_request,
-      chunk_server_client_client.SendRequest(write_file_request, 
+      send_file_request,
+      chunk_server_client_client.SendRequest(send_file_request, 
                                              client_context8));
 
   // Prepare a mock gRPC: AdvanceFileChunkVersion

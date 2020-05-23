@@ -1,4 +1,4 @@
-#include "src/common/protocol_client/chunk_server_service_master_client.h"
+#include "src/common/protocol_client/chunk_server_service_master_server_client.h"
 
 #include <memory>
 
@@ -21,28 +21,28 @@ using protos::grpc::RevokeLeaseRequest;
 namespace gfs {
 namespace service {
 
-StatusOr<GrantLeaseReply> ChunkServerServiceMasterClient::SendRequest(
+StatusOr<GrantLeaseReply> ChunkServerServiceMasterServerClient::SendRequest(
     const GrantLeaseRequest& request, ClientContext& context) {
   GrantLeaseReply reply;
   grpc::Status status = lease_stub_->GrantLease(&context, request, &reply);
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
-StatusOr<RevokeLeaseReply> ChunkServerServiceMasterClient::SendRequest(
+StatusOr<RevokeLeaseReply> ChunkServerServiceMasterServerClient::SendRequest(
     const RevokeLeaseRequest& request, ClientContext& context) {
   RevokeLeaseReply reply;
   grpc::Status status = lease_stub_->RevokeLease(&context, request, &reply);
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
-StatusOr<InitFileChunkReply> ChunkServerServiceMasterClient::SendRequest(
+StatusOr<InitFileChunkReply> ChunkServerServiceMasterServerClient::SendRequest(
     const InitFileChunkRequest& request, ClientContext& context) {
   InitFileChunkReply reply;
   grpc::Status status = file_stub_->InitFileChunk(&context, request, &reply);
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
-StatusOr<AdvanceFileChunkVersionReply> ChunkServerServiceMasterClient::SendRequest(
+StatusOr<AdvanceFileChunkVersionReply> ChunkServerServiceMasterServerClient::SendRequest(
     const AdvanceFileChunkVersionRequest& request, ClientContext& context) {
   AdvanceFileChunkVersionReply reply;
   grpc::Status status =
@@ -54,25 +54,25 @@ StatusOr<AdvanceFileChunkVersionReply> ChunkServerServiceMasterClient::SendReque
 // Overloaded functions using default mutable client context
 //
 
-StatusOr<GrantLeaseReply> ChunkServerServiceMasterClient::SendRequest(
+StatusOr<GrantLeaseReply> ChunkServerServiceMasterServerClient::SendRequest(
     const GrantLeaseRequest& request) {
   ClientContext default_context;
   return SendRequest(request, default_context);
 }
 
-StatusOr<RevokeLeaseReply> ChunkServerServiceMasterClient::SendRequest(
+StatusOr<RevokeLeaseReply> ChunkServerServiceMasterServerClient::SendRequest(
     const RevokeLeaseRequest& request) {
   ClientContext default_context;
   return SendRequest(request, default_context);
 }
 
-StatusOr<InitFileChunkReply> ChunkServerServiceMasterClient::SendRequest(
+StatusOr<InitFileChunkReply> ChunkServerServiceMasterServerClient::SendRequest(
     const InitFileChunkRequest& request) {
   ClientContext default_context;
   return SendRequest(request, default_context);
 }
 
-StatusOr<AdvanceFileChunkVersionReply> ChunkServerServiceMasterClient::SendRequest(
+StatusOr<AdvanceFileChunkVersionReply> ChunkServerServiceMasterServerClient::SendRequest(
     const AdvanceFileChunkVersionRequest& request) {
   ClientContext default_context;
   return SendRequest(request, default_context);

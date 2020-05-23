@@ -1,5 +1,5 @@
-#ifndef GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_CLIENT_CLIENT_H_
-#define GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_CLIENT_CLIENT_H_
+#ifndef GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_GFS_CLIENT_H_
+#define GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_GFS_CLIENT_H_
 
 #include <memory>
 
@@ -10,8 +10,8 @@
 namespace gfs {
 namespace service {
 
-// Communication manager for a GFS client to send gRPC requests to the 
-// chunk server to perform file operations.
+// Communication manager for a GFS client / chunk server to send gRPC requests 
+// to the chunk server to perform file operations.
 //
 // If you need to customize the gRPC behavior, such as sending extra metadata
 // or set a timeout for the gRPC call, pass an extra gRPC |context| object.
@@ -21,12 +21,12 @@ namespace service {
 // Note that you should NOT reuse client context, as they are call-specific.
 //
 // TODO(tugan): support sending asynchronous client requests
-class ChunkServerServiceClientClient {
+class ChunkServerServiceGfsClient {
  public:
   // Initialize a protocol manager for talking to a gRPC server listening on
   // the specified gRPC |channel|, which handles gRPCs defined in both the
   // ChunkServerLeaseService and ChunkServerFileService.
-  ChunkServerServiceClientClient(std::shared_ptr<grpc::Channel> channel)
+  ChunkServerServiceGfsClient(std::shared_ptr<grpc::Channel> channel)
       : file_stub_(protos::grpc::ChunkServerFileService::NewStub(channel)) {}
 
   // Send an ReadFileChunk gRPC |request| to the chunk server, and return chunk
@@ -37,6 +37,16 @@ class ChunkServerServiceClientClient {
   SendRequest(const protos::grpc::ReadFileChunkRequest& request);
   google::protobuf::util::StatusOr<protos::grpc::ReadFileChunkReply>
   SendRequest(const protos::grpc::ReadFileChunkRequest& request,
+              grpc::ClientContext& context);
+
+  // Send an SendFileChunkRequest gRPC |request| to the chunk server, and
+  // return chunk server's corresponding reply if successful; otherwise a Status
+  // with error message. This method is synchronous and will block until it
+  // hears from the chunk server.
+  google::protobuf::util::StatusOr<protos::grpc::SendFileChunkReply>
+  SendRequest(const protos::grpc::SendFileChunkRequest& request);
+  google::protobuf::util::StatusOr<protos::grpc::SendFileChunkReply>
+  SendRequest(const protos::grpc::SendFileChunkRequest& request,
               grpc::ClientContext& context);
 
   // Send an WriteFileChunkRequest gRPC |request| to the chunk server, and
@@ -57,4 +67,4 @@ class ChunkServerServiceClientClient {
 }  // namespace service
 }  // namespace gfs
 
-#endif  // GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_CLIENT_CLIENT_H_
+#endif  // GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_GFS_CLIENT_H_

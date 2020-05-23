@@ -27,9 +27,9 @@ cc_library(
 )
 
 cc_library(
-    name = "chunk_server_service_client_client",
-    srcs = ["chunk_server_service_client_client.cc"],
-    hdrs = ["chunk_server_service_client_client.h"],
+    name = "chunk_server_service_gfs_client",
+    srcs = ["chunk_server_service_gfs_client.cc"],
+    hdrs = ["chunk_server_service_gfs_client.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/common:utils",
@@ -40,9 +40,9 @@ cc_library(
 )
 
 cc_library(
-    name = "chunk_server_service_master_client",
-    srcs = ["chunk_server_service_master_client.cc"],
-    hdrs = ["chunk_server_service_master_client.h"],
+    name = "chunk_server_service_master_server_client",
+    srcs = ["chunk_server_service_master_server_client.cc"],
+    hdrs = ["chunk_server_service_master_server_client.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/common:utils",

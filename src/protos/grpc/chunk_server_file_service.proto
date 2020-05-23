@@ -25,16 +25,25 @@ service ChunkServerFileService {
   rpc AdvanceFileChunkVersion(AdvanceFileChunkVersionRequest) 
     returns (AdvanceFileChunkVersionReply) {}
 
-  // Write |length| number of bytes of given |data| buffer to |chunk_handle| 
+  // Send |length| number of bytes of given |data| buffer to |chunk_handle| 
   // of known version |chunk_version| at |offset_start|. Return the actual 
-  // number of bytes written, if the operation is successful; otherwise, 
-  // return any errors.
+  // number of bytes written (to memory), if the operation is successful; 
+  // otherwise, return any errors. The chunk server stores the writen data 
+  // in an internal cache unit, which later it will apply to write to the disk. 
   //
   // The actual number of bytes written can be smaller than requested |length|,
   // if either EOF has reached, or the given |data| buffer is shorter than 
   // specified |length|. If |length| is smaller than the whole |data| buffer
   // length, only the first |length| bytes of the |data| buffer will be written.
   // If |offset_start| is larger than the chunk size, no bytes will be written
+  rpc SendFileChunk(SendFileChunkRequest) returns (SendFileChunkReply) {}
+
+  // Send a WriteFileChunkRequest, which includes repeated fields of 
+  // WriteFileChunkRequestHeader that identify a sequence of write operations
+  // upon a chunk handle (offset, length). This request was first sent by
+  // client to the primary chunk server, and then forwarded to the replicas. 
+  // All replicas apply the write requests in the sequence specified in this
+  // RPC.
   rpc WriteFileChunk(WriteFileChunkRequest) returns (WriteFileChunkReply) {}
 
   // TODO(tugan): add support for the master to ask chunk server to copy file
@@ -118,7 +127,7 @@ message AdvanceFileChunkVersionReply {
   uint32 chunk_version = 3;
 }
 
-message WriteFileChunkRequest {
+message WriteFileChunkRequestHeader {
   // An immutable and globally unique UUID chunk identifier.
   string chunk_handle = 1;
   // The version of the file chunk that the requester is trying to write
@@ -127,22 +136,47 @@ message WriteFileChunkRequest {
   uint32 offset_start = 3;
   // The number of bytes to write
   uint32 length = 4;
-  // The data to write
-  bytes data = 5;
+  // Use a check_sum of the written data so that the chunk server can uniquely 
+  // identify a write operation (chunk_handle, offset, len, data). 
+  // TODO(Xi): This field is likely optional given that we are not supporting
+  // concurrent write. Leave it here as a placeholder. 
+  string check_sum = 5;  
+}
+
+message SendFileChunkRequest {
+  // Store the information of a write operation on a chunk in the header
+  WriteFileChunkRequestHeader header = 1;
+  bytes data = 2;
+}
+
+// An enum type used for return status for Send/WriteFileChunkReply
+enum FileChunkStatus {
+  UNKNOWN = 0;
+  OK = 1;
+  FAILED_NOT_FOUND = 2;
+  FAILED_STALE_VERSION = 3;
+  FAILED_NOT_LEASE_HOLDER = 4;
+}
+
+message SendFileChunkReply {
+  // The original request associated with this reply.
+  SendFileChunkRequest request = 1;
+  // The status of file chunk write operation
+  FileChunkStatus status = 2;
+  // The number of bytes that was actually written
+  uint32 bytes_written = 3;
+}
+
+message WriteFileChunkRequest {
+  // A sequence of operations that all chunk server replica apply to a file
+  repeated WriteFileChunkRequestHeader write_request_headers = 1; 
 }
 
 message WriteFileChunkReply {
   // The original request associated with this reply.
   WriteFileChunkRequest request = 1;
   // The status of file chunk write operation
-  enum WriteFileChunkStatus {
-    UNKNOWN = 0;
-    OK = 1;
-    FAILED_NOT_FOUND = 2;
-    FAILED_STALE_VERSION = 3;
-    FAILED_NOT_LEASE_HOLDER = 4;
-  }
-  WriteFileChunkStatus status = 2;
+  FileChunkStatus status = 2;
   // The number of bytes that was actually written
   uint32 bytes_written = 3;
 }

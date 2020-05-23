@@ -1,4 +1,4 @@
-#include "src/common/protocol_client/chunk_server_service_client_client.h"
+#include "src/common/protocol_client/chunk_server_service_gfs_client.h"
 
 #include <memory>
 
@@ -11,20 +11,29 @@ using google::protobuf::util::StatusOr;
 using grpc::ClientContext;
 using protos::grpc::ReadFileChunkReply;
 using protos::grpc::ReadFileChunkRequest;
+using protos::grpc::SendFileChunkReply;
+using protos::grpc::SendFileChunkRequest;
 using protos::grpc::WriteFileChunkReply;
 using protos::grpc::WriteFileChunkRequest;
 
 namespace gfs {
 namespace service {
 
-StatusOr<ReadFileChunkReply> ChunkServerServiceClientClient::SendRequest(
+StatusOr<ReadFileChunkReply> ChunkServerServiceGfsClient::SendRequest(
     const ReadFileChunkRequest& request, ClientContext& context) {
   ReadFileChunkReply reply;
   grpc::Status status = file_stub_->ReadFileChunk(&context, request, &reply);
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
-StatusOr<WriteFileChunkReply> ChunkServerServiceClientClient::SendRequest(
+StatusOr<SendFileChunkReply> ChunkServerServiceGfsClient::SendRequest(
+    const SendFileChunkRequest& request, ClientContext& context) {
+  SendFileChunkReply reply;
+  grpc::Status status = file_stub_->SendFileChunk(&context, request, &reply);
+  return ReturnStatusOrFromGrpcStatus(reply, status);
+}
+
+StatusOr<WriteFileChunkReply> ChunkServerServiceGfsClient::SendRequest(
     const WriteFileChunkRequest& request, ClientContext& context) {
   WriteFileChunkReply reply;
   grpc::Status status = file_stub_->WriteFileChunk(&context, request, &reply);
@@ -35,13 +44,19 @@ StatusOr<WriteFileChunkReply> ChunkServerServiceClientClient::SendRequest(
 // Overloaded functions using default mutable client context
 //
 
-StatusOr<ReadFileChunkReply> ChunkServerServiceClientClient::SendRequest(
+StatusOr<ReadFileChunkReply> ChunkServerServiceGfsClient::SendRequest(
     const ReadFileChunkRequest& request) {
   ClientContext default_context;
   return SendRequest(request, default_context);
 }
 
-StatusOr<WriteFileChunkReply> ChunkServerServiceClientClient::SendRequest(
+StatusOr<SendFileChunkReply> ChunkServerServiceGfsClient::SendRequest(
+    const SendFileChunkRequest& request) {
+  ClientContext default_context;
+  return SendRequest(request, default_context);
+}
+
+StatusOr<WriteFileChunkReply> ChunkServerServiceGfsClient::SendRequest(
     const WriteFileChunkRequest& request) {
   ClientContext default_context;
   return SendRequest(request, default_context);

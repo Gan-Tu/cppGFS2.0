@@ -1,5 +1,5 @@
-#ifndef GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_MASTER_CLIENT_H_
-#define GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_MASTER_CLIENT_H_
+#ifndef GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_MASTER_SERVER_CLIENT_H_
+#define GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_MASTER_SERVER_CLIENT_H_
 
 #include <memory>
 
@@ -23,12 +23,12 @@ namespace service {
 // Note that you should NOT reuse client context, as they are call-specific.
 //
 // TODO(tugan): support sending asynchronous client requests
-class ChunkServerServiceMasterClient {
+class ChunkServerServiceMasterServerClient {
  public:
   // Initialize a protocol manager for talking to a gRPC server listening on
   // the specified gRPC |channel|, which handles gRPCs defined in both the
   // ChunkServerLeaseService and ChunkServerFileService.
-  ChunkServerServiceMasterClient(std::shared_ptr<grpc::Channel> channel)
+  ChunkServerServiceMasterServerClient(std::shared_ptr<grpc::Channel> channel)
       : lease_stub_(protos::grpc::ChunkServerLeaseService::NewStub(channel)),
         file_stub_(protos::grpc::ChunkServerFileService::NewStub(channel)) {}
 
@@ -84,4 +84,4 @@ class ChunkServerServiceMasterClient {
 }  // namespace service
 }  // namespace gfs
 
-#endif  // GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_MASTER_CLIENT_H_
+#endif  // GFS_COMMON_PROTOCOL_CLIENT_CHUNK_SERVER_SERVICE_MASTER_SERVER_CLIENT_H_
