@@ -3,7 +3,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "grpcpp/grpcpp.h"
-#include "src/common/protocol_client/chunk_server_service_client.h"
+#include "src/common/protocol_client/chunk_server_service_server_client.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
 namespace gfs {
@@ -31,8 +31,9 @@ class MasterMetadataServiceImpl final
                           google::protobuf::Empty* reply) override;
 
   // Chunk server name and its corresponding GFS protocol client
-  absl::flat_hash_map<std::string,
-                      std::shared_ptr<gfs::service::ChunkServerServiceClient>>
+  absl::flat_hash_map<
+      std::string,
+      std::shared_ptr<gfs::service::ChunkServerServiceMasterServerClient>>
       chunk_server_service_clients_;
 };
 
