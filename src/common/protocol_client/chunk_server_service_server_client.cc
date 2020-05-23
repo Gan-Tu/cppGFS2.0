@@ -1,4 +1,4 @@
-#include "src/common/protocol_client/chunk_server_service_master_server_client.h"
+#include "src/common/protocol_client/chunk_server_service_server_client.h"
 
 #include <memory>
 
@@ -11,6 +11,8 @@ using google::protobuf::util::StatusOr;
 using grpc::ClientContext;
 using protos::grpc::AdvanceFileChunkVersionReply;
 using protos::grpc::AdvanceFileChunkVersionRequest;
+using protos::grpc::ApplyMutationsReply;
+using protos::grpc::ApplyMutationsRequest;
 using protos::grpc::GrantLeaseReply;
 using protos::grpc::GrantLeaseRequest;
 using protos::grpc::InitFileChunkReply;
@@ -42,11 +44,19 @@ StatusOr<InitFileChunkReply> ChunkServerServiceMasterServerClient::SendRequest(
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
-StatusOr<AdvanceFileChunkVersionReply> ChunkServerServiceMasterServerClient::SendRequest(
+StatusOr<AdvanceFileChunkVersionReply>
+ChunkServerServiceMasterServerClient::SendRequest(
     const AdvanceFileChunkVersionRequest& request, ClientContext& context) {
   AdvanceFileChunkVersionReply reply;
   grpc::Status status =
       file_stub_->AdvanceFileChunkVersion(&context, request, &reply);
+  return ReturnStatusOrFromGrpcStatus(reply, status);
+}
+
+StatusOr<ApplyMutationsReply> ChunkServerServiceChunkServerClient::SendRequest(
+    const ApplyMutationsRequest& request, ClientContext& context) {
+  ApplyMutationsReply reply;
+  grpc::Status status = file_stub_->ApplyMutations(&context, request, &reply);
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
@@ -72,7 +82,8 @@ StatusOr<InitFileChunkReply> ChunkServerServiceMasterServerClient::SendRequest(
   return SendRequest(request, default_context);
 }
 
-StatusOr<AdvanceFileChunkVersionReply> ChunkServerServiceMasterServerClient::SendRequest(
+StatusOr<AdvanceFileChunkVersionReply>
+ChunkServerServiceMasterServerClient::SendRequest(
     const AdvanceFileChunkVersionRequest& request) {
   ClientContext default_context;
   return SendRequest(request, default_context);

@@ -11,8 +11,8 @@ using google::protobuf::util::StatusOr;
 using grpc::ClientContext;
 using protos::grpc::ReadFileChunkReply;
 using protos::grpc::ReadFileChunkRequest;
-using protos::grpc::SendFileChunkReply;
-using protos::grpc::SendFileChunkRequest;
+using protos::grpc::SendChunkDataReply;
+using protos::grpc::SendChunkDataRequest;
 using protos::grpc::WriteFileChunkReply;
 using protos::grpc::WriteFileChunkRequest;
 
@@ -26,10 +26,10 @@ StatusOr<ReadFileChunkReply> ChunkServerServiceGfsClient::SendRequest(
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
-StatusOr<SendFileChunkReply> ChunkServerServiceGfsClient::SendRequest(
-    const SendFileChunkRequest& request, ClientContext& context) {
-  SendFileChunkReply reply;
-  grpc::Status status = file_stub_->SendFileChunk(&context, request, &reply);
+StatusOr<SendChunkDataReply> ChunkServerServiceGfsClient::SendRequest(
+    const SendChunkDataRequest& request, ClientContext& context) {
+  SendChunkDataReply reply;
+  grpc::Status status = file_stub_->SendChunkData(&context, request, &reply);
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
@@ -50,8 +50,8 @@ StatusOr<ReadFileChunkReply> ChunkServerServiceGfsClient::SendRequest(
   return SendRequest(request, default_context);
 }
 
-StatusOr<SendFileChunkReply> ChunkServerServiceGfsClient::SendRequest(
-    const SendFileChunkRequest& request) {
+StatusOr<SendChunkDataReply> ChunkServerServiceGfsClient::SendRequest(
+    const SendChunkDataRequest& request) {
   ClientContext default_context;
   return SendRequest(request, default_context);
 }
