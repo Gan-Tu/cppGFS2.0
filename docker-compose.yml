@@ -65,19 +65,3 @@ services:
     volumes:
       - ./:/app
     restart: unless-stopped
-  # Run mock clients after all servers are up
-  # For now, only try to talk to master server #1 and chunk server #1
-  mock_client:
-    container_name: mock_client
-    image: gfs-image:latest
-    command: bazel run examples:run_mock_protocol_client_main --
-      --config_path=data/config.yml
-      --use_docker_dns_server
-      --master_name=master_server_01
-      --chunk_server_name=chunk_server_01
-    depends_on:
-      - master_server_01
-      - chunk_server_01
-    working_dir: /app
-    volumes:
-      - ./:/app
