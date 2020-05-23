@@ -21,7 +21,6 @@ ABSL_FLAG(std::string, master_name, "master_server_01",
 ABSL_FLAG(bool, use_docker_dns_server, false, "use docker's DNS server");
 
 int main(int argc, char** argv) {
-  // Initialize logger, must do this first before logging
   gfs::common::SystemLogger::GetInstance().Initialize(/*program_name=*/argv[0]);
 
   // Parse command line arguments
