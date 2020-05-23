@@ -6,8 +6,8 @@ services:
     build: .
     image: gfs-image:latest
     command: bazel run src/server/master_server:run_master_server_main --
-      --config_path=data/config.yml \
-      --use_docker_dns_server \
+      --config_path=data/config.yml
+      --use_docker_dns_server
       --master_name=master_server_01
     working_dir: /app
     ports:
