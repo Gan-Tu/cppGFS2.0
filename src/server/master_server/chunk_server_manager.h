@@ -18,15 +18,9 @@
 // TODO(bmokutub): Can move to a separate header file e.g. chunk_server.h
 namespace protos {
 bool operator==(const protos::ChunkServerLocation& lhs,
-                const protos::ChunkServerLocation& rhs) {
-  return lhs.server_hostname() == rhs.server_hostname() &&
-         lhs.server_port() == rhs.server_port();
-}
+                const protos::ChunkServerLocation& rhs);
 
-bool operator==(const protos::ChunkServer& lhs,
-                const protos::ChunkServer& rhs) {
-  return lhs.location() == rhs.location();
-}
+bool operator==(const protos::ChunkServer& lhs, const protos::ChunkServer& rhs);
 }  // namespace protos
 
 namespace gfs {
@@ -102,7 +96,27 @@ class ChunkServerAvailableDiskGreaterCompare {
 // Note: All ChunkServerManager methods are thread safe.
 //
 // ChunkServerManager User:
-//   Metadata manager (AllocateChunkServer, GetChunkLocations)
+//   Metadata manager (AllocateChunkServer, GetChunkLocations):
+//   Usage: For a new chunk that needs servers for storage call,
+//     if it needs 1 replica (1 server):
+//     auto server_locations_set =
+//     ChunkServerManager::GetInstance()::AllocateChunkServer("chunk_handle",
+//     /*requested_servers_count=*/ 1);
+//     if it needs 5 replicas (5 servers):
+//     auto server_locations_set =
+//     ChunkServerManager::GetInstance()::AllocateChunkServer("chunk_handle",
+//     /*requested_servers_count=*/ 5);
+//
+//     To find the locations where a chunk is stored:
+//     auto server_locations_set =
+//     ChunkServerManager::GetInstance()::GetChunkLocations("chunk_handle");
+//     Note: As stated in the method comment, if a server goes down, it will not
+//     be returned as part of the locations for a stored chunk. To avoid clients
+//     calling a server that is down. This is why chunk replication is good,
+//     so if you allocated 3 servers in the allocation call, if 1 of the servers
+//     is down, when you call GetChunkLocations, you get 2 servers. If the
+//     server recovers and starts again, then subsequent GetChunkLocations will
+//     return 3 servers.
 //
 // ChunkServerManager services that keeps it updated:
 //   ChunkServerHeartBeatMonitoringTask (UnregisterChunkServer)

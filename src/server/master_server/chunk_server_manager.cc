@@ -1,5 +1,18 @@
 #include "src/server/master_server/chunk_server_manager.h"
 
+namespace protos {
+bool operator==(const protos::ChunkServerLocation& lhs,
+                const protos::ChunkServerLocation& rhs) {
+  return lhs.server_hostname() == rhs.server_hostname() &&
+         lhs.server_port() == rhs.server_port();
+}
+
+bool operator==(const protos::ChunkServer& lhs,
+                const protos::ChunkServer& rhs) {
+  return lhs.location() == rhs.location();
+}
+}  // namespace protos
+
 namespace gfs {
 
 namespace server {
