@@ -44,7 +44,8 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//src/protos:cc_chunk_server_proto",
-        "@com_google_absl//absl/container:flat_hash_map",
+        "//src/common:utils",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/synchronization",
     ],
 )
@@ -64,7 +65,10 @@ cc_library(
     srcs = ["master_chunk_server_manager_service_impl.cc"],
     hdrs = ["master_chunk_server_manager_service_impl.h"],
     deps = [
+        ":chunk_server_manager",
         "//src/protos/grpc:cc_master_chunk_server_manager_service_grpc",
         "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/synchronization",
     ],
 )

@@ -20,7 +20,7 @@ MasterChunkServerManagerServiceClient::SendRequest(
     const ReportChunkServerRequest& request, ClientContext& context) {
   ReportChunkServerReply reply;
   grpc::Status status = stub_->ReportChunkServer(&context, request, &reply);
-  
+
   // TODO(tugan): Replace this with ReturnStatusOrFromGrpcStatus.
   if (status.ok()) {
     return reply;

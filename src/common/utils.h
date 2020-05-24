@@ -19,22 +19,19 @@ namespace common {
 // The example below follows the pattern defined in:
 // https://greg7mdp.github.io/parallel-hashmap/
 // https://github.com/greg7mdp/parallel-hashmap/blob/master/examples/bench.cc
-template <class K, class V>
+template <class K, class V,
+          class Hash = phmap::container_internal::hash_default_hash<K>>
 class thread_safe_flat_hash_map
     : public phmap::parallel_flat_hash_map<
-          K, V, phmap::container_internal::hash_default_hash<K>,
-          phmap::container_internal::hash_default_eq<K>,
-          std::allocator<std::pair<const K, V>>, /*submaps=*/4, absl::Mutex> {
-};
+          K, V, Hash, phmap::container_internal::hash_default_eq<K>,
+          std::allocator<std::pair<const K, V>>, /*submaps=*/4, absl::Mutex> {};
 
 // Similar as above, define an intrinsically thread-safe flat hash set
-template <class V>
+template <class V, class Hash = phmap::container_internal::hash_default_hash<V>>
 class thread_safe_flat_hash_set
     : public phmap::parallel_flat_hash_set<
-          V, phmap::container_internal::hash_default_hash<V>,
-          phmap::container_internal::hash_default_eq<V>,
-          std::allocator<V>, /*submaps=*/4, absl::Mutex> {
-};
+          V, Hash, phmap::container_internal::hash_default_eq<V>,
+          std::allocator<V>, /*submaps=*/4, absl::Mutex> {};
 
 namespace utils {
 

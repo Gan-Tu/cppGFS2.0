@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package protos.grpc;
+
+// This service running on the chunkserver is used by the master to
+// send control information to it. Such as checking the chunkserver heartbeat.
+service ChunkServerControlService {
+  // Used to check if the chunkserver is alive. The chunkserver sends an ok,
+  // and a reply. A reply shows that the server is alive.
+  rpc CheckHeartBeat(CheckHeartBeatRequest) returns (CheckHeartBeatReply) {}
+
+  // Handles a TriggerReportChunkServer request by master. Usually the
+  // chunkserver reports itself to the master, but there are instances where the
+  // master needs to trigger/ask for the report itself. e.g. if the master
+  // crashed and restarting.
+  rpc TriggerReportChunkServer(TriggerReportChunkServerRequest) returns (TriggerReportChunkServerReply) {}
+}
+
+// Empty request for now.
+message CheckHeartBeatRequest {
+}
+
+message CheckHeartBeatReply {
+  // The original request associated with this reply.
+  CheckHeartBeatRequest request = 1;
+}
+
+// Empty request for now.
+message TriggerReportChunkServerRequest {
+}
+
+message TriggerReportChunkServerReply {
+  // The original request associated with this reply.
+  TriggerReportChunkServerRequest request = 1;
+}
