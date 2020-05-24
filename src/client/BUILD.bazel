@@ -1,14 +1,6 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 cc_library(
-    name = "gfs_client",
-    srcs = ["gfs_client.cc"],
-    hdrs = ["gfs_client.h"],
-    visibility = ["//visibility:public"],
-    deps = ["@com_google_protobuf//:protobuf_lite"],
-)
-
-cc_library(
     name = "client_cache_manager",
     srcs = ["client_cache_manager.cc"],
     hdrs = ["client_cache_manager.h"],
@@ -19,4 +11,28 @@ cc_library(
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_protobuf//:protobuf_lite"
     ]
+)
+
+cc_library(
+    name = "client_impl",
+    srcs = ["client_impl.cc"],
+    hdrs = ["client_impl.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/client:client_cache_manager",
+        "//src/common:config_manager",
+        "//src/common/protocol_client:chunk_server_service_gfs_client",
+        "//src/common/protocol_client:master_metadata_service_client",
+        "@com_google_protobuf//:protobuf_lite"],
+)
+
+cc_library(
+    name = "gfs_client",
+    srcs = ["gfs_client.cc"],
+    hdrs = ["gfs_client.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/client:client_impl",
+        "//src/common:utils",
+        "@com_google_protobuf//:protobuf_lite"],
 )
