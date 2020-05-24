@@ -66,6 +66,65 @@ google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
   return google::protobuf::util::Status(error_code, status.error_message());
 }
 
+grpc::Status ConvertProtobufStatusToGrpcStatus(
+    const google::protobuf::util::Status& status) {
+  grpc::StatusCode error_code;
+  switch (status.error_code()) {
+    case google::protobuf::util::error::OK:
+      error_code = grpc::StatusCode::OK;
+      break;
+    case google::protobuf::util::error::CANCELLED:
+      error_code = grpc::StatusCode::CANCELLED;
+      break;
+    case google::protobuf::util::error::INVALID_ARGUMENT:
+      error_code = grpc::StatusCode::INVALID_ARGUMENT;
+      break;
+    case google::protobuf::util::error::DEADLINE_EXCEEDED:
+      error_code = grpc::StatusCode::DEADLINE_EXCEEDED;
+      break;
+    case google::protobuf::util::error::NOT_FOUND:
+      error_code = grpc::StatusCode::NOT_FOUND;
+      break;
+    case google::protobuf::util::error::ALREADY_EXISTS:
+      error_code = grpc::StatusCode::ALREADY_EXISTS;
+      break;
+    case google::protobuf::util::error::PERMISSION_DENIED:
+      error_code = grpc::StatusCode::PERMISSION_DENIED;
+      break;
+    case google::protobuf::util::error::UNAUTHENTICATED:
+      error_code = grpc::StatusCode::UNAUTHENTICATED;
+      break;
+    case google::protobuf::util::error::RESOURCE_EXHAUSTED:
+      error_code = grpc::StatusCode::RESOURCE_EXHAUSTED;
+      break;
+    case google::protobuf::util::error::FAILED_PRECONDITION:
+      error_code = grpc::StatusCode::FAILED_PRECONDITION;
+      break;
+    case google::protobuf::util::error::ABORTED:
+      error_code = grpc::StatusCode::ABORTED;
+      break;
+    case google::protobuf::util::error::OUT_OF_RANGE:
+      error_code = grpc::StatusCode::OUT_OF_RANGE;
+      break;
+    case google::protobuf::util::error::UNIMPLEMENTED:
+      error_code = grpc::StatusCode::UNIMPLEMENTED;
+      break;
+    case google::protobuf::util::error::INTERNAL:
+      error_code = grpc::StatusCode::INTERNAL;
+      break;
+    case google::protobuf::util::error::UNAVAILABLE:
+      error_code = grpc::StatusCode::UNAVAILABLE;
+      break;
+    case google::protobuf::util::error::DATA_LOSS:
+      error_code = grpc::StatusCode::DATA_LOSS;
+      break;
+    default:
+      error_code = grpc::StatusCode::UNKNOWN;
+      break;
+  }
+  return grpc::Status(error_code, status.error_message());
+}
+
 google::protobuf::util::Status CheckFilenameValidity(
     const std::string& filename) {
   if (filename.empty()) {

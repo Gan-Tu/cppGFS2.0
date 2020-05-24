@@ -1,10 +1,45 @@
 #include "src/client/client_impl.h"
+#include "src/protos/grpc/master_metadata_service.grpc.pb.h"
+
+using google::protobuf::util::Status;
+using google::protobuf::util::StatusOr;
+using protos::grpc::OpenFileRequest;
+using protos::grpc::OpenFileReply;
 
 namespace gfs {
 namespace client {
 
+inline void ClientImpl::SetClientContextDeadline(
+    grpc::ClientContext& client_context) {
+  absl::Duration grpc_timeout(config_manager_->GetGrpcDeadline());
+  client_context.set_deadline(std::chrono::system_clock::now() + 
+      std::chrono::milliseconds(absl::ToInt64Milliseconds(grpc_timeout)));
+}
+
 google::protobuf::util::Status ClientImpl::CreateFile(
     const std::string& filename) {
+  OpenFileRequest open_file_request;
+  // For create mode, we just set filename and mode and leave other fields
+  // default
+  open_file_request.set_filename(filename);
+  open_file_request.set_mode(OpenFileRequest::CREATE);
+ 
+  // Define a client context and set its deadline using the timeout value 
+  // obtained from the config manager
+  grpc::ClientContext client_context;  
+  SetClientContextDeadline(client_context); 
+
+  // Issue OpenFileReply rpc and check status
+  StatusOr<OpenFileReply> status_or(
+      master_metadata_service_client_->SendRequest(
+          open_file_request, client_context));
+
+  if (!status_or.ok()) {
+    return status_or.status();
+  }
+
+  // Optionally we could have the master create the first chunk for this 
+  // file, that case the client should cache the FileChunkMetadata 
   return google::protobuf::util::Status::OK;
 }
 

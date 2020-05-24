@@ -33,7 +33,11 @@ class ClientImpl {
   ClientImpl(common::ConfigManager* config_manager, 
              const std::string& master_name, 
              const bool resolve_hostname = false);
-  
+
+  // Helper function to set deadline for a client context object using the 
+  // timeout configuration obtained from the config manager
+  void SetClientContextDeadline(grpc::ClientContext& client_context); 
+
   // Reference to the configuration manager
   common::ConfigManager* config_manager_;
 

@@ -6,6 +6,7 @@ cc_library(
     hdrs = ["master_metadata_service_impl.h"],
     deps = [
         "//src/protos/grpc:cc_master_metadata_service_grpc",
+        "//src/server/master_server:metadata_manager",
         "@com_github_grpc_grpc//:grpc++",
     ],
 )
