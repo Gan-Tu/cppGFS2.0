@@ -27,14 +27,27 @@ cc_library(
 )
 
 cc_library(
-    name = "chunk_server_service_client",
-    srcs = ["chunk_server_service_client.cc"],
-    hdrs = ["chunk_server_service_client.h"],
+    name = "chunk_server_service_gfs_client",
+    srcs = ["chunk_server_service_gfs_client.cc"],
+    hdrs = ["chunk_server_service_gfs_client.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/common:utils",
-        "//src/protos/grpc:cc_chunk_server_lease_service_grpc",
         "//src/protos/grpc:cc_chunk_server_file_service_grpc",
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_google_protobuf//:protobuf_lite",
+    ],
+)
+
+cc_library(
+    name = "chunk_server_service_server_client",
+    srcs = ["chunk_server_service_server_client.cc"],
+    hdrs = ["chunk_server_service_server_client.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/common:utils",
+        "//src/protos/grpc:cc_chunk_server_file_service_grpc",
+        "//src/protos/grpc:cc_chunk_server_lease_service_grpc",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_protobuf//:protobuf_lite",
     ],

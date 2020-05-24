@@ -5,27 +5,31 @@
 #include "google/protobuf/stubs/statusor.h"
 
 namespace gfs {
+
+// Define open flag type using enum with bitmask
+enum OpenFlag {
+  Read = 0x1,
+  Write = 0x2,
+  Create = 0x4
+};
+
 namespace client {
 
-/* Data type for the return of read operation. This includes how many bytes
- * have been read and a pointer of the buffer */
+// Data type for the return of read operation. This includes how many bytes
+// have been read and a pointer of the buffer
 struct Data {
   int bytesRead;
   void* buffer;
 };
 
-/* Let's plan to support the following open mode:
- * Read Mode | Write Mode | Create Mode | Is Directory
- * Possible combination:
- * Create | Write - create and write to a file
- * Create | Is Directory - Create a direcotry
- */
-google::protobuf::util::Status open(const char* pathname, int flags);
+// We support the following mode: Read Mode | Write Mode | Create Mode
+// when opening a file. The only possible combination is Write | Create  
+google::protobuf::util::Status open(const char* pathname, unsigned int flags);
 
 google::protobuf::util::Status close(const char* pathname);
 
-google::protobuf::util::StatusOr<Data> read(const char* pathname, size_t offset,
-                                            size_t nbytes);
+google::protobuf::util::StatusOr<Data> read(
+    const char* pathname, size_t offset, size_t nbytes);
 
 google::protobuf::util::Status write(const char* path, void* buffer,
                                      size_t offset, size_t nbytes);

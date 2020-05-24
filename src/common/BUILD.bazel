@@ -7,16 +7,31 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@com_github_grpc_grpc//:grpc++",
-        "@com_google_absl//absl/synchronization",  
+        "@com_google_absl//absl/synchronization",
         "@com_google_protobuf//:protobuf_lite",
-        "@parallel_hashmap//:parallel_hashmap",
+        "@parallel_hashmap",
+        "@yaml_cpp//:yaml-cpp",
     ],
 )
 
 cc_library(
-  name = "system_logger",
-  srcs = ["system_logger.cc"],
-  hdrs = ["system_logger.h"],
-  visibility = ["//visibility:public"],
-  deps = ["@com_google_glog//:glog"],
+    name = "system_logger",
+    srcs = ["system_logger.cc"],
+    hdrs = ["system_logger.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@com_google_glog//:glog"],
+)
+
+cc_library(
+    name = "config_manager",
+    srcs = ["config_manager.cc"],
+    hdrs = ["config_manager.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":utils",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/strings",
+        "@com_google_protobuf//:protobuf_lite",
+        "@yaml_cpp//:yaml-cpp",
+    ],
 )

@@ -1,0 +1,9 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+
+cc_library(
+    name = "utils",
+    srcs = ["utils.cc"],
+    hdrs = ["utils.h"],
+    visibility = ["//visibility:public"],
+    deps = ["//src/protos:cc_metadata_proto"],
+)

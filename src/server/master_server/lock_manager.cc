@@ -2,33 +2,28 @@
 
 #include <thread>
 
-#include "absl/hash/hash.h"
-
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
 
 namespace gfs {
 namespace server {
 
-bool LockManager::Exist(const std::string& filename) const {
-  return file_path_locks_.contains(filename);
+bool LockManager::Exist(const std::string& filename) {
+  return file_path_locks_.Contains(filename);
 }
 
 google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
     const std::string& filename) {
-  // The emplace method returns a pair, where the first field corresponds 
-  // to the item for this key, and the second field is true if this 
-  // call successfully inserts an item, and is false if there
-  // is already an item existed for the given key. We use the second field
-  // to detect whether a lock has been created already (or there is another
-  // racing thread that inserted one before this call). 
-  auto new_lock(std::shared_ptr<absl::Mutex>(new absl::Mutex()));
-  auto lock_and_if_took_place(file_path_locks_.emplace(filename,new_lock));
-  bool has_insert_taken_place(lock_and_if_took_place.second);
-  if (!has_insert_taken_place) {
+  std::shared_ptr<absl::Mutex> new_lock(new absl::Mutex());  
+ 
+  // If the filename exists, that means another thread has created this
+  // lock, or this thread has been created previously by the current
+  // thread
+  if (!file_path_locks_.TryInsert(filename, new_lock)) {
     return Status(google::protobuf::util::error::ALREADY_EXISTS,
                   "Lock already exists for " + filename);
   }
+ 
   // TODO: We have not finalized the plan regarding to the removal of locks.
   // The simplest approach is to say we don't remove locks (note that not 
   // removing locks doesn't equate to not removing files) so we won't have 
@@ -44,21 +39,18 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
 }
 
 google::protobuf::util::StatusOr<absl::Mutex*> LockManager::FetchLock(
-    const std::string& filename) const {
-  // Again, note that we do not fully support crazy schemes like 
-  // concurrent create and delete locks. Otherwise, the following pattern
-  // may seem to have a time-of-check-time-of-use bug, namely the lock
-  // got removed in the two lines between. Furthermore, it may seem
-  // tempting to just use the operator [] and a null check to 
-  // accomplish this, but the problem is that it makes this function
-  // invasive and can insert a default item underneath, this can 
-  // interact with the CreateLock function above and cause an empty
-  // share_ptr ended up for a lock, which is obviously not great. 
-  if (!Exist(filename)) {
+    const std::string& filename) {
+  // The second item of the TryGetValue return indicates whether the item 
+  // exists in the collection, and the first item corresponds to the item
+  // the second item is true 
+  auto try_get_lock(file_path_locks_.TryGetValue(filename));
+  bool lock_exist(try_get_lock.second);
+
+  if (!lock_exist) {
     return Status(google::protobuf::util::error::NOT_FOUND,
                   "Lock does not exist for " + filename);
   }
-  return file_path_locks_.at(filename).get();
+  return try_get_lock.first.get();
 }
 
 LockManager* LockManager::GetInstance() {

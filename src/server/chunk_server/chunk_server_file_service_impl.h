@@ -15,16 +15,28 @@ class ChunkServerFileServiceImpl final
                              const protos::grpc::InitFileChunkRequest* request,
                              protos::grpc::InitFileChunkReply* reply) override;
 
-  // Handle an ReadFileChunkRequest request by client or another chunk server.
+  // Handle a ReadFileChunkRequest request by client or another chunk server.
   grpc::Status ReadFileChunk(grpc::ServerContext* context,
                              const protos::grpc::ReadFileChunkRequest* request,
                              protos::grpc::ReadFileChunkReply* reply) override;
 
-  // Handle an WriteFileChunkRequest request sent by the client.
+  // Handle a SendChunkDataRequest request sent by the client.
+  grpc::Status SendChunkData(
+      grpc::ServerContext* context,
+      const protos::grpc::SendChunkDataRequest* request,
+      protos::grpc::SendChunkDataReply* reply) override;
+
+  // Handle a WriteFileChunkRequest request sent by the client.
   grpc::Status WriteFileChunk(
       grpc::ServerContext* context,
       const protos::grpc::WriteFileChunkRequest* request,
       protos::grpc::WriteFileChunkReply* reply) override;
+
+  // Handle an ApplyMutationsRequest request sent by the primary replica.
+  grpc::Status ApplyMutations(
+      grpc::ServerContext* context,
+      const protos::grpc::ApplyMutationsRequest* request,
+      protos::grpc::ApplyMutationsReply* reply) override;
 
   // Handle an AdvanceFileChunkVersionRequest request sent by the master.
   grpc::Status AdvanceFileChunkVersion(

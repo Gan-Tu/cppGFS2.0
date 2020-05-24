@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protos.grpc;
 
+import "src/protos/chunk_server.proto";
+
 service ChunkServerFileService {
   // Create an empty file chunk with |chunk_handle| at the chunk server.
   // The chunk server returns error if |chunk_handle| already exists; 
@@ -25,17 +27,58 @@ service ChunkServerFileService {
   rpc AdvanceFileChunkVersion(AdvanceFileChunkVersionRequest) 
     returns (AdvanceFileChunkVersionReply) {}
 
-  // Write |length| number of bytes of given |data| buffer to |chunk_handle| 
-  // of known version |chunk_version| at |offset_start|. Return the actual 
-  // number of bytes written, if the operation is successful; otherwise, 
-  // return any errors.
+  // BEFORE a write, the client pushes the data, identifiable by |checksum|, to 
+  // all the replicas. A client can do so in any order. Each chunk server will 
+  // store the data in an internal cache until the data is used or aged out. 
+  // The chunk server doesn't care where this data will be written to in future,
+  // and finds out only from "ApplyMutations" gRPC sent by the primary replica.
+  //
+  // This design from GFS also makes writing redundant data to different chunks
+  // easy, by sending the data only once.
+  //
+  // Alternatively, a client can push it the closest replica and let the network
+  // forward the data to other replicas; however, we wont implement this for now
+  rpc SendChunkData(SendChunkDataRequest) returns (SendChunkDataReply) {}
+
+  // Write |length| number of bytes to |chunk_handle| of known version 
+  // |chunk_version| at |offset_start|, using data previously sent by client, 
+  // which is identified by the |checksum|. Return the actual number of bytes 
+  // written (to memory), if the operation is successful; otherwise, any errors.
+  //
+  // The chunk server will expect that the client has already sent the |data|
+  // to all the secondary replicas; otherwise, the write operation will fail.
+  //
+  // For concurrent writes, chunk server will determine the serialization order.
+  // It guarantees the consistency of data across all replica, but the data
+  // is undefined if concurrent writes happened successfully. For overlapping 
+  // regions between concurrent writes, either one of the write, or a mixture of
+  // the write data is applied (GFS paper Table 1). If the client wants data 
+  // consistency and defined behavior, it should use external lock services.
   //
   // The actual number of bytes written can be smaller than requested |length|,
   // if either EOF has reached, or the given |data| buffer is shorter than 
   // specified |length|. If |length| is smaller than the whole |data| buffer
   // length, only the first |length| bytes of the |data| buffer will be written.
   // If |offset_start| is larger than the chunk size, no bytes will be written
+  //
+  // This RPC is sent by a client to the primary chunk server AFTER the client
+  // acknowledges the receipt of data from all replicas. Upon receipt of this
+  // write request, the primary chunk server assigns consecutive serial numbers 
+  // to all the write mutations it receives, possibly from multiple clients, 
+  // which provides the necessary serialization. It applies the mutation to its 
+  // own local state in serial number order, and then forwards the write request
+  // to all secondary replicas using "ApplyMutations" gRPC. 
+  //
+  // Each secondary replica applies mutations in the same serial number order 
+  // assigned by the primary. The secondaries all reply to the primary 
+  // indicating that they have completed the operation, before the primary 
+  // replies to the client.
   rpc WriteFileChunk(WriteFileChunkRequest) returns (WriteFileChunkReply) {}
+
+  // The primary chunk server bundles the write mutations and gives a 
+  // serialization order. After the primary applies the mutations locally, it
+  // forwards these ordered mutations to secondary replicas via this gRPC.
+  rpc ApplyMutations(ApplyMutationsRequest) returns (ApplyMutationsReply) {}
 
   // TODO(tugan): add support for the master to ask chunk server to copy file
   // from other chunk servers for min file replica count maintenance
@@ -94,6 +137,8 @@ message ReadFileChunkReply {
 message AdvanceFileChunkVersionRequest {
   // An immutable and globally unique UUID chunk identifier.
   string chunk_handle = 1;
+  // The expected chunk version after version advance.
+  uint32 new_chunk_version = 2;
 }
 
 message AdvanceFileChunkVersionReply {
@@ -104,13 +149,40 @@ message AdvanceFileChunkVersionReply {
     UNKNOWN = 0;
     OK = 1;
     FAILED_NOT_FOUND = 2;
+    FAILED_VERSION_OUT_OF_SYNC = 3;
   }
   AdvanceFileChunkVersionStatus status = 2;
-  // The new chunk version after the version advance
-  uint32 new_chunk_version = 3;
+  // The chunk version on the chunk server after the reply
+  // If reply status is OK, this should match the `new_chunk_version`
+  // sent by the request. If reply status is failure, no version has
+  // been advanced on the chunk server, and this is the existing version
+  // for the requested chunk handle on the chunk server. This helps
+  // master to become aware of either itself or chunk server is out of sync
+  uint32 chunk_version = 3;
 }
 
-message WriteFileChunkRequest {
+message SendChunkDataRequest {
+  // The data that the client wants the chunk server to store
+  bytes data = 1;
+  // The checksum for uniquely identifying this data across requests, so
+  // future requests don't need to resend the data, unless the data expired.
+  string checksum = 2;
+}
+
+message SendChunkDataReply {
+  // The original request associated with this reply.
+  SendChunkDataRequest request = 1;
+  enum SendChunkDataRequestStatus {
+    UNKNOWN = 0;
+    OK = 1;
+    RATE_LIMITED = 2; // not used, but as an example of what we can have
+    DATA_TOO_BIG = 3; // data is bigger than allowed GFS file chunk block size
+    FAILED = 4;
+  }
+  SendChunkDataRequestStatus status = 2;
+}
+
+message WriteFileChunkRequestHeader {
   // An immutable and globally unique UUID chunk identifier.
   string chunk_handle = 1;
   // The version of the file chunk that the requester is trying to write
@@ -119,22 +191,60 @@ message WriteFileChunkRequest {
   uint32 offset_start = 3;
   // The number of bytes to write
   uint32 length = 4;
-  // The data to write
-  bytes data = 5;
+  // The checksum for uniquely identifying the data previously sent to all 
+  // replicas already via SendChunkData gRPC.
+  string data_checksum = 5;
+}
+
+message ApplyMutationsRequest {
+  // Serialized/ordered concurrent write mutations to apply
+  repeated WriteFileChunkRequestHeader headers = 1;
+}
+
+enum FileChunkMutationStatus {
+  UNKNOWN = 0;
+  OK = 1;
+  // Data with given |data_checksum| either doesn't exist, or has expired,
+  // in the data cache; client needs to resend the data using SendDataRequest
+  FAILED_DATA_NOT_FOUND = 2;
+  // No given chunk handle is found.
+  FAILED_CHUNK_NOT_FOUND = 3;
+  // Failed to apply mutation because replica has a stale chunk
+  FAILED_STALE_VERSION = 4;
+  // This only applies if a client tries to send a WriteRequest to a secondary
+  // replica; it'll not error when ApplyMutationRequests are sent by the primary
+  FAILED_NOT_LEASE_HOLDER = 5;
+}
+
+
+message ApplyMutationsReply {
+  // The original request associated with this reply.
+  ApplyMutationsRequest request = 1;
+  // The status of applying all mutations
+  FileChunkMutationStatus status = 2;
+}
+
+message WriteFileChunkRequest {
+  // The write header for this write request
+  WriteFileChunkRequestHeader header = 1;
+  // The replicas that the client has already sent the data to, so the primary
+  // chunk server knows who to forward the serialized concurrent writes to.
+  repeated protos.ChunkServerLocation replica_locations = 2;
 }
 
 message WriteFileChunkReply {
   // The original request associated with this reply.
   WriteFileChunkRequest request = 1;
-  // The status of file chunk write operation
-  enum WriteFileChunkStatus {
-    UNKNOWN = 0;
-    OK = 1;
-    FAILED_NOT_FOUND = 2;
-    FAILED_STALE_VERSION = 3;
-    FAILED_NOT_LEASE_HOLDER = 4;
-  }
-  WriteFileChunkStatus status = 2;
   // The number of bytes that was actually written
-  uint32 bytes_written = 3;
+  uint32 bytes_written = 2;
+  // The final status of the write
+  FileChunkMutationStatus status = 3;
+  // The specific statuses returned from all replicas
+  // If the write fails at the primary before the write request is forwarded
+  // toe the clients, this field will be empty.
+  message ReplicaStatus {
+    protos.ChunkServerLocation chunk_server_location = 1;
+    FileChunkMutationStatus status = 2;
+  }
+  repeated ReplicaStatus replica_status = 4;
 }
