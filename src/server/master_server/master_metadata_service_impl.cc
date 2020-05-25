@@ -1,7 +1,8 @@
+#include "src/server/master_server/master_metadata_service_impl.h"
+
 #include "grpcpp/grpcpp.h"
 #include "src/common/utils.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
-#include "src/server/master_server/master_metadata_service_impl.h"
 
 
 using gfs::service::ChunkServerServiceMasterServerClient;
@@ -23,7 +24,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
     protos::grpc::OpenFileReply* reply) {
   const std::string& filename(request->filename());
   google::protobuf::util::Status status(
-      metadata_manager()->CreateFileMetadata(filename)); 
+      metadata_manager()->CreateFileMetadata(filename));
   return common::utils::ConvertProtobufStatusToGrpcStatus(status);
 }
 
