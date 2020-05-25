@@ -46,11 +46,12 @@ After all servers have started, try it out by running an example client script:
 ```
 bazel run examples:run_mock_protocol_client_main -- \
   --config_path=data/config.yml \
+  --use_docker_dns_server=false \
   --master_name=master_server_01 \
   --chunk_server_name=chunk_server_01
 ```
 
-After you are down with it, turn everything off by either typing Ctrl + C, or using
+After you are done with it, turn everything off by either typing Ctrl + C, or using
 
 ```
 docker-compose down
