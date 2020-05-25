@@ -22,19 +22,36 @@ struct Data {
   void* buffer;
 };
 
-// We support the following mode: Read Mode | Write Mode | Create Mode
-// when opening a file. The only possible combination is Write | Create  
-google::protobuf::util::Status open(const char* pathname, unsigned int flags);
+// Initialization function that a user should call before using any of the 
+// APIs below. This function takes a configuration file path, a master node
+// name, and an optional bool to indicate whether to resolve host name. 
+// It will initialize the internal units (e.g. cacheManager) according to the 
+// configuration.  
+google::protobuf::util::Status init_client(const std::string& config_filename,
+    const std::string& master_name, const bool resolve_hostname = false);
 
-google::protobuf::util::Status close(const char* pathname);
+// We support the following mode: Read Mode | Write Mode | Create Mode
+// when opening a file. The only possible combination is Write | Create. 
+// The flags is an unsigned integer (similar to the open system call) which
+// is essentially a bit set representing a combination of OpenFlags. 
+// For read mode, flags = gfs::OpenFlags::Read 
+// For write mode, flags = gfs::OpenFlags::Write
+// For create mode, flags = gfs::OpenFlags::Create
+// For write + create mode, flags = (gfs::OpenFlags::Write |
+//                                   gfs::OpenFlags::Create)
+// You should not use integer literals when setting these flags as they are
+// error prone. Simply use the enum names shown as above. 
+google::protobuf::util::Status open(const char* filename, unsigned int flags);
+
+google::protobuf::util::Status close(const char* filename);
 
 google::protobuf::util::StatusOr<Data> read(
-    const char* pathname, size_t offset, size_t nbytes);
+    const char* filename, size_t offset, size_t nbytes);
 
 google::protobuf::util::Status write(const char* path, void* buffer,
-                                     size_t offset, size_t nbytes);
+    size_t offset, size_t nbytes);
 
-google::protobuf::util::Status remove(const char* pathname);
+google::protobuf::util::Status remove(const char* filename);
 
 }  // namespace client
 }  // namespace gfs

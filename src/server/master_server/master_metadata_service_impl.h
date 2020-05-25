@@ -5,6 +5,7 @@
 #include "grpcpp/grpcpp.h"
 #include "src/common/protocol_client/chunk_server_service_server_client.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
+#include "src/server/master_server/metadata_manager.h"
 
 namespace gfs {
 namespace service {
@@ -19,7 +20,26 @@ class MasterMetadataServiceImpl final
   bool RegisterChunkServerRpcClient(std::string server_name,
                                     std::shared_ptr<grpc::Channel> channel);
 
- protected:
+protected:
+  // Accessor to the MetadataManager instance
+  server::MetadataManager* metadata_manager();
+
+  // Handle file creation request. This function is called by OpenFile
+  // function to dispatch the task for creating a file
+  grpc::Status HandleFileCreation(const protos::grpc::OpenFileRequest* request,
+                                  protos::grpc::OpenFileReply* reply);
+
+  // Handle file read request. This function is called by OpenFile
+  // function to dispatch the task for read a file chunk
+  grpc::Status HandleFileChunkRead(const protos::grpc::OpenFileRequest* request,
+                                   protos::grpc::OpenFileReply* reply);
+
+  // Handle file read request. This function is called by OpenFile
+  // function to dispatch the task for writing to a file chunk
+  grpc::Status HandleFileChunkWrite(
+      const protos::grpc::OpenFileRequest* request,
+      protos::grpc::OpenFileReply* reply);
+
   // Handle an OpenFileRequest request sent by the client.
   grpc::Status OpenFile(grpc::ServerContext* context,
                         const protos::grpc::OpenFileRequest* request,

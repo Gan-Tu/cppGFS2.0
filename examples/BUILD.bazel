@@ -51,3 +51,14 @@ cc_binary(
         "@com_google_absl//absl/flags:parse",
     ],
 )
+
+cc_binary(
+    name = "run_client_main",
+    srcs = ["run_client_main.cc"],
+    data = ["//data:config.yml"],
+    deps = [
+        "//src/client:gfs_client",
+        "//src/common:system_logger",
+    ],
+)
+
