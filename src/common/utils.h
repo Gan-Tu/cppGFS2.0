@@ -132,6 +132,13 @@ namespace utils {
 google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
     const grpc::Status& status);
 
+// Convert a protocol buffer's Status to grpc::Status. This occurs typically
+// on the server side when converting an internal state represented by 
+// protocol buffer's Status or StatusOr to a grpc::Status would would be 
+// sent to the client
+grpc::Status ConvertProtobufStatusToGrpcStatus(
+    const google::protobuf::util::Status& status);
+
 // Check the validity of a given Filename. By validity we mean that a pathname
 // must follow the format /comp1/comp2/.../compn. Specifically a path should
 // have the following properties

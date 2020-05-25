@@ -46,10 +46,12 @@ message OpenFileRequest {
     UNKNOWN = 0;
     READ = 1;
     WRITE = 2;
-    APPEND = 3;
+    CREATE = 3;
+    APPEND = 4;
   }
   OpenMode mode = 3;
-  // Create the file chunk, if it doesn't exist
+  // Create the file chunk, if it doesn't exist. This is only valid for WRITE 
+  // mode
   bool create_if_not_exists = 4;
 }
 

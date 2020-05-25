@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
   const std::string config_path = absl::GetFlag(FLAGS_config_path);
   const std::string master_name = absl::GetFlag(FLAGS_master_name);
-  const bool use_docker_dns_server = absl::GetFlag(FLAGS_use_docker_dns_server);
+  const bool resolve_hostname = !absl::GetFlag(FLAGS_use_docker_dns_server);
 
   // Initialize configurations
   LOG(INFO) << "Reading GFS configuration: " << config_path;
@@ -39,10 +39,12 @@ int main(int argc, char** argv) {
 
   LOG(INFO) << "Running as master server: " << master_name;
   LOG(INFO) << "Server starting...";
-  ServerBuilder builder;
 
-  std::string server_address(config->GetServerAddress(
-      master_name, /*resolve_hostname=*/!use_docker_dns_server));
+  ServerBuilder builder;
+  auto credentials = grpc::InsecureChannelCredentials();
+
+  std::string server_address(
+      config->GetServerAddress(master_name, resolve_hostname));
 
   // Listen on the given address without any authentication mechanism for now.
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
@@ -54,6 +56,18 @@ int main(int argc, char** argv) {
   // Register a synchronous service for coordinating with chunkservers
   MasterChunkServerManagerServiceImpl chunk_server_mgr_service;
   builder.RegisterService(&chunk_server_mgr_service);
+
+  // Initialize gRPC protocol clients for talking to other servers
+  for (std::string& server_name : config->GetAllChunkServers()) {
+    const std::string chunk_server_address =
+        config->GetServerAddress(server_name, resolve_hostname);
+    LOG(INFO) << "Register gRPC client for talking to chunk server: "
+              << server_name << " at " << chunk_server_address;
+    metadata_service.RegisterChunkServerRpcClient(
+        server_name, grpc::CreateChannel(config->GetServerAddress(
+                                             server_name, resolve_hostname),
+                                         credentials));
+  }
 
   // Assemble and start the server
   std::unique_ptr<Server> server(builder.BuildAndStart());
