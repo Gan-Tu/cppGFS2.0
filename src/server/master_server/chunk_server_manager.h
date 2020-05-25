@@ -244,6 +244,11 @@ class ChunkServerManager {
   // allocation. we always keep this list sorted so max available disk
   // chunkservers first. There are several possible optimizations for this, but
   // will fist monitor performance of this.
+  // Also not using an ordered set/multiset because they use equivalance
+  // (!comp(a, b) && !comp(b, a)) for element uniqueness. So if we remove a
+  // chunkserver with disk 10, it removes all with disk 10. The list gives us
+  // full control of things and can periodically sort or offload sorting to
+  // background thread.
   std::list<std::shared_ptr<protos::ChunkServer>> chunk_servers_priority_list_;
 
   // Lock to synchronize access to the priority list. Since we allow different
