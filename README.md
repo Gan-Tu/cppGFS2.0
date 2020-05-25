@@ -25,11 +25,37 @@ scripts/install_bazel.sh
 Then, from the root directory, you can run Bazel commands as normal. For example:
 
 ```
-bazel build :all
-bazel test :all
+bazel build ...
+bazel test ...
 ```
 
 To learn more about how to use Bazel, or how to write Bazel build rule for C++, see the [official documentation](https://docs.bazel.build/versions/master/bazel-overview.html).
+
+## Running servers using Docker
+
+Make sure you have [Docker](https://docs.docker.com/engine/install/) and [Docker compose](https://docs.docker.com/compose/install/) installed
+
+To start all servers and expose respective server ports outside of Docker for connection, run:
+
+```
+docker-compose up
+```
+
+After all servers have started, try it out by running an example client script:
+
+```
+bazel run examples:run_mock_protocol_client_main -- \
+  --config_path=data/config.yml \
+  --use_docker_dns_server=false \
+  --master_name=master_server_01 \
+  --chunk_server_name=chunk_server_01
+```
+
+After you are done with it, turn everything off by either typing Ctrl + C, or using
+
+```
+docker-compose down
+```
 
 ## C++ Style Guide
 
