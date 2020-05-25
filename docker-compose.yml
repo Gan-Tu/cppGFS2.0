@@ -1,0 +1,67 @@
+version: "3.7" # version of docker compose syntax
+services:
+  # Start master server #1 on port 50051
+  master_server_01:
+    container_name: master_server_01
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gfs-image:latest
+    command: bazel run src/server/master_server:run_master_server_main --
+      --config_path=data/config.yml
+      --use_docker_dns_server
+      --master_name=master_server_01
+    working_dir: /app
+    ports:
+      - 50051:50051
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+  # Start chunk server #1 on port 50052
+  chunk_server_01:
+    container_name: chunk_server_01
+    image: gfs-image:latest
+    command: bazel run src/server/chunk_server:run_chunk_server_main --
+      --config_path=data/config.yml
+      --use_docker_dns_server
+      --chunk_server_name=chunk_server_01
+    ports:
+      - 50052:50052
+    depends_on:
+      - master_server_01
+    working_dir: /app
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+  # Start chunk server #2 on port 50053
+  chunk_server_02:
+    container_name: chunk_server_02
+    image: gfs-image:latest
+    command: bazel run src/server/chunk_server:run_chunk_server_main --
+      --config_path=data/config.yml
+      --use_docker_dns_server
+      --chunk_server_name=chunk_server_02
+    ports:
+      - 50053:50053
+    depends_on:
+      - master_server_01
+    working_dir: /app
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+  # Start chunk server #3 on port 50054
+  chunk_server_03:
+    container_name: chunk_server_03
+    image: gfs-image:latest
+    command: bazel run src/server/chunk_server:run_chunk_server_main --
+      --config_path=data/config.yml
+      --use_docker_dns_server
+      --chunk_server_name=chunk_server_03
+    ports:
+      - 50054:50054
+    depends_on:
+      - master_server_01
+    working_dir: /app
+    volumes:
+      - ./:/app
+    restart: unless-stopped

@@ -14,8 +14,8 @@ bool LockManager::Exist(const std::string& filename) {
 
 google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
     const std::string& filename) {
-  std::shared_ptr<absl::Mutex> new_lock(new absl::Mutex());  
- 
+  std::shared_ptr<absl::Mutex> new_lock(new absl::Mutex());
+
   // If the filename exists, that means another thread has created this
   // lock, or this thread has been created previously by the current
   // thread
@@ -23,26 +23,26 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
     return Status(google::protobuf::util::error::ALREADY_EXISTS,
                   "Lock already exists for " + filename);
   }
- 
+
   // TODO: We have not finalized the plan regarding to the removal of locks.
-  // The simplest approach is to say we don't remove locks (note that not 
-  // removing locks doesn't equate to not removing files) so we won't have 
-  // an issue that a removal takes place between the above and code below. 
+  // The simplest approach is to say we don't remove locks (note that not
+  // removing locks doesn't equate to not removing files) so we won't have
+  // an issue that a removal takes place between the above and code below.
   // This may seem too restricted, but dealing with concurrent creation and
-  // deletion is a pain and having a full-support of this may be rather 
-  // an overkill. What we can do instead is to defer the deletion of 
+  // deletion is a pain and having a full-support of this may be rather
+  // an overkill. What we can do instead is to defer the deletion of
   // lock resources (they are relatively small comparing to file metadata)
-  // and say, let's remove the lock resources only after the actual chunk 
-  // resources got garbage collected. Let's see how far we can go with this 
-  // project and see if we get a chance to improve the design here. 
+  // and say, let's remove the lock resources only after the actual chunk
+  // resources got garbage collected. Let's see how far we can go with this
+  // project and see if we get a chance to improve the design here.
   return new_lock.get();
 }
 
 google::protobuf::util::StatusOr<absl::Mutex*> LockManager::FetchLock(
     const std::string& filename) {
-  // The second item of the TryGetValue return indicates whether the item 
+  // The second item of the TryGetValue return indicates whether the item
   // exists in the collection, and the first item corresponds to the item
-  // the second item is true 
+  // the second item is true
   auto try_get_lock(file_path_locks_.TryGetValue(filename));
   bool lock_exist(try_get_lock.second);
 
