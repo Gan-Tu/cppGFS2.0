@@ -49,8 +49,8 @@ class LockManager {
  private:
   // A parallel hash map that maps from file path to mutexes, which are
   // used to synchronize read and write operations to FileMetadata
-  gfs::common::parallel_hash_map<
-      std::string, std::shared_ptr<absl::Mutex>> file_path_locks_;
+  gfs::common::parallel_hash_map<std::string, std::shared_ptr<absl::Mutex>>
+      file_path_locks_;
 };
 
 // A helper class which is an RAII wrapper to automatically acquire reader

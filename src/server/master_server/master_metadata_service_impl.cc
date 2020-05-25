@@ -1,7 +1,9 @@
-#include "grpcpp/grpcpp.h"
-#include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 #include "src/server/master_server/master_metadata_service_impl.h"
 
+#include "grpcpp/grpcpp.h"
+#include "src/protos/grpc/master_metadata_service.grpc.pb.h"
+
+using gfs::service::ChunkServerServiceMasterServerClient;
 using google::protobuf::Empty;
 using grpc::ServerContext;
 using protos::grpc::DeleteFileRequest;
@@ -20,7 +22,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
     protos::grpc::OpenFileReply* reply) {
   const std::string& filename(request->filename());
   google::protobuf::util::Status status(
-      metadata_manager()->CreateFileMetadata(filename)); 
+      metadata_manager()->CreateFileMetadata(filename));
   return common::utils::ConvertProtobufStatusToGrpcStatus(status);
 }
 
@@ -34,6 +36,15 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
     const protos::grpc::OpenFileRequest* request,
     protos::grpc::OpenFileReply* reply) {
   return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+}
+
+
+bool MasterMetadataServiceImpl::RegisterChunkServerRpcClient(
+    std::string server_name, std::shared_ptr<grpc::Channel> channel) {
+  auto iter_and_inserted = chunk_server_service_clients_.insert(
+      {server_name,
+       std::make_shared<ChunkServerServiceMasterServerClient>(channel)});
+  return iter_and_inserted.second;
 }
 
 grpc::Status MasterMetadataServiceImpl::OpenFile(ServerContext* context,
@@ -50,8 +61,8 @@ grpc::Status MasterMetadataServiceImpl::OpenFile(ServerContext* context,
     default:
       return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "invalid mode");
   }
-  
-  // Should not come to this line as all cases have been covered above 
+
+  // Should not come to this line as all cases have been covered above
   return grpc::Status(grpc::StatusCode::UNKNOWN, "internal error");
 }
 

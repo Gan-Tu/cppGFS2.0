@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
   const std::string config_path = absl::GetFlag(FLAGS_config_path);
   const std::string master_name = absl::GetFlag(FLAGS_master_name);
   const std::string chunk_server_name = absl::GetFlag(FLAGS_chunk_server_name);
-  const bool use_docker_dns_server = absl::GetFlag(FLAGS_use_docker_dns_server);
+  const bool resolve_hostname = !absl::GetFlag(FLAGS_use_docker_dns_server);
 
   // Initialize configurations
   LOG(INFO) << "Reading GFS configuration: " << config_path;
@@ -73,10 +73,11 @@ int main(int argc, char** argv) {
   }
 
   // Initialize an instance of communication manager
-  std::string master_address(config->GetServerAddress(
-      master_name, /*resolve_hostname=*/!use_docker_dns_server));
-  std::string chunk_server_address(config->GetServerAddress(
-      chunk_server_name, /*resolve_hostname=*/!use_docker_dns_server));
+  std::string master_address(
+      config->GetServerAddress(master_name, resolve_hostname));
+  std::string chunk_server_address(
+      config->GetServerAddress(chunk_server_name, resolve_hostname));
+
   auto credentials = grpc::InsecureChannelCredentials();
 
   LOG(INFO) << "Connecting to master server at " << master_address;
