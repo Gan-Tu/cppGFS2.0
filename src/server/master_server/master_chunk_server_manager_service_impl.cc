@@ -38,7 +38,7 @@ grpc::Status MasterChunkServerManagerServiceImpl::ReportChunkServer(
       gfs::server::ChunkServerManager::GetInstance().GetChunkServer(
           new_server_info.location());
 
-  if (!existing_server_info.first) {
+  if (!existing_server_info.has_location()) {
     // Not found, new server info, maybe chunkserver is just starting up or
     // restarted. Or the master just started or crashed/restarted and lost all
     // in-mem chunkservermgr record. Lets register this chunkserver.
@@ -52,69 +52,59 @@ grpc::Status MasterChunkServerManagerServiceImpl::ReportChunkServer(
     // The chunkserver already exist, so we need to compare the existing info
     // with new info and update.
 
-    auto existing_server = existing_server_info.first;
-    auto existing_server_lock = existing_server_info.second;
-
     // The reported chunks that we don't know about.
-    absl::flat_hash_set<std::string> chunks_to_add;
+    // First set all the reported chunks as chunks to add to our chunkserver
+    // info.
+    absl::flat_hash_set<std::string> chunks_to_add =
+        CreateFlatSetFromRepeatedPtrField<std::string>(
+            request->chunk_server().stored_chunk_handles());
 
     // The chunks that we think exist on the chunkserver but no longer exist
     // on it.
     absl::flat_hash_set<std::string> chunks_to_remove;
 
-    // Lock guard scope. We need to drop this read lock before calling update
-    // chunkserver.
-    {
-      // First set all the reported chunks as chunks to add to our chunkserver
-      // info.
-      chunks_to_add = CreateFlatSetFromRepeatedPtrField<std::string>(
-          request->chunk_server().stored_chunk_handles());
+    // Compare with our stored chunk handles for the chunk server. To see
+    // which reported chunks we have or don't have.
+    for (int i = 0; i < existing_server_info.stored_chunk_handles_size(); ++i) {
+      auto current_chunk_handle = existing_server_info.stored_chunk_handles(i);
 
-      // We need to take a read lock because chunkservermgr could be doing
-      // allocation for this server at the same time we are trying to read.
-      absl::ReaderMutexLock chunk_server_read_lock_guard(
-          existing_server_lock.get());
-
-      // Compare with our stored chunk handles for the chunk server. To see
-      // which reported chunks we have or don't have.
-      for (int i = 0; i < existing_server->stored_chunk_handles_size(); ++i) {
-        auto current_chunk_handle = existing_server->stored_chunk_handles(i);
-
-        if (chunks_to_add.contains(current_chunk_handle)) {
-          // Chunk server also reported this chunk. We know about this chunk,
-          // no need to add. We remove it from the add set. We will know what
-          // reported chunks weren't found in chunkservermgr at the end of the
-          // iteration.
-          // TODO(bmokutub): Check with metadata mgr that reported version
-          // matches the current version if it doesn't match, add to stale
-          // chunks in reply so chunkserver can delete it. And remove this
-          // chunkserver from the chunk locations in chunkservermgr, so we don't
-          // return this location as chunk location.
-          chunks_to_add.erase(current_chunk_handle);
-        } else {
-          // This means chunk server doesn't have this chunk stored on it.
-          // Maybe crashed during write or disk got corrupted.
-          // Add this chunk to the set of chunks to remove from chunkserver.
-          // Chunkserver will be removed from chunklocation map and update
-          // chunkserver info not to include this chunk
-          //
-          // NOTE: Lets watch this, and watchout for a situation where the we
-          // allocated a chunkserver for a chunk and before client connects to
-          // chunkserver, the chunkserver reports chunks to master and this
-          // willn't include the just allocated chunk since client has not
-          // talked to the chunkserver, so we end up removing the chunk here
-          // from the chunkserver and subsequent client calls will result in us
-          // not including this chunkserver, (and this can possible happen to
-          // all the allocated chunkserver) and end up returning no
-          // chunklocation for the chunk when chunkservermgr is asked. This will
-          // be fixed once the chunkserver makes another report since it will
-          // now include this chunk and we will add it. The duration, where we
-          // don't return this chunkserver for the chunk depends on the
-          // chunkserver report interval. If this report is frequent, then this
-          // will be fixed fast. If very frequent, then this situation mayn't be
-          // noticed.
-          chunks_to_remove.insert(current_chunk_handle);
-        }
+      if (chunks_to_add.contains(current_chunk_handle)) {
+        // Chunk server also reported this chunk. We know about this chunk,
+        // no need to add. We remove it from the add set. We will know what
+        // reported chunks weren't found in chunkservermgr at the end of the
+        // iteration.
+        // TODO(bmokutub): Check with metadata mgr that reported version
+        // matches the current version if it doesn't match, if report version is
+        // old, add to stale chunks in reply so chunkserver can delete it. And
+        // remove this chunkserver from the chunk locations in chunkservermgr,
+        // so we don't return this location as chunk location. If reported
+        // version is newer, that means master crashed after asking all
+        // chunkservers to advance chunk version before a write, so ask metadata
+        // mgr to advance the version to the new version.
+        chunks_to_add.erase(current_chunk_handle);
+      } else {
+        // This means chunk server doesn't have this chunk stored on it.
+        // Maybe crashed during write or disk got corrupted.
+        // Add this chunk to the set of chunks to remove from chunkserver.
+        // Chunkserver will be removed from chunklocation map and update
+        // chunkserver info not to include this chunk
+        //
+        // NOTE: Lets watch this, and watchout for a situation where the we
+        // allocated a chunkserver for a chunk and before client connects to
+        // chunkserver, the chunkserver reports chunks to master and this
+        // willn't include the just allocated chunk since client has not
+        // talked to the chunkserver, so we end up removing the chunk here
+        // from the chunkserver and subsequent client calls will result in us
+        // not including this chunkserver, (and this can possible happen to
+        // all the allocated chunkserver) and end up returning no
+        // chunklocation for the chunk when chunkservermgr is asked. This will
+        // be fixed once the chunkserver makes another report since it will
+        // now include this chunk and we will add it. The duration, where we
+        // don't return this chunkserver for the chunk depends on the
+        // chunkserver report interval. If this report is frequent, then this
+        // will be fixed fast. If very frequent, then this situation mayn't be
+        // noticed.
+        chunks_to_remove.insert(current_chunk_handle);
       }
     }
 

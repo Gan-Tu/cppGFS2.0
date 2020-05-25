@@ -197,22 +197,18 @@ void ChunkServerManager::UnRegisterAllChunkServers() {
   this->chunk_servers_lock_map_.clear();
 }
 
-std::pair<std::shared_ptr<const protos::ChunkServer>,
-          std::shared_ptr<absl::Mutex>>
-ChunkServerManager::GetChunkServer(
+const protos::ChunkServer ChunkServerManager::GetChunkServer(
     const protos::ChunkServerLocation& server_location) {
-  std::shared_ptr<protos::ChunkServer> server = nullptr;
-  std::shared_ptr<absl::Mutex> server_lock = nullptr;
+  protos::ChunkServer server;
 
   auto result = this->chunk_servers_map_.find(server_location);
 
   // Check if it was found
   if (result != this->chunk_servers_map_.end()) {
-    server = result->second;
-    server_lock = this->chunk_servers_lock_map_[server->location()];
+    server = *result->second;
   }
 
-  return {server, server_lock};
+  return server;
 }
 
 void ChunkServerManager::UpdateChunkServer(
@@ -231,58 +227,48 @@ void ChunkServerManager::UpdateChunkServer(
   // be removed and add the new ones.
   auto chunk_server = result->second;
 
-  // Lock guard scope
-  {
-    // We could be adding to chunkserver during allocation. Acquire lock here
-    // before adding/removing chunks from the chunkserver.
-    absl::WriterMutexLock chunk_server_write_lock_guard(
-        chunk_servers_lock_map_[chunk_server->location()].get());
-
-    // Remove chunks
-    if (!chunks_to_remove.empty()) {
-      for (auto iterator = chunk_server->stored_chunk_handles().begin();
-           iterator != chunk_server->stored_chunk_handles().end();) {
-        auto current_chunk_handle = *iterator;
-
-        if (chunks_to_remove.contains(current_chunk_handle)) {
-          // Remove this chunk from chunkserver
-          // Returns iterator to next element
-          iterator =
-              chunk_server->mutable_stored_chunk_handles()->erase(iterator);
-          // Remove this chunk server from the chunk handle location map.
-          this->chunk_locations_map_[current_chunk_handle].erase(
-              chunk_server->location());
-        } else {
-          ++iterator;
-        }
-      }
-    }
-
-    // Add chunks
-    for (auto iterator = chunks_to_add.begin(); iterator != chunks_to_add.end();
-         ++iterator) {
-      auto current_chunk_handle = *iterator;
-      chunk_server->add_stored_chunk_handles(current_chunk_handle);
-      // Add to chunk location map
-      this->chunk_locations_map_[current_chunk_handle].insert(
-          chunk_server->location());
-    }
-  }
-
-  // We drop the initial write lock before getting the priority list lock,
-  // because the priority list lock is gotten in chunk allocation before
-  // requesting chunkserver write lock. This is to avoid deadlock when we are
-  // running update while allocation is also going on. And for better
-  // performance don't want to block all allocations before doing update,
-  // that why i'm getting the priority list lock here.
+  // Get priority list lock before chunkserver lock. This is to avoid deadlock
+  // when we are running update while allocation is also going on. Since
+  // allocation also gets priority list lock before chunkserver lock.
 
   // Taking this lock here, since an allocation could
   // be resorting the priority list as we update the chunkserver disk.
   absl::MutexLock chunk_servers_priority_list_lock_guard(
       &chunk_servers_priority_list_lock_);
 
+  // Acquire lock here before adding/removing chunks from the chunkserver.
   absl::WriterMutexLock chunk_server_write_lock_guard(
       chunk_servers_lock_map_[chunk_server->location()].get());
+
+  // Remove chunks
+  if (!chunks_to_remove.empty()) {
+    for (auto iterator = chunk_server->stored_chunk_handles().begin();
+         iterator != chunk_server->stored_chunk_handles().end();) {
+      auto current_chunk_handle = *iterator;
+
+      if (chunks_to_remove.contains(current_chunk_handle)) {
+        // Remove this chunk from chunkserver
+        // Returns iterator to next element
+        iterator =
+            chunk_server->mutable_stored_chunk_handles()->erase(iterator);
+        // Remove this chunk server from the chunk handle location map.
+        this->chunk_locations_map_[current_chunk_handle].erase(
+            chunk_server->location());
+      } else {
+        ++iterator;
+      }
+    }
+  }
+
+  // Add chunks
+  for (auto iterator = chunks_to_add.begin(); iterator != chunks_to_add.end();
+       ++iterator) {
+    auto current_chunk_handle = *iterator;
+    chunk_server->add_stored_chunk_handles(current_chunk_handle);
+    // Add to chunk location map
+    this->chunk_locations_map_[current_chunk_handle].insert(
+        chunk_server->location());
+  }
 
   // Update available disk.
   chunk_server->set_available_disk_mb(available_disk_mb);

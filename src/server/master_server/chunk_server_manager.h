@@ -149,6 +149,8 @@ class ChunkServerManager {
   // space left or there are no chunk servers registered (i.e. servers down).
   // 3. If allocate is called for an already allocated chunk, we will return the
   // previously allocated locations and not do new allocation.
+  // TODO(bmokutub): We will need to support allocating new locations for a
+  // previously allocated chunk. Useful in order to increase replica count.
   ChunkServerLocationThreadSafeFlatSet AllocateChunkServer(
       const std::string& chunk_handle, const ushort& requested_servers_count);
 
@@ -179,15 +181,13 @@ class ChunkServerManager {
   // a friend.
   void UnRegisterAllChunkServers();
 
-  // Returns the ChunkServer for the specified location and the chunkserver
-  // mutex for threadsafe access. Returns a constant so it can't be modified
-  // outside the manager. Returns nullptr if not registered. This is used by the
+  // Returns the ChunkServer for the specified location. Returns the default
+  // chunkserver object if not registered. This is used by the
   // ChunkServerManager services only.
   // TODO(bmokutub): Consider making this private and making the service class
   // a friend.
-  std::pair<std::shared_ptr<const protos::ChunkServer>,
-            std::shared_ptr<absl::Mutex>>
-  GetChunkServer(const protos::ChunkServerLocation& server_location);
+  const protos::ChunkServer GetChunkServer(
+      const protos::ChunkServerLocation& server_location);
 
   // Update information about a registered chunkserver. We only allow updating
   // the available disk and chunks. Location can't be updated since it uniquely

@@ -17,6 +17,7 @@ service ChunkServerControlService {
 }
 
 // Empty request for now.
+// We can use this to pass the deleted chunks list to the chunkserver.
 message CheckHeartBeatRequest {
 }
 

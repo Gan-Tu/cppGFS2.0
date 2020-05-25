@@ -30,6 +30,8 @@ service MasterChunkServerManagerService {
   rpc ReportChunkServer(ReportChunkServerRequest) returns (ReportChunkServerReply) {}
 }
 
+// TODO(bmokutub): Chunkserver type has list of handles, 
+// and we are using stored_chunks here again for handle to version mapping. 
 message ReportChunkServerRequest {
   // The chunkserver making this request.
   protos.ChunkServer chunk_server = 1;

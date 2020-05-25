@@ -42,9 +42,8 @@ TEST_F(ChunkServerManagerTest, RegisterChunkServerWithNoChunks) {
   EXPECT_TRUE(
       ChunkServerManager::GetInstance().RegisterChunkServer(chunk_server));
 
-  EXPECT_EQ(*chunk_server, *ChunkServerManager::GetInstance()
-                                .GetChunkServer(*server_location)
-                                .first);
+  EXPECT_EQ(*chunk_server,
+            ChunkServerManager::GetInstance().GetChunkServer(*server_location));
 }
 
 // Test registering a chunkserver with some stored chunks (happens when an
@@ -67,9 +66,8 @@ TEST_F(ChunkServerManagerTest, RegisterAndUnregisterChunkServerWithChunks) {
   EXPECT_TRUE(
       ChunkServerManager::GetInstance().RegisterChunkServer(chunk_server));
 
-  EXPECT_EQ(*chunk_server, *ChunkServerManager::GetInstance()
-                                .GetChunkServer(*server_location)
-                                .first);
+  EXPECT_EQ(*chunk_server,
+            ChunkServerManager::GetInstance().GetChunkServer(*server_location));
 
   // check that the location of the chunks is our chunkserver
   for (ushort i = 0; i < chunk_count; ++i) {
@@ -87,7 +85,7 @@ TEST_F(ChunkServerManagerTest, RegisterAndUnregisterChunkServerWithChunks) {
   // Trying to get the unregistered chunkserver should fail
   EXPECT_FALSE(ChunkServerManager::GetInstance()
                    .GetChunkServer(*server_location)
-                   .first.get());
+                   .has_location());
 
   // Verify that this chunkserver location no longer appears for the chunk
   // handles
@@ -209,9 +207,8 @@ TEST_F(ChunkServerManagerTest, UpdateChunkServer) {
   EXPECT_TRUE(
       ChunkServerManager::GetInstance().RegisterChunkServer(chunk_server));
 
-  EXPECT_EQ(*chunk_server, *ChunkServerManager::GetInstance()
-                                .GetChunkServer(*server_location)
-                                .first);
+  EXPECT_EQ(*chunk_server,
+            ChunkServerManager::GetInstance().GetChunkServer(*server_location));
 
   const uint32_t available_disk_mb = 100;
 
@@ -300,7 +297,7 @@ TEST_F(ChunkServerManagerTest,
 
     EXPECT_TRUE(ChunkServerManager::GetInstance()
                     .GetChunkServer(server_location)
-                    .first.get());
+                    .has_location());
   }
 
   // Check that the chunkservers were correctly mapped to the chunks
@@ -344,7 +341,7 @@ TEST_F(ChunkServerManagerTest,
 
     EXPECT_FALSE(ChunkServerManager::GetInstance()
                      .GetChunkServer(server_location)
-                     .first.get());
+                     .has_location());
   }
 
   // Check that the chunkservers were correctly Unmapped to the chunks
@@ -378,9 +375,8 @@ TEST_F(ChunkServerManagerTest, ConcurrentAllocateChunkServers) {
     EXPECT_TRUE(
         ChunkServerManager::GetInstance().RegisterChunkServer(chunk_server));
 
-    EXPECT_EQ(*chunk_server, *ChunkServerManager::GetInstance()
-                                  .GetChunkServer(*server_location)
-                                  .first);
+    EXPECT_EQ(*chunk_server, ChunkServerManager::GetInstance().GetChunkServer(
+                                 *server_location));
   }
 
   // concurrently allocate chunkservers
@@ -449,9 +445,8 @@ TEST_F(ChunkServerManagerTest, ConcurrentRegisterAndAllocateChunkServers) {
     EXPECT_TRUE(
         ChunkServerManager::GetInstance().RegisterChunkServer(chunk_server));
 
-    EXPECT_EQ(*chunk_server, *ChunkServerManager::GetInstance()
-                                  .GetChunkServer(*server_location)
-                                  .first);
+    EXPECT_EQ(*chunk_server, ChunkServerManager::GetInstance().GetChunkServer(
+                                 *server_location));
   }
 
   // concurrently register 5 more chunservers and allocate 8 chunkservers
@@ -554,9 +549,8 @@ TEST_F(ChunkServerManagerTest, ConcurrentAllocateAndUpdateChunkServers) {
     EXPECT_TRUE(
         ChunkServerManager::GetInstance().RegisterChunkServer(chunk_server));
 
-    EXPECT_EQ(*chunk_server, *ChunkServerManager::GetInstance()
-                                  .GetChunkServer(*server_location)
-                                  .first);
+    EXPECT_EQ(*chunk_server, ChunkServerManager::GetInstance().GetChunkServer(
+                                 *server_location));
   }
 
   // Only doing 5 allocations, because we will be updating 5 servers disk to 0.
