@@ -22,6 +22,7 @@ int main(int argc, char** argv) {
   if (!create_foo_status.ok()) {
     LOG(ERROR) << "Open to create /foo failed with error: "
                << create_foo_status.error_message();
+    return 1;
   } else {
     LOG(INFO) << "Open to create /foo succeeded";
   }

@@ -38,8 +38,8 @@ google::protobuf::util::Status ClientImpl::CreateFile(
     return status_or.status();
   }
 
-  // Optionally we could have the master create the first chunk for this 
-  // file, that case the client should cache the FileChunkMetadata 
+  // TODO(Xi): the master creates the first chunk for this file, and the client 
+  // should cache the FileChunkMetadata 
   return google::protobuf::util::Status::OK;
 }
 
@@ -65,8 +65,8 @@ ClientImpl::ClientImpl(common::ConfigManager* config_manager,
                                   chunk_server_name, resolve_hostname));
     auto chunk_server_channel(grpc::CreateChannel(
                                   chunk_server_address, credentials));
-    chunk_server_service_client_.push_back(
-        new service::ChunkServerServiceGfsClient(chunk_server_channel));
+    chunk_server_service_client_[chunk_server_address] = 
+        new service::ChunkServerServiceGfsClient(chunk_server_channel);
   }
 }
 

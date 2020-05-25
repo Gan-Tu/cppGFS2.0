@@ -1,6 +1,8 @@
 #include "grpcpp/grpcpp.h"
+#include "src/common/utils.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 #include "src/server/master_server/master_metadata_service_impl.h"
+
 
 using google::protobuf::Empty;
 using grpc::ServerContext;
@@ -50,9 +52,6 @@ grpc::Status MasterMetadataServiceImpl::OpenFile(ServerContext* context,
     default:
       return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "invalid mode");
   }
-  
-  // Should not come to this line as all cases have been covered above 
-  return grpc::Status(grpc::StatusCode::UNKNOWN, "internal error");
 }
 
 // Handle a DeleteFileRequest request sent by the client.

@@ -59,9 +59,13 @@ google::protobuf::util::Status open(const char* filename, unsigned int flags) {
     return check_filename_status;
   }
 
-  // Creation mode
+  // Creation mode, this is true when flags = OpenFlag::Create or 
+  // Open::Create | Open::Write
   if (flags | OpenFlag::Create) {
-    return client_impl_->CreateFile(filename);
+    auto create_status(client_impl_->CreateFile(filename));
+    if (!create_status.ok()) {
+      return create_status;
+    }
   }
 
   // Note that real GFS does permission check when a read or write open flags

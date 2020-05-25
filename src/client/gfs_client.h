@@ -31,7 +31,16 @@ google::protobuf::util::Status init_client(const std::string& config_filename,
     const std::string& master_name, const bool resolve_hostname = false);
 
 // We support the following mode: Read Mode | Write Mode | Create Mode
-// when opening a file. The only possible combination is Write | Create  
+// when opening a file. The only possible combination is Write | Create. 
+// The flags is an unsigned integer (similar to the open system call) which
+// is essentially a bit set representing a combination of OpenFlags. 
+// For read mode, flags = gfs::OpenFlags::Read 
+// For write mode, flags = gfs::OpenFlags::Write
+// For create mode, flags = gfs::OpenFlags::Create
+// For write + create mode, flags = (gfs::OpenFlags::Write |
+//                                   gfs::OpenFlags::Create)
+// You should not use integer literals when setting these flags as they are
+// error prone. Simply use the enum names shown as above. 
 google::protobuf::util::Status open(const char* filename, unsigned int flags);
 
 google::protobuf::util::Status close(const char* filename);

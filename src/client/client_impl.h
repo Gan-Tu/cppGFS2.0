@@ -3,6 +3,7 @@
 
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "google/protobuf/stubs/status.h"
 #include "google/protobuf/stubs/statusor.h"
 #include "src/client/client_cache_manager.h"
@@ -47,9 +48,10 @@ class ClientImpl {
   // Reference to the MasterMetadataService client
   service::MasterMetadataServiceClient* master_metadata_service_client_;
 
-  // Reference to a list of ChunkServerServiceGfs clients, as the client 
-  // will have to connect to different chunk servers. 
-  std::vector<service::ChunkServerServiceGfsClient*> 
+  // Reference to ChunkServerServiceGfs clients which can be accessed by the
+  // chunk server addresses, the client will have to connect to different 
+  // chunk servers. 
+  absl::flat_hash_map<std::string, service::ChunkServerServiceGfsClient*> 
       chunk_server_service_client_;
 };
 
