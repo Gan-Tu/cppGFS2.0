@@ -7,7 +7,8 @@ import "src/protos/chunk_server.proto";
 // This is a service that runs on the master server that handles 
 // master coordination with chunk servers. This is different from the
 // heartbeat service which is used to send light messages to check the
-// health of the chunkserver.
+// health of the chunkserver. We use this to keep the chunkserver
+// manager in sync with the chunkservers.
 service MasterChunkServerManagerService {
   // Each chunkserver periodically reports the chunks it has, 
   // and the master replies with the identity of all chunks that are
@@ -23,10 +24,14 @@ service MasterChunkServerManagerService {
   // This chunkserver report call will be less frequent compared to the heartbeat
   // call (which is used to see if the chunkserver is still running), due to the
   // potential size of the messages. Since there can be a very large number of chunks
-  // on each chunkserver.
+  // on each chunkserver. Also, after the initial report during chunkserver/master startup
+  // the info on the chunkservermgr and chunkserver ideally shouldn't differ much 
+  // very often.
   rpc ReportChunkServer(ReportChunkServerRequest) returns (ReportChunkServerReply) {}
 }
 
+// TODO(bmokutub): Chunkserver type has list of handles, 
+// and we are using stored_chunks here again for handle to version mapping. 
 message ReportChunkServerRequest {
   // The chunkserver making this request.
   protos.ChunkServer chunk_server = 1;

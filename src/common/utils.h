@@ -20,23 +20,23 @@ namespace common {
 // The example below follows the pattern defined in:
 // https://greg7mdp.github.io/parallel-hashmap/
 // https://github.com/greg7mdp/parallel-hashmap/blob/master/examples/bench.cc
-template <class K, class V>
+template <class K, class V,
+          class Hash = phmap::container_internal::hash_default_hash<K>>
 class thread_safe_flat_hash_map
     : public phmap::parallel_flat_hash_map<
-          K, V, phmap::container_internal::hash_default_hash<K>,
-          phmap::container_internal::hash_default_eq<K>,
+          K, V, Hash, phmap::container_internal::hash_default_eq<K>,
           std::allocator<std::pair<const K, V>>, /*submaps=*/4, absl::Mutex> {};
 
-// Define a customized parallel hashmap that builds on a default 
+// Define a customized parallel hashmap that builds on a default
 // parallel_flat_hash_map to provide atomic operations such as "return the
 // item if the key exists or return false". As the development move forward we
 // realize that a pure thread-safe hashmap has limitations when it comes to
-// sophisticated operations, and we'd really like to gain control of the 
+// sophisticated operations, and we'd really like to gain control of the
 // locks on submaps if possible. For this purpose, we build a customized
 // parallel hashmap with a control of the submap locks (the default one
-// does not have locks, and we allocate locks manually). 
-// 
-// Example 1: You can try to access a value from a key by 
+// does not have locks, and we allocate locks manually).
+//
+// Example 1: You can try to access a value from a key by
 //   auto try_value(hmap.TryGetValue(key));
 //   if (!try_value.second) {
 //     // Handle the non-existing case
@@ -58,24 +58,22 @@ class thread_safe_flat_hash_map
 // there is no protection on submaps provided by the base class, and you'd run
 // into race condition if you do so. Always use the added methods below
 template <class Key, class Value>
-class parallel_hash_map 
-    : public phmap::parallel_flat_hash_map<Key, Value> {
+class parallel_hash_map : public phmap::parallel_flat_hash_map<Key, Value> {
  public:
   // Constructor initializes the lock array
   parallel_hash_map() {
     locks_ = std::vector<std::shared_ptr<absl::Mutex>>(
-                 this->subcnt(),
-                 std::shared_ptr<absl::Mutex>(new absl::Mutex()));
+        this->subcnt(), std::shared_ptr<absl::Mutex>(new absl::Mutex()));
   }
- 
+
   // Safely return if a key exists in the map
   bool Contains(const Key& key) {
     absl::Mutex* lock(FetchLock(key));
     absl::ReaderMutexLock lock_guard(lock);
-    return this->contains(key); 
+    return this->contains(key);
   }
-   
-  // Return a pair where the second item corresponds to whether the key 
+
+  // Return a pair where the second item corresponds to whether the key
   // exists. If the second item is true, then the first item corresponds
   // to the value of the item
   std::pair<Value, bool> TryGetValue(const Key& key) {
@@ -88,7 +86,7 @@ class parallel_hash_map
   }
 
   // Return a bool where the second item corresponds to whether the insertion
-  // takes place, i.e. this is a new key. If the key already exists, 
+  // takes place, i.e. this is a new key. If the key already exists,
   // do nothing and return false
   bool TryInsert(const Key& key, const Value& value) {
     absl::Mutex* lock(FetchLock(key));
@@ -106,27 +104,26 @@ class parallel_hash_map
     absl::WriterMutexLock lock_guard(lock);
     (*this)[key] = value;
   }
- 
+
  private:
-   std::vector<std::shared_ptr<absl::Mutex>> locks_; 
-   absl::Mutex* FetchLock(const Key& key) {
-     // Note that the "hash" method is somehow non-const (for no good 
-     // reason). An update of the library may resolve this, but for now
-     // let's live with what we have. This causes methods defined above
-     // to be non-const. 
-     size_t hash_val = this->hash(key);
-     size_t idx = this->subidx(hash_val);
-     return locks_[idx].get();
-   }
+  std::vector<std::shared_ptr<absl::Mutex>> locks_;
+  absl::Mutex* FetchLock(const Key& key) {
+    // Note that the "hash" method is somehow non-const (for no good
+    // reason). An update of the library may resolve this, but for now
+    // let's live with what we have. This causes methods defined above
+    // to be non-const.
+    size_t hash_val = this->hash(key);
+    size_t idx = this->subidx(hash_val);
+    return locks_[idx].get();
+  }
 };
 
 // Similar as above, define an intrinsically thread-safe flat hash set
-template <class V>
+template <class V, class Hash = phmap::container_internal::hash_default_hash<V>>
 class thread_safe_flat_hash_set
     : public phmap::parallel_flat_hash_set<
-          V, phmap::container_internal::hash_default_hash<V>,
-          phmap::container_internal::hash_default_eq<V>, std::allocator<V>,
-          /*submaps=*/4, absl::Mutex> {};
+          V, Hash, phmap::container_internal::hash_default_eq<V>,
+          std::allocator<V>, /*submaps=*/4, absl::Mutex> {};
 
 namespace utils {
 
