@@ -151,6 +151,10 @@ class ChunkServerManager {
   // previously allocated locations and not do new allocation.
   // TODO(bmokutub): We will need to support allocating new locations for a
   // previously allocated chunk. Useful in order to increase replica count.
+  // Also just return a flat set instead of the internal threadsafe set copy.
+  // Copy the internal threadsafe set to a flat set and return.
+  // Caller is just getting a copy so shouldn't worry about thread safety and
+  // shouldn't be confused by the return type.
   ChunkServerLocationThreadSafeFlatSet AllocateChunkServer(
       const std::string& chunk_handle, const ushort& requested_servers_count);
 
@@ -213,6 +217,9 @@ class ChunkServerManager {
   // unregistered (due to server down). The ChunkServer heartbeat monitor,
   // checks when a server is down and unregister it. If the server comes back
   // up, it will be reregistered by the chunkservermanager service.
+  // TODO(bmokutub): Copy the internal threadsafe set to a flat set and return.
+  // Caller is just getting a copy so shouldn't worry about thread safety and
+  // shouldn't be confused by the return type.
   ChunkServerLocationThreadSafeFlatSet GetChunkLocations(
       const std::string& chunk_handle);
 
