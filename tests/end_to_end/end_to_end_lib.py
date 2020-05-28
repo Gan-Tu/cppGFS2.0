@@ -85,7 +85,7 @@ def chunk_server_binary():
 # duplicated test case name in our test suite, or one has called this function
 # twice in the same test. 
 def setup_test_directory(test_case_name):
-    os.mkdir(test_case_name)
+    os.makedirs(test_case_name, exist_ok=True)
 
 # Helper function to generate name for master server for a given server id
 def master_server_name(id):
@@ -262,7 +262,7 @@ def start_master_and_chunk_servers(config_filename, log_directory = None,
                        "--master_name=%s"%master_server_name]
         master_proc = None
         if log_directory != None:
-            os.makedirs(log_directory)
+            os.makedirs(log_directory, exist_ok=True)
             log_file = open(log_directory + "/" + master_server_name \
                                 + ".txt", "w+")
             master_proc = subprocess.Popen(command, stderr=log_file)
