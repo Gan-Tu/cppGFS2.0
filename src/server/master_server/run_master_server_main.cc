@@ -64,9 +64,7 @@ int main(int argc, char** argv) {
     LOG(INFO) << "Register gRPC client for talking to chunk server: "
               << server_name << " at " << chunk_server_address;
     metadata_service.RegisterChunkServerRpcClient(
-        server_name, grpc::CreateChannel(config->GetServerAddress(
-                                             server_name, resolve_hostname),
-                                         credentials));
+        server_name, grpc::CreateChannel(chunk_server_address, credentials));
   }
 
   // Assemble and start the server

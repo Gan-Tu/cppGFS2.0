@@ -4,6 +4,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "grpcpp/grpcpp.h"
 #include "src/common/protocol_client/chunk_server_service_server_client.h"
+#include "src/common/utils.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 #include "src/server/master_server/metadata_manager.h"
 
@@ -20,7 +21,7 @@ class MasterMetadataServiceImpl final
   bool RegisterChunkServerRpcClient(std::string server_name,
                                     std::shared_ptr<grpc::Channel> channel);
 
-protected:
+ protected:
   // Accessor to the MetadataManager instance
   server::MetadataManager* metadata_manager();
 
@@ -51,7 +52,7 @@ protected:
                           google::protobuf::Empty* reply) override;
 
   // Chunk server name and its corresponding GFS protocol client
-  absl::flat_hash_map<
+  gfs::common::thread_safe_flat_hash_map<
       std::string,
       std::shared_ptr<gfs::service::ChunkServerServiceMasterServerClient>>
       chunk_server_service_clients_;

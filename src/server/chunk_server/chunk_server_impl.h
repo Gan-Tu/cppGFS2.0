@@ -2,6 +2,7 @@
 #define GFS_SERVER_CHUNK_SERVER_IMPL_H_
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/time/time.h"
 #include "google/protobuf/stubs/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "src/common/config_manager.h"
@@ -21,6 +22,9 @@ class ChunkServerImpl {
 
   void AddOrUpdateLease(std::string file_handle, uint64_t expiration_usec);
   bool HasWriteLease(std::string file_handle);
+  void RemoveLease(std::string file_handle);
+  google::protobuf::util::StatusOr<absl::Time> GetLeaseExpirationTime(
+      std::string file_handle);
 
   bool RegisterMasterServerRpcClient(std::string server_name,
                                      std::shared_ptr<grpc::Channel> channel);

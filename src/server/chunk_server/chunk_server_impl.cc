@@ -2,7 +2,6 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
-#include "absl/time/time.h"
 
 using gfs::common::ConfigManager;
 using gfs::common::thread_safe_flat_hash_map;
@@ -79,6 +78,21 @@ bool ChunkServerImpl::HasWriteLease(std::string file_handle) {
   absl::Time expiration_time =
       absl::FromUnixNanos(lease_and_expiration_usec_[file_handle]);
   return absl::Now() < expiration_time;
+}
+
+StatusOr<absl::Time> ChunkServerImpl::GetLeaseExpirationTime(
+    std::string file_handle) {
+  if (!lease_and_expiration_usec_.contains(file_handle)) {
+    return Status(
+        google::protobuf::util::error::NOT_FOUND,
+        absl::StrCat("Lease is not found for file handle: ", file_handle));
+  } else {
+    return absl::FromUnixNanos(lease_and_expiration_usec_[file_handle]);
+  }
+}
+
+void ChunkServerImpl::RemoveLease(std::string file_handle) {
+  lease_and_expiration_usec_.erase(file_handle);
 }
 
 bool ChunkServerImpl::RegisterMasterServerRpcClient(
