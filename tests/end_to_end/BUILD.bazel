@@ -1,0 +1,25 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_python//python:defs.bzl", "py_test")
+
+cc_binary(
+    name = "file_creation_client",
+    srcs = ["file_creation_client.cc"],
+    deps = [
+        "//src/common:system_logger",
+        "//src/client:gfs_client"]
+)
+
+py_library(
+    name = "end_to_end_lib",
+    srcs = ["end_to_end_lib.py"]
+)
+
+py_test(
+    name = "file_creation_test",
+    srcs = ["file_creation_test.py"],
+    # For python test, the executables are listed in the data section
+    data = [
+        ":file_creation_client",
+        "//src/server/master_server:run_master_server_main"],
+    deps = [":end_to_end_lib"]
+)
