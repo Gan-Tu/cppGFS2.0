@@ -1,12 +1,60 @@
-# This is a shared python module that many end-to-end tests will use
-# TODO(Xi): more documentations here
 import os
 import signal
 import socket
 import subprocess
 
+# This is a shared python module that many end-to-end tests will use. It 
+# provides utility function that a distributed end-to-end test can take 
+# use to automatically generate configure file and launch a GFS cluster,
+# which includes a number of master servers and chunk servers. 
+#
+# Example: First create a directory designated for your test
+#     test_case_name = "test_case"
+#     end_to_end_lib.setup_test_directory(test_case_name)
+#
+# Then specify a config file name and log directory (note here is the 
+# system log for the servers, not the operational log) as:
+#     config_filename = test_case_name + "/" + "config.yaml"    
+#     log_directory = test_case_name + "/" + "logs"
+#
+# The config file will be used to launch the servers and client and the log
+# directory stores teh logs for running the servers, which comes handy for
+# debugging.
+# 
+# Then you call start_master_and_chunk_servers function to launch the server
+# cluster:
+#    server_procs = end_to_end_lib.start_master_and_chunk_servers(
+#                       config_filename, log_directory)
+#
+# This function launches the master and chunk servers, and returns the process
+# handle so you can later kill them for cleanup. The default setting is 1 
+# master + 3 chunk servers, and you can configure all fields in the config
+# file via this function (see details for configurable params in the function
+# below). 
+#
+# Once you have finished the above steps, you can start lanching your client
+# binaries and test its end-to-end behavior.  
+#
+# When you test a new end-to-end test or deal with a failure that shows up, 
+# typically you have run:
+#     bazel test -c dbg ...
+# The "-c dbg" is for debugging build and is optional. You may find it hard
+# to locate the generated data and files in bazel as they got generated in
+# sand box (by default). To see the files in sandbox, you have to add 
+# --sandbox_debug option in the above command, and then search under the 
+# bazel build directory (most likely under your ~/.cache). 
+#
+# Alternatively, you could debug your test locally, and to do this, you have
+# to lauch the script in the correct path as the dependencies on files are 
+# expressed in relative path. To do so, first cd into the bazel-bin dir:
+#    cd bazel-bin
+# Then launch your test script in that directory (note that you may have to
+# specify the absolute path of your script, as bazel-bin is a soft-link so
+# "../" does point to a different directory of your cppGFS2.0 root)
+
 master_server_name_prefix = "master_server_"
 chunk_server_name_prefix = "chunk_server_"
+# Used to prevent duplicated port number assignment
 used_port_number = []
 
 # Kill a given process
@@ -85,10 +133,15 @@ def get_avaialble_port():
 # {server_id} and "chunk_server_" + {server_id} as name schemes for the servers
 # Furthermore, all IP addresses from the dns_lookup_table is 0.0.0.0 as most
 # end-to-end tests are expected to run on the same machine
-def generate_config_and_config_file(config_filename, num_of_master_server = 1, 
-    num_of_chunk_server = 3, block_size_mb = 64, min_free_disk_space_mb = 100,
-    grpc_timeout_s = 10, lease_timeout_s = 60, heartbeat_timeout_s = 30,
-    client_cache_timeout_m = 10):
+# 
+# This function also returns a config object in json (as a directory), which
+# will be used later when launching the servers. This is more of an artifact 
+# due to the limitation of importing yaml to Bazel sandbox (running out of 
+# time to figure this out)
+def generate_config_and_config_file(config_filename, num_of_master_server, 
+    num_of_chunk_server, block_size_mb, min_free_disk_space_mb,
+    grpc_timeout_s, lease_timeout_s, heartbeat_timeout_s,
+    client_cache_timeout_m):
  
     config_data = {}
     config_data["version"] = "1.0"
@@ -128,9 +181,9 @@ def generate_config_and_config_file(config_filename, num_of_master_server = 1,
     # If time allows (most likely not), will refactor this
     indent = " "
     config_file_content = "version: 1.0\n"
+    # Generate the servers section
     config_file_content += "servers:\n"
     config_file_content += indent + "master_servers:\n"
-
     for i in range(1, num_of_master_server+1):
         server_name = master_server_name(i)
         config_file_content += indent + indent + "- " + server_name + "\n"
@@ -140,6 +193,7 @@ def generate_config_and_config_file(config_filename, num_of_master_server = 1,
         server_name = chunk_server_name(i)
         config_file_content += indent + indent + "- " + server_name + "\n"
 
+    # Generate the network section
     config_file_content += "network:\n"
     for i in range(1, num_of_master_server+1):
         server_name = master_server_name(i)
@@ -156,7 +210,8 @@ def generate_config_and_config_file(config_filename, num_of_master_server = 1,
                                    + "\n"
         config_file_content += indent + indent + "port: " \
             + str(config_data["network"][server_name]["port"]) + "\n"
-
+    
+    # Generate the dns_lookup_table
     config_file_content += indent + "dns_lookup_table:\n"
     for i in range(1, num_of_master_server+1):
         server_name = master_server_name(i)
@@ -165,6 +220,7 @@ def generate_config_and_config_file(config_filename, num_of_master_server = 1,
         server_name = chunk_server_name(i)
         config_file_content += indent + indent + server_name + ": 0.0.0.0\n"
 
+    # Generate a few configuration params
     config_file_content += "disk:\n"
     config_file_content += indent + "block_size_mb: " + str(block_size_mb) \
                                + "\n"
@@ -179,7 +235,7 @@ def generate_config_and_config_file(config_filename, num_of_master_server = 1,
     config_file_content += indent + "client_cache: " \
                                + str(client_cache_timeout_m) + "m\n"
 
-    # Dump the object using yaml
+    # Write to the config file
     with open(config_filename, "w") as config_file:
         config_file.write(config_file_content)
 
@@ -187,12 +243,21 @@ def generate_config_and_config_file(config_filename, num_of_master_server = 1,
     return config_data
 
 # Start a cluster which is composed by a number of master and chunk servers
-# as specified in a given config file. Optionally this function takes a path
-# to the directory to store the logs. Return the processes in a list
-def start_master_and_chunk_servers(config_filename, config_data, 
-                                       log_directory = None):
+# as specified by the configurable params. Optionally this function takes a path
+# to the directory to store the logs. Return the processes in a list.
+def start_master_and_chunk_servers(config_filename, log_directory = None,
+        num_of_master_server = 1, num_of_chunk_server = 3, block_size_mb = 64,
+        min_free_disk_space_mb = 100, grpc_timeout_s = 10, lease_timeout_s = 60,
+        heartbeat_timeout_s = 30, client_cache_timeout_m = 10):
+    # Generate the config file and config data
+    config_data = generate_config_and_config_file(config_filename, 
+                      num_of_master_server, num_of_chunk_server, block_size_mb,
+                      min_free_disk_space_mb, grpc_timeout_s, lease_timeout_s,
+                      heartbeat_timeout_s, client_cache_timeout_m)
+
     master_and_chunk_server_procs = []
     for master_server_name in config_data["servers"]["master_servers"]:
+        # Specify the command for master node
         command = [master_server_binary(), "--config_path=%s"%config_filename,
                        "--master_name=%s"%master_server_name]
         master_proc = None
@@ -205,6 +270,6 @@ def start_master_and_chunk_servers(config_filename, config_data,
             master_proc = subprocess.Popen(command)
         
         master_and_chunk_server_procs.append(master_proc)
-        # TODO(Xi): Add chunk server's launching once it is shaped up
-
+    
+    # TODO(Xi): Add chunk server's launching once it is shaped up
     return master_and_chunk_server_procs 
