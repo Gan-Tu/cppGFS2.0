@@ -3,6 +3,7 @@
 
 #include "grpcpp/grpcpp.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
+#include "src/server/chunk_server/chunk_server_impl.h"
 
 namespace gfs {
 namespace service {
@@ -10,6 +11,11 @@ namespace service {
 // The synchronous implementation for handling ChunkServerFileService requests
 class ChunkServerFileServiceImpl final
     : public protos::grpc::ChunkServerFileService::Service {
+ public:
+  ChunkServerFileServiceImpl(gfs::server::ChunkServerImpl* chunk_server_impl)
+      : protos::grpc::ChunkServerFileService::Service(),
+        chunk_server_impl_(chunk_server_impl) {}
+
   // Handle an InitFileChunkRequest request sent by the master.
   grpc::Status InitFileChunk(grpc::ServerContext* context,
                              const protos::grpc::InitFileChunkRequest* request,
@@ -21,10 +27,9 @@ class ChunkServerFileServiceImpl final
                              protos::grpc::ReadFileChunkReply* reply) override;
 
   // Handle a SendChunkDataRequest request sent by the client.
-  grpc::Status SendChunkData(
-      grpc::ServerContext* context,
-      const protos::grpc::SendChunkDataRequest* request,
-      protos::grpc::SendChunkDataReply* reply) override;
+  grpc::Status SendChunkData(grpc::ServerContext* context,
+                             const protos::grpc::SendChunkDataRequest* request,
+                             protos::grpc::SendChunkDataReply* reply) override;
 
   // Handle a WriteFileChunkRequest request sent by the client.
   grpc::Status WriteFileChunk(
@@ -43,6 +48,8 @@ class ChunkServerFileServiceImpl final
       grpc::ServerContext* context,
       const protos::grpc::AdvanceFileChunkVersionRequest* request,
       protos::grpc::AdvanceFileChunkVersionReply* reply) override;
+
+  gfs::server::ChunkServerImpl* chunk_server_impl_;
 };
 
 // The asynchronous implementation for handling ChunkServerFileService requests

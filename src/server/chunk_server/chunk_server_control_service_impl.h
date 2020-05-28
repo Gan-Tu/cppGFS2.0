@@ -3,6 +3,7 @@
 
 #include "grpcpp/grpcpp.h"
 #include "src/protos/grpc/chunk_server_control_service.grpc.pb.h"
+#include "src/server/chunk_server/chunk_server_impl.h"
 
 namespace gfs {
 namespace service {
@@ -12,6 +13,11 @@ namespace service {
 // send control information to it. Such as checking the chunkserver heartbeat.
 class ChunkServerControlServiceImpl final
     : public protos::grpc::ChunkServerControlService::Service {
+ public:
+  ChunkServerControlServiceImpl(gfs::server::ChunkServerImpl* chunk_server_impl)
+      : protos::grpc::ChunkServerControlService::Service(),
+        chunk_server_impl_(chunk_server_impl) {}
+
   // Handle a CheckHeartBeat request sent by the master.
   // Used to check if the chunkserver is alive.
   grpc::Status CheckHeartBeat(
@@ -27,6 +33,8 @@ class ChunkServerControlServiceImpl final
       grpc::ServerContext* context,
       const protos::grpc::TriggerReportChunkServerRequest* request,
       protos::grpc::TriggerReportChunkServerReply* reply) override;
+
+  gfs::server::ChunkServerImpl* chunk_server_impl_;
 };
 
 // The asynchronous implementation for handling ChunkServerControlService
