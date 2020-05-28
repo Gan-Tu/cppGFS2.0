@@ -6,7 +6,9 @@ cc_binary(
     srcs = ["file_creation_client.cc"],
     deps = [
         "//src/common:system_logger",
-        "//src/client:gfs_client"]
+        "//src/client:gfs_client",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/flags:parse"]
 )
 
 py_library(

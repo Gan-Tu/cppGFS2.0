@@ -1,19 +1,25 @@
 #include <thread>
 #include <vector>
+#include "absl/flags/flag.h"
+#include "absl/flags/parse.h"
 #include "src/client/gfs_client.h"
 #include "src/common/system_logger.h"
 
-// Initialization, including setting up system logging, config file and master
-// name. This function may be refactored into a utils call later
+// TODO(Xi): Refactor the following and init() into a util.h as many tests
+// may reuse this piece
+ABSL_FLAG(std::string, config_path, "file_creation_test/config.yaml", 
+          "/path/to/config.yml");
+ABSL_FLAG(std::string, master_name, "master_server_01",
+          "master name for this client to talk to");
+
+// Init function to initialize the client
 void init() {
-  const std::string config_filename("file_creation_test/config.yaml");
-  const std::string master_name("master_server_01");
-  // Currently data/config.yml does not have real hostname so we set 
-  // resolve_hostname to enable a manual lookup
+  const std::string config_path = absl::GetFlag(FLAGS_config_path);
+  const std::string master_name = absl::GetFlag(FLAGS_master_name);
   const bool resolve_hostname(true);
 
   LOG(INFO) << "Calling init_client...";
-  auto init_status(gfs::client::init_client(config_filename, master_name, 
+  auto init_status(gfs::client::init_client(config_path, master_name, 
                                             resolve_hostname));
   if (!init_status.ok()) {
     LOG(ERROR) << "Client initialiation failed with error: " 
@@ -22,6 +28,7 @@ void init() {
   }
 }
 
+// Create a single file
 void singleFileCreation(const std::string& filename) {
   init();
   auto create_foo_status(gfs::client::open(filename.c_str(), 
@@ -35,6 +42,7 @@ void singleFileCreation(const std::string& filename) {
   }
 }
 
+// Launch multiple threads and have each to create a file concurrently
 void concurrentFileCreation(const unsigned int num_of_threads) {
   std::vector<std::thread> threads;
   for (unsigned int i = 0; i < num_of_threads; i++) {
@@ -48,7 +56,9 @@ void concurrentFileCreation(const unsigned int num_of_threads) {
 }
 
 int main(int argc, char** argv) {
+  // Initialize system log and parse command line options
   gfs::common::SystemLogger::GetInstance().Initialize(argv[0]);
+  absl::ParseCommandLine(argc, argv);
   
   // Simple test case, create a single file
   singleFileCreation("/foo"); 
