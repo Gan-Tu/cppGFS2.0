@@ -5,21 +5,28 @@ package protos;
 message ChunkServerLocation {
   // The hostname of this chunk server location
   string server_hostname = 1;
+
   // The port that this chunk server is listening on for requests
   uint32 server_port = 2;
 }
 
 message ChunkServer {
+  // Used as the unique identifier for this chunkserver.
   ChunkServerLocation location = 1;
-  // Amount of memory in megabytes available on the server
-  uint32 available_memory_mb = 2;
+
+  // Amount of disk in megabytes available on the server
+  uint32 available_disk_mb = 2;
+
+  // The chunk handles for chunks on this server.
+  repeated string stored_chunk_handles = 3;
 }
 
 // Information about a chunk on a chunkserver.
 // This shouldn't include the chunk data.
 // Can be renamed to something better later.
 message FileChunk {
-  string handle = 1;  
+  string handle = 1;
+
   // The version of the chunk on the chunkserver.
   uint32 version = 2;
 }
