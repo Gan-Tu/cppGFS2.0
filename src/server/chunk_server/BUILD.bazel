@@ -39,6 +39,7 @@ cc_binary(
     name = "run_chunk_server_main",
     srcs = ["run_chunk_server_main.cc"],
     data = ["//data:config.yml"],
+    visibility = ["//visibility:public"],
     deps = [
         ":chunk_server_control_service_impl",
         ":chunk_server_file_service_impl",
