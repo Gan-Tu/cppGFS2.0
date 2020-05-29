@@ -17,7 +17,6 @@ namespace server {
 StatusOr<ChunkServerImpl*> ChunkServerImpl::ConstructChunkServerImpl(
     const std::string& config_filename, const std::string& chunk_server_name,
     const bool resolve_hostname) {
-
   LOG(INFO) << "Parsing configuration file...";
   // Instantiate a ConfigManager with the given filename
   StatusOr<ConfigManager*> config_manager_or(
@@ -65,16 +64,12 @@ StatusOr<ChunkServerImpl*> ChunkServerImpl::ConstructChunkServerImpl(
   return chunks_server_impl;
 }
 
-void ChunkServerImpl::AddOrUpdateLease(std::string file_handle,
-                                       uint64_t expiration_usec) {
-  if (lease_and_expiration_usec_.contains(file_handle)) {
-    lease_and_expiration_usec_[file_handle] = expiration_usec;
-  } else {
-    lease_and_expiration_usec_.insert({file_handle, expiration_usec});
-  }
+void ChunkServerImpl::AddOrUpdateLease(const std::string& file_handle,
+                                       const uint64_t expiration_usec) {
+  lease_and_expiration_usec_[file_handle] = expiration_usec;
 }
 
-bool ChunkServerImpl::HasWriteLease(std::string file_handle) {
+bool ChunkServerImpl::HasWriteLease(const std::string& file_handle) {
   if (!lease_and_expiration_usec_.contains(file_handle)) {
     return false;
   }
@@ -86,7 +81,7 @@ bool ChunkServerImpl::HasWriteLease(std::string file_handle) {
 }
 
 StatusOr<absl::Time> ChunkServerImpl::GetLeaseExpirationTime(
-    std::string file_handle) {
+    const std::string& file_handle) {
   if (!lease_and_expiration_usec_.contains(file_handle)) {
     return Status(
         google::protobuf::util::error::NOT_FOUND,
@@ -96,12 +91,29 @@ StatusOr<absl::Time> ChunkServerImpl::GetLeaseExpirationTime(
   }
 }
 
-void ChunkServerImpl::RemoveLease(std::string file_handle) {
+void ChunkServerImpl::RemoveLease(const std::string& file_handle) {
   lease_and_expiration_usec_.erase(file_handle);
 }
 
+void ChunkServerImpl::SetChunkVersion(const std::string& file_handle,
+                                      const uint32_t version) {
+  // TODO(tugan,michael): use chunk file manager instead, when ready
+  chunk_versions_[file_handle] = version;
+}
+
+google::protobuf::util::StatusOr<uint32_t> ChunkServerImpl::GetChunkVersion(
+    const std::string& file_handle) {
+  // TODO(tugan,michael): use chunk file manager instead, when ready
+  if (!chunk_versions_.contains(file_handle)) {
+    return Status(google::protobuf::util::error::NOT_FOUND,
+                  absl::StrCat("File chunk is not found: ", file_handle));
+  } else {
+    return chunk_versions_[file_handle];
+  }
+}
+
 bool ChunkServerImpl::RegisterMasterServerRpcClient(
-    std::string server_name, std::shared_ptr<grpc::Channel> channel) {
+    const std::string& server_name, std::shared_ptr<grpc::Channel> channel) {
   auto iter_and_inserted = master_server_clients_.insert(
       {server_name,
        std::make_shared<MasterChunkServerManagerServiceClient>(channel)});
@@ -109,7 +121,7 @@ bool ChunkServerImpl::RegisterMasterServerRpcClient(
 }
 
 bool ChunkServerImpl::RegisterChunkServerRpcClient(
-    std::string server_name, std::shared_ptr<grpc::Channel> channel) {
+    const std::string& server_name, std::shared_ptr<grpc::Channel> channel) {
   auto iter_and_inserted = chunk_server_clients_.insert(
       {server_name,
        std::make_shared<ChunkServerServiceChunkServerClient>(channel)});
