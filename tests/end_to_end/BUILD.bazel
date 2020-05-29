@@ -22,6 +22,7 @@ py_test(
     # For python test, the executables are listed in the data section
     data = [
         ":file_creation_client",
+        "//src/server/chunk_server:run_chunk_server_main",
         "//src/server/master_server:run_master_server_main"],
     deps = [":end_to_end_lib"]
 )

@@ -256,13 +256,18 @@ def start_master_and_chunk_servers(config_filename, log_directory = None,
                       heartbeat_timeout_s, client_cache_timeout_m)
 
     master_and_chunk_server_procs = []
+
+    # Create log directory 
+    if log_directory != None:
+        os.makedirs(log_directory)
+
+    # Launch master servers
     for master_server_name in config_data["servers"]["master_servers"]:
         # Specify the command for master node
         command = [master_server_binary(), "--config_path=%s"%config_filename,
                        "--master_name=%s"%master_server_name]
         master_proc = None
         if log_directory != None:
-            os.makedirs(log_directory)
             log_file = open(log_directory + "/" + master_server_name \
                                 + ".txt", "w+")
             master_proc = subprocess.Popen(command, stderr=log_file)
@@ -270,6 +275,20 @@ def start_master_and_chunk_servers(config_filename, log_directory = None,
             master_proc = subprocess.Popen(command)
         
         master_and_chunk_server_procs.append(master_proc)
+ 
+    # Launch chunk servers
+    for chunk_server_name in config_data["servers"]["chunk_servers"]:
+        # Specify the command for chunk server node
+        command = [chunk_server_binary(), "--config_path=%s"%config_filename,
+                       "--chunk_server_name=%s"%chunk_server_name]
+        chunk_server_proc = None
+        if log_directory != None:
+            log_file = open(log_directory + "/" + chunk_server_name \
+                                + ".txt", "w+")
+            chunk_server_proc = subprocess.Popen(command, stderr=log_file)
+        else:
+            chunk_server_proc = subprocess.Popen(command)
+        
+        master_and_chunk_server_procs.append(chunk_server_proc)
     
-    # TODO(Xi): Add chunk server's launching once it is shaped up
     return master_and_chunk_server_procs 
