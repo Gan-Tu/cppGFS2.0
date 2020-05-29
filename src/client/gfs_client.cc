@@ -5,10 +5,10 @@
 namespace gfs {
 namespace client {
 
-// A singleton object that serves as the interface for the impl code to access
+// A per-thread object that serves as the interface for the impl code to access
 // and issue calls to internal units such as cache manager, service clients to
 // master and chunk servers
-static ClientImpl* client_impl_ = nullptr;
+static thread_local ClientImpl* client_impl_ = nullptr;
 
 // Validate a given open flag, currently we only support four modes, namely
 // read, write, create and create | write

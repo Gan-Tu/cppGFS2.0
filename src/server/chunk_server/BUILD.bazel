@@ -20,10 +20,21 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "chunk_server_control_service_impl",
+    srcs = ["chunk_server_control_service_impl.cc"],
+    hdrs = ["chunk_server_control_service_impl.h"],
+    deps = [
+        "//src/protos/grpc:cc_chunk_server_control_service_grpc",
+        "@com_github_grpc_grpc//:grpc++",
+    ],
+)
+
 cc_binary(
     name = "run_chunk_server_main",
     srcs = ["run_chunk_server_main.cc"],
     data = ["//data:config.yml"],
+    visibility = ["//visibility:public"],
     deps = [
         ":chunk_server_file_service_impl",
         ":chunk_server_lease_service_impl",
