@@ -53,6 +53,7 @@ int main(int argc, char** argv) {
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
 
   // Chunk Server implementation
+  LOG(INFO) << "Initializing main chunk server...";
   StatusOr<ChunkServerImpl*> chunk_server_impl_or =
       ChunkServerImpl::ConstructChunkServerImpl(config_path, chunk_server_name,
                                                 resolve_hostname);
@@ -62,8 +63,6 @@ int main(int argc, char** argv) {
                << chunk_server_impl_or.status();
     return 1;
   }
-
-  LOG(INFO) << "Initializing main chunk server...";
   ChunkServerImpl* chunk_server_impl = chunk_server_impl_or.ValueOrDie();
   LOG(INFO) << "Chunk server initialized...";
 

@@ -21,11 +21,16 @@ class ChunkServerImpl {
                            const bool resolve_hostname = false);
 
   void AddOrUpdateLease(std::string file_handle, uint64_t expiration_usec);
-  bool HasWriteLease(std::string file_handle);
   void RemoveLease(std::string file_handle);
+
+  bool HasWriteLease(std::string file_handle);
+
   google::protobuf::util::StatusOr<absl::Time> GetLeaseExpirationTime(
       std::string file_handle);
 
+  // Register the gRPC protocol client for connecting to the server listening
+  // on the given channel; if a client has already been registered for the 
+  // server, return false
   bool RegisterMasterServerRpcClient(std::string server_name,
                                      std::shared_ptr<grpc::Channel> channel);
   bool RegisterChunkServerRpcClient(std::string server_name,

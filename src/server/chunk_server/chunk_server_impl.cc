@@ -2,6 +2,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
+#include "src/common/system_logger.h"
 
 using gfs::common::ConfigManager;
 using gfs::common::thread_safe_flat_hash_map;
@@ -16,6 +17,8 @@ namespace server {
 StatusOr<ChunkServerImpl*> ChunkServerImpl::ConstructChunkServerImpl(
     const std::string& config_filename, const std::string& chunk_server_name,
     const bool resolve_hostname) {
+
+  LOG(INFO) << "Parsing configuration file...";
   // Instantiate a ConfigManager with the given filename
   StatusOr<ConfigManager*> config_manager_or(
       ConfigManager::GetConfig(config_filename));
@@ -28,6 +31,7 @@ StatusOr<ChunkServerImpl*> ChunkServerImpl::ConstructChunkServerImpl(
   auto credentials = grpc::InsecureChannelCredentials();
 
   // initialize gRPC clients to talk to all master servers
+  LOG(INFO) << "Estabalishing connections to all master servers...";
   for (std::string& server_name : config_manager->GetAllMasterServers()) {
     const std::string master_server_address =
         config_manager->GetServerAddress(server_name, resolve_hostname);
@@ -41,6 +45,7 @@ StatusOr<ChunkServerImpl*> ChunkServerImpl::ConstructChunkServerImpl(
   }
 
   // initialize gRPC clients to talk to all other chunk servers
+  LOG(INFO) << "Estabalishing connections to all other chunk servers...";
   for (std::string& server_name : config_manager->GetAllChunkServers()) {
     // connect to all chunk servers except itself
     // -  compare returns 0 : if both strings are equal.
