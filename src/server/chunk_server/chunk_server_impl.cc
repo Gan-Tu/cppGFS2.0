@@ -76,7 +76,7 @@ bool ChunkServerImpl::HasWriteLease(const std::string& file_handle) {
   // there could be a time-of-check and time-of-use race condition, but we will
   // allow it happen for now, and simply let caller retry
   absl::Time expiration_time =
-      absl::FromUnixNanos(lease_and_expiration_usec_[file_handle]);
+      absl::FromUnixSeconds(lease_and_expiration_usec_[file_handle]);
   return absl::Now() < expiration_time;
 }
 
@@ -87,7 +87,7 @@ StatusOr<absl::Time> ChunkServerImpl::GetLeaseExpirationTime(
         google::protobuf::util::error::NOT_FOUND,
         absl::StrCat("Lease is not found for file handle: ", file_handle));
   } else {
-    return absl::FromUnixNanos(lease_and_expiration_usec_[file_handle]);
+    return absl::FromUnixSeconds(lease_and_expiration_usec_[file_handle]);
   }
 }
 
@@ -104,12 +104,13 @@ void ChunkServerImpl::SetChunkVersion(const std::string& file_handle,
 google::protobuf::util::StatusOr<uint32_t> ChunkServerImpl::GetChunkVersion(
     const std::string& file_handle) {
   // TODO(tugan,michael): use chunk file manager instead, when ready
-  if (!chunk_versions_.contains(file_handle)) {
-    return Status(google::protobuf::util::error::NOT_FOUND,
-                  absl::StrCat("File chunk is not found: ", file_handle));
-  } else {
-    return chunk_versions_[file_handle];
-  }
+  // if (!chunk_versions_.contains(file_handle)) {
+  //   return Status(google::protobuf::util::error::NOT_FOUND,
+  //                 absl::StrCat("File chunk is not found: ", file_handle));
+  // } else {
+  //   return chunk_versions_[file_handle];
+  // }
+  return 1;
 }
 
 bool ChunkServerImpl::RegisterMasterServerRpcClient(
