@@ -1,0 +1,13 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+    name = "chunk_server_impl_test",
+    srcs = ["chunk_server_impl_test.cc"],
+    data = ["test_config.yml"],
+    deps = [
+        "//src/server/chunk_server:chunk_server_impl",
+        "@com_google_absl//absl/time",
+        "@com_google_protobuf//:protobuf_lite",
+        "@com_google_test//:gtest_main",
+    ],
+)
