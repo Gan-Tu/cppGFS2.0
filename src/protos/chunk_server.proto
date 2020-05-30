@@ -24,9 +24,16 @@ message ChunkServer {
 // Information about a chunk on a chunkserver.
 // This shouldn't include the chunk data.
 // Can be renamed to something better later.
-message FileChunk {
+message FileChunkOld { // remove??
   string handle = 1;
 
   // The version of the chunk on the chunkserver.
   uint32 version = 2;
+}
+
+message FileChunk {
+  // The version of the chunk.
+  uint32 version = 1;
+
+  bytes data = 2;
 }

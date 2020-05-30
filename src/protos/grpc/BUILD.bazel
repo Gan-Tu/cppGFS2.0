@@ -79,6 +79,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//src/protos:chunk_server_proto",
+        "//src/protos:metadata_proto",
     ],
 )
 

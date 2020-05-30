@@ -1,0 +1,13 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+    name = "file_chunk_manager_test",
+    srcs = ["file_chunk_manager_test.cc"],
+    deps = [
+        #"//src/protos:cc_chunk_server_proto",
+        "//src/server/chunk_server:file_chunk_manager",
+        #"//tests:utils",
+        "@com_google_test//:gtest_main",
+        "@com_google_absl//absl/container:flat_hash_set",
+    ],
+)
