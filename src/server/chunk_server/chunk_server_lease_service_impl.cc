@@ -100,7 +100,8 @@ grpc::Status ChunkServerLeaseServiceImpl::RevokeLease(
       request->original_lease_expiration_time().seconds());
   if (original_lease_expiration_time <
       current_lease_expiration_time_or.ValueOrDie()) {
-    LOG(INFO) << "Lease is already expired for " << request->chunk_handle();
+    LOG(INFO) << "Server already holds a newer lease that expires in future: "
+              << request->chunk_handle();
     reply->set_status(RevokeLeaseReply::IGNORED_HAS_NEWER_LEASE);
   } else {
     chunk_server_impl_->RemoveLease(request->chunk_handle());

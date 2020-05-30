@@ -17,6 +17,9 @@ namespace server {
 StatusOr<ChunkServerImpl*> ChunkServerImpl::ConstructChunkServerImpl(
     const std::string& config_filename, const std::string& chunk_server_name,
     const bool resolve_hostname) {
+  resolve_hostname_ = resolve_hostname;
+  chunk_server_name_ = chunk_server_name;
+
   LOG(INFO) << "Parsing configuration file...";
   // Instantiate a ConfigManager with the given filename
   StatusOr<ConfigManager*> config_manager_or(
@@ -24,76 +27,49 @@ StatusOr<ChunkServerImpl*> ChunkServerImpl::ConstructChunkServerImpl(
   if (!config_manager_or.ok()) {
     return config_manager_or.status();
   }
-  ConfigManager* config_manager = config_manager_or.ValueOrDie();
-  ChunkServerImpl* chunks_server_impl = new ChunkServerImpl(config_manager);
 
-  auto credentials = grpc::InsecureChannelCredentials();
-
-  // initialize gRPC clients to talk to all master servers
-  LOG(INFO) << "Estabalishing connections to all master servers...";
-  for (std::string& server_name : config_manager->GetAllMasterServers()) {
-    const std::string master_server_address =
-        config_manager->GetServerAddress(server_name, resolve_hostname);
-    if (!chunks_server_impl->RegisterMasterServerRpcClient(
-            server_name,
-            grpc::CreateChannel(master_server_address, credentials))) {
-      return Status(
-          google::protobuf::util::error::INTERNAL,
-          absl::StrCat("Failed to connect to ", master_server_address));
-    }
-  }
-
-  // initialize gRPC clients to talk to all other chunk servers
-  LOG(INFO) << "Estabalishing connections to all other chunk servers...";
-  for (std::string& server_name : config_manager->GetAllChunkServers()) {
-    // connect to all chunk servers except itself
-    // -  compare returns 0 : if both strings are equal.
-    if (server_name.compare(chunk_server_name)) {
-      const std::string chunk_server_address =
-          config_manager->GetServerAddress(server_name, resolve_hostname);
-      if (!chunks_server_impl->RegisterChunkServerRpcClient(
-              server_name,
-              grpc::CreateChannel(chunk_server_address, credentials))) {
-        return Status(
-            google::protobuf::util::error::INTERNAL,
-            absl::StrCat("Failed to connect to ", chunk_server_address));
-      }
-    }
-  }
-
-  return chunks_server_impl;
+  return new ChunkServerImpl(config_manager_or.ValueOrDie());
 }
 
+//
+// Lease Management
+//
+
+
 void ChunkServerImpl::AddOrUpdateLease(const std::string& file_handle,
-                                       const uint64_t expiration_usec) {
-  lease_and_expiration_usec_[file_handle] = expiration_usec;
+                                       const uint64_t expiration_unix_sec) {
+  lease_and_expiration_unix_sec_[file_handle] = expiration_unix_sec;
 }
 
 bool ChunkServerImpl::HasWriteLease(const std::string& file_handle) {
-  if (!lease_and_expiration_usec_.contains(file_handle)) {
+  if (!lease_and_expiration_unix_sec_.contains(file_handle)) {
     return false;
   }
   // there could be a time-of-check and time-of-use race condition, but we will
   // allow it happen for now, and simply let caller retry
   absl::Time expiration_time =
-      absl::FromUnixSeconds(lease_and_expiration_usec_[file_handle]);
+      absl::FromUnixSeconds(lease_and_expiration_unix_sec_[file_handle]);
   return absl::Now() < expiration_time;
 }
 
 StatusOr<absl::Time> ChunkServerImpl::GetLeaseExpirationTime(
     const std::string& file_handle) {
-  if (!lease_and_expiration_usec_.contains(file_handle)) {
+  if (!lease_and_expiration_unix_sec_.contains(file_handle)) {
     return Status(
         google::protobuf::util::error::NOT_FOUND,
         absl::StrCat("Lease is not found for file handle: ", file_handle));
   } else {
-    return absl::FromUnixSeconds(lease_and_expiration_usec_[file_handle]);
+    return absl::FromUnixSeconds(lease_and_expiration_unix_sec_[file_handle]);
   }
 }
 
 void ChunkServerImpl::RemoveLease(const std::string& file_handle) {
-  lease_and_expiration_usec_.erase(file_handle);
+  lease_and_expiration_unix_sec_.erase(file_handle);
 }
+
+//
+// Mock Functions - File Chunks management
+//
 
 void ChunkServerImpl::SetChunkVersion(const std::string& file_handle,
                                       const uint32_t version) {
@@ -113,20 +89,39 @@ google::protobuf::util::StatusOr<uint32_t> ChunkServerImpl::GetChunkVersion(
   return 1;
 }
 
-bool ChunkServerImpl::RegisterMasterServerRpcClient(
-    const std::string& server_name, std::shared_ptr<grpc::Channel> channel) {
-  auto iter_and_inserted = master_server_clients_.insert(
-      {server_name,
-       std::make_shared<MasterChunkServerManagerServiceClient>(channel)});
-  return iter_and_inserted.second;
+//
+// gRPC Protocol Helpers
+//
+
+std::shared_ptr<MasterChunkServerManagerServiceClient> GetMasterProtocolClient(
+    const std::string& server_address) {
+  if (master_server_clients_.contains(server_address)) {
+    return master_server_clients_[server_address];
+  } else {
+    LOG(INFO) << "Estabalishing new connection to master:" << server_address;
+    auto iter_and_inserted = master_server_clients_.insert(
+        {server_address,
+         std::make_shared<MasterChunkServerManagerServiceClient>(
+             grpc::CreateChannel(server_address,
+                                 grpc::InsecureChannelCredentials()))});
+    return iter_and_inserted->first;
+  }
 }
 
-bool ChunkServerImpl::RegisterChunkServerRpcClient(
-    const std::string& server_name, std::shared_ptr<grpc::Channel> channel) {
-  auto iter_and_inserted = chunk_server_clients_.insert(
-      {server_name,
-       std::make_shared<ChunkServerServiceChunkServerClient>(channel)});
-  return iter_and_inserted.second;
+std::shared_ptr<ChunkServerServiceChunkServerClient>
+GetChunkServerProtocolClient(const std::string& server_address) {
+  if (chunk_server_clients_.contains(server_address)) {
+    return chunk_server_clients_[server_address];
+  } else {
+    LOG(INFO) << "Estabalishing new connection to chunk server:"
+              << server_address;
+    auto iter_and_inserted = chunk_server_clients_.insert(
+        {server_address,
+         std::make_shared<ChunkServerServiceChunkServerClient>(
+             grpc::CreateChannel(server_address,
+                                 grpc::InsecureChannelCredentials()))});
+    return iter_and_inserted->first;
+  }
 }
 
 }  // namespace server

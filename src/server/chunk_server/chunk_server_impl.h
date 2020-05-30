@@ -20,44 +20,53 @@ class ChunkServerImpl {
                            const std::string& chunk_server_name,
                            const bool resolve_hostname = false);
 
-  // Write lease management
+  // Add or update the write lease for |file_handle| to expire at UNIX seconds
+  // timestamp of |expiration_unix_sec|.
   void AddOrUpdateLease(const std::string& file_handle,
-                        const uint64_t expiration_usec);
+                        const uint64_t expiration_unix_sec);
   void RemoveLease(const std::string& file_handle);
   bool HasWriteLease(const std::string& file_handle);
   // Return NOT_FOUND, if no lease exists for file handle
   google::protobuf::util::StatusOr<absl::Time> GetLeaseExpirationTime(
       const std::string& file_handle);
 
-  // mock functions for chunk file manager
+  // Mock functions for chunk file manager
   // TODO(tugan,michael): use chunk file manager instead, when ready
   void SetChunkVersion(const std::string& file_handle, const uint32_t version);
   // Return NOT_FOUND, if no chunk exists on this chunk server
   google::protobuf::util::StatusOr<uint32_t> GetChunkVersion(
       const std::string& file_handle);
 
-  // Register the gRPC protocol client for connecting to the server listening
-  // on the given channel; if a client has already been registered for the
-  // server, return false
-  bool RegisterMasterServerRpcClient(const std::string& server_name,
-                                     std::shared_ptr<grpc::Channel> channel);
-  bool RegisterChunkServerRpcClient(const std::string& server_name,
-                                    std::shared_ptr<grpc::Channel> channel);
+  // Return the protocol client for talking to the master at |server_address|.
+  // If the connection is already established, reuse the connection. Otherwise,
+  // initialize and return a new protocol client connecting to |server_address|.
+  std::shared_ptr<gfs::service::MasterChunkServerManagerServiceClient>
+  GetMasterProtocolClient(const std::string& server_address);
+
+  // Similar to GetMasterProtocolClient, but for talking to chunk servers.
+  std::shared_ptr<gfs::service::ChunkServerServiceChunkServerClient>
+  GetChunkServerProtocolClient(const std::string& server_address);
 
  private:
   ChunkServerImpl() = default;
   ChunkServerImpl(gfs::common::ConfigManager* config_manager)
       : config_manager_(config_manager) {}
 
+  const bool resolve_hostname_;
+  const std::string chunk_server_name_;
   gfs::common::ConfigManager* config_manager_;
 
-  // Master server name and its corresponding GFS protocol client
+  // Server address and its corresponding GFS protocol client
+  // A protocol client will be added the first time the connection is added, and
+  // subsequent calls will simply reuse this protocol client and connection.
+  // Currently we don't remove connections no longer in use, for simplicity.
+  //
+  // Note that this design makes it possible to dynamically add new connections
+  // to new servers that may not be present during startup configuration.
   gfs::common::thread_safe_flat_hash_map<
       std::string,
       std::shared_ptr<gfs::service::MasterChunkServerManagerServiceClient>>
       master_server_clients_;
-
-  // Chunk server name and its corresponding GFS protocol client
   gfs::common::thread_safe_flat_hash_map<
       std::string,
       std::shared_ptr<gfs::service::ChunkServerServiceChunkServerClient>>
@@ -69,7 +78,7 @@ class ChunkServerImpl {
 
   // Write leases that chunk server holds, and their respective expiration time
   gfs::common::thread_safe_flat_hash_map<std::string, uint64_t>
-      lease_and_expiration_usec_;
+      lease_and_expiration_unix_sec_;
 };
 
 }  // namespace server
