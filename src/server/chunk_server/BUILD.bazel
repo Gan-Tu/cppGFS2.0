@@ -56,6 +56,7 @@ cc_library(
     name = "chunk_server_impl",
     srcs = ["chunk_server_impl.cc"],
     hdrs = ["chunk_server_impl.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "//src/common:config_manager",
         "//src/common:system_logger",

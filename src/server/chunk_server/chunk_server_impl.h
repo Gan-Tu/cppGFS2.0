@@ -31,6 +31,7 @@ class ChunkServerImpl {
       const std::string& file_handle);
 
   // Mock functions for chunk file manager
+  // Initialize, or update the chunk |version| for the given |file_handle|
   // TODO(tugan,michael): use chunk file manager instead, when ready
   void SetChunkVersion(const std::string& file_handle, const uint32_t version);
   // Return NOT_FOUND, if no chunk exists on this chunk server
