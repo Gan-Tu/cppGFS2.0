@@ -14,6 +14,13 @@ using google::protobuf::util::StatusOr;
 namespace gfs {
 namespace server {
 
+ChunkServerImpl::~ChunkServerImpl() {
+  master_server_clients_.clear();
+  chunk_server_clients_.clear();
+  chunk_versions_.clear();
+  lease_and_expiration_unix_sec_.clear();
+}
+
 StatusOr<ChunkServerImpl*> ChunkServerImpl::ConstructChunkServerImpl(
     const std::string& config_filename, const std::string& chunk_server_name,
     const bool resolve_hostname) {
