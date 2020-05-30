@@ -29,12 +29,17 @@ protos::ChunkServerLocation ChunkServerLocationBuilder(
 void InitializeChunkMetadata(
          protos::FileChunkMetadata& chunk_metadata, 
          const std::string& chunk_handle, uint32_t version,
-         const std::pair<std::string, uint32_t>& primary_location) {
+         const std::pair<std::string, uint32_t>& primary_location,
+         const std::vector<std::pair<std::string, uint32_t>>& locations) {
   chunk_metadata.set_chunk_handle(chunk_handle);
   chunk_metadata.set_version(version);
   *chunk_metadata.mutable_primary_location() =
       ChunkServerLocationBuilder(primary_location.first, 
                                  primary_location.second);
+  for(auto& location : locations) {
+      chunk_metadata.mutable_locations()->Add(
+          ChunkServerLocationBuilder(location.first, location.second));
+  }
 }
 
 } // namespace tests
