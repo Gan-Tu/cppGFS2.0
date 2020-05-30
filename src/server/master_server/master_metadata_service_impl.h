@@ -15,11 +15,11 @@ namespace service {
 class MasterMetadataServiceImpl final
     : public protos::grpc::MasterMetadataService::Service {
  public:
-  // Register a protocol client for talking to the lease and file service
-  // of given |server_name| chunk server, using the gRPC |channel|.
-  // If the client already exits, return false.
-  bool RegisterChunkServerRpcClient(std::string server_name,
-                                    std::shared_ptr<grpc::Channel> channel);
+  // Return the protocol client for talking to the chunk server at
+  // |server_address|.  If the connection is already established, reuse the
+  // connection and return the existing client.
+  std::shared_ptr<gfs::service::ChunkServerServiceMasterServerClient>
+  GetOrCreateChunkServerProtocolClient(const std::string& server_address);
 
  protected:
   // Accessor to the MetadataManager instance

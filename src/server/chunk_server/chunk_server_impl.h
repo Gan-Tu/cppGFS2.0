@@ -48,13 +48,18 @@ class ChunkServerImpl {
   GetChunkServerProtocolClient(const std::string& server_address);
 
  private:
-  ChunkServerImpl() = default;
-  ChunkServerImpl(gfs::common::ConfigManager* config_manager)
-      : config_manager_(config_manager) {}
+  ChunkServerImpl();
 
-  const bool resolve_hostname_;
-  const std::string chunk_server_name_;
-  gfs::common::ConfigManager* config_manager_;
+  ChunkServerImpl(gfs::common::ConfigManager* config_manager,
+                  const std::string& chunk_server_name,
+                  const bool resolve_hostname)
+      : config_manager_(config_manager),
+        chunk_server_name_(chunk_server_name),
+        resolve_hostname_(resolve_hostname) {}
+
+  bool resolve_hostname_ = false;
+  std::string chunk_server_name_ = nullptr;
+  gfs::common::ConfigManager* config_manager_ = nullptr;
 
   // Server address and its corresponding GFS protocol client
   // A protocol client will be added the first time the connection is added, and

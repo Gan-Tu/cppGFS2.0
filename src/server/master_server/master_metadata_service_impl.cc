@@ -1,9 +1,9 @@
 #include "src/server/master_server/master_metadata_service_impl.h"
 
 #include "grpcpp/grpcpp.h"
+#include "src/common/system_logger.h"
 #include "src/common/utils.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
-
 
 using gfs::service::ChunkServerServiceMasterServerClient;
 using google::protobuf::Empty;
@@ -40,12 +40,20 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
   return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
 }
 
-bool MasterMetadataServiceImpl::RegisterChunkServerRpcClient(
-    std::string server_name, std::shared_ptr<grpc::Channel> channel) {
-  auto iter_and_inserted = chunk_server_service_clients_.insert(
-      {server_name,
-       std::make_shared<ChunkServerServiceMasterServerClient>(channel)});
-  return iter_and_inserted.second;
+std::shared_ptr<ChunkServerServiceMasterServerClient>
+MasterMetadataServiceImpl::GetOrCreateChunkServerProtocolClient(
+    const std::string& server_address) {
+  if (chunk_server_service_clients_.contains(server_address)) {
+    return chunk_server_service_clients_[server_address];
+  } else {
+    LOG(INFO) << "Estabalishing new connection to chunk server:"
+              << server_address;
+    chunk_server_service_clients_[server_address] =
+        std::make_shared<ChunkServerServiceMasterServerClient>(
+            grpc::CreateChannel(server_address,
+                                grpc::InsecureChannelCredentials()));
+    return chunk_server_service_clients_[server_address];
+  }
 }
 
 grpc::Status MasterMetadataServiceImpl::OpenFile(ServerContext* context,

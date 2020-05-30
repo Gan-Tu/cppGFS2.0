@@ -57,14 +57,14 @@ int main(int argc, char** argv) {
   MasterChunkServerManagerServiceImpl chunk_server_mgr_service;
   builder.RegisterService(&chunk_server_mgr_service);
 
-  // Initialize gRPC protocol clients for talking to other servers
+  // Initialize gRPC protocol clients for talking to other servers that should
+  // be available upon GFS cluster's startup time, based on initial config file.
   for (std::string& server_name : config->GetAllChunkServers()) {
     const std::string chunk_server_address =
         config->GetServerAddress(server_name, resolve_hostname);
-    LOG(INFO) << "Register gRPC client for talking to chunk server: "
+    LOG(INFO) << "Initialize gRPC protocol client for talking to chunk server: "
               << server_name << " at " << chunk_server_address;
-    metadata_service.RegisterChunkServerRpcClient(
-        server_name, grpc::CreateChannel(chunk_server_address, credentials));
+    metadata_service.GetOrCreateChunkServerProtocolClient(chunk_server_address);
   }
 
   // Assemble and start the server

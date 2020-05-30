@@ -17,9 +17,6 @@ namespace server {
 StatusOr<ChunkServerImpl*> ChunkServerImpl::ConstructChunkServerImpl(
     const std::string& config_filename, const std::string& chunk_server_name,
     const bool resolve_hostname) {
-  resolve_hostname_ = resolve_hostname;
-  chunk_server_name_ = chunk_server_name;
-
   LOG(INFO) << "Parsing configuration file...";
   // Instantiate a ConfigManager with the given filename
   StatusOr<ConfigManager*> config_manager_or(
@@ -27,14 +24,13 @@ StatusOr<ChunkServerImpl*> ChunkServerImpl::ConstructChunkServerImpl(
   if (!config_manager_or.ok()) {
     return config_manager_or.status();
   }
-
-  return new ChunkServerImpl(config_manager_or.ValueOrDie());
+  return new ChunkServerImpl(config_manager_or.ValueOrDie(), chunk_server_name,
+                             resolve_hostname);
 }
 
 //
 // Lease Management
 //
-
 
 void ChunkServerImpl::AddOrUpdateLease(const std::string& file_handle,
                                        const uint64_t expiration_unix_sec) {
@@ -93,34 +89,33 @@ google::protobuf::util::StatusOr<uint32_t> ChunkServerImpl::GetChunkVersion(
 // gRPC Protocol Helpers
 //
 
-std::shared_ptr<MasterChunkServerManagerServiceClient> GetMasterProtocolClient(
-    const std::string& server_address) {
+std::shared_ptr<MasterChunkServerManagerServiceClient>
+ChunkServerImpl::GetMasterProtocolClient(const std::string& server_address) {
   if (master_server_clients_.contains(server_address)) {
     return master_server_clients_[server_address];
   } else {
     LOG(INFO) << "Estabalishing new connection to master:" << server_address;
-    auto iter_and_inserted = master_server_clients_.insert(
-        {server_address,
-         std::make_shared<MasterChunkServerManagerServiceClient>(
-             grpc::CreateChannel(server_address,
-                                 grpc::InsecureChannelCredentials()))});
-    return iter_and_inserted->first;
+    master_server_clients_[server_address] =
+        std::make_shared<MasterChunkServerManagerServiceClient>(
+            grpc::CreateChannel(server_address,
+                                grpc::InsecureChannelCredentials()));
+    return master_server_clients_[server_address];
   }
 }
 
 std::shared_ptr<ChunkServerServiceChunkServerClient>
-GetChunkServerProtocolClient(const std::string& server_address) {
+ChunkServerImpl::GetChunkServerProtocolClient(
+    const std::string& server_address) {
   if (chunk_server_clients_.contains(server_address)) {
     return chunk_server_clients_[server_address];
   } else {
     LOG(INFO) << "Estabalishing new connection to chunk server:"
               << server_address;
-    auto iter_and_inserted = chunk_server_clients_.insert(
-        {server_address,
-         std::make_shared<ChunkServerServiceChunkServerClient>(
-             grpc::CreateChannel(server_address,
-                                 grpc::InsecureChannelCredentials()))});
-    return iter_and_inserted->first;
+    chunk_server_clients_[server_address] =
+        std::make_shared<ChunkServerServiceChunkServerClient>(
+            grpc::CreateChannel(server_address,
+                                grpc::InsecureChannelCredentials()));
+    return chunk_server_clients_[server_address];
   }
 }
 
