@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
   for (std::string& server_name : config->GetAllChunkServers()) {
     const std::string chunk_server_address =
         config->GetServerAddress(server_name, resolve_hostname);
-    LOG(INFO) << "Initialize gRPC protocol client for talking to chunk server: "
+    LOG(INFO) << "Initialize gRPC protocol client for talking to "
               << server_name << " at " << chunk_server_address;
     metadata_service.GetOrCreateChunkServerProtocolClient(chunk_server_address);
   }

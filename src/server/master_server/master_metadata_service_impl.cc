@@ -46,7 +46,7 @@ MasterMetadataServiceImpl::GetOrCreateChunkServerProtocolClient(
   if (chunk_server_service_clients_.contains(server_address)) {
     return chunk_server_service_clients_[server_address];
   } else {
-    LOG(INFO) << "Estabalishing new connection to chunk server:"
+    LOG(INFO) << "Estabalishing new connection to chunk server at: "
               << server_address;
     chunk_server_service_clients_[server_address] =
         std::make_shared<ChunkServerServiceMasterServerClient>(
