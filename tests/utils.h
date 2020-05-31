@@ -30,8 +30,8 @@ protos::ChunkServerLocation ChunkServerLocationBuilder(
 void InitializeChunkMetadata(
          protos::FileChunkMetadata& chunk_metadata, 
          const std::string& chunk_handle, uint32_t version,
-         const std::pair<std::string, uint32_t>& primary_location);
-
+         const std::pair<std::string, uint32_t>& primary_location,
+         const std::vector<std::pair<std::string, uint32_t>>& locations);
 } // namespace tests
 
 #endif // GFS_TESTS_UTILS_H_

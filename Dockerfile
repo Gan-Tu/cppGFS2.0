@@ -1,6 +1,7 @@
 # Use pre-built image of ubuntu with bazel
 FROM tugan0329/bazel-linux:latest
 WORKDIR /app
+RUN apt-get install -y python python3
 COPY WORKSPACE ./
 COPY data ./data
 COPY scripts ./scripts

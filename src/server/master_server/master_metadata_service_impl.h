@@ -3,9 +3,11 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "grpcpp/grpcpp.h"
+#include "src/common/config_manager.h"
 #include "src/common/protocol_client/chunk_server_service_server_client.h"
 #include "src/common/utils.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
+#include "src/server/master_server/chunk_server_manager.h"
 #include "src/server/master_server/metadata_manager.h"
 
 namespace gfs {
@@ -15,6 +17,9 @@ namespace service {
 class MasterMetadataServiceImpl final
     : public protos::grpc::MasterMetadataService::Service {
  public:
+  MasterMetadataServiceImpl(common::ConfigManager* config_manager) : 
+      config_manager_(config_manager) {}
+
   // Return the protocol client for talking to the chunk server at
   // |server_address|.  If the connection is already established, reuse the
   // connection and return the existing client.
@@ -24,6 +29,9 @@ class MasterMetadataServiceImpl final
  protected:
   // Accessor to the MetadataManager instance
   server::MetadataManager* metadata_manager();
+
+  // Accessor to the ChunkServerManager instance
+  server::ChunkServerManager& chunk_server_manager();
 
   // Handle file creation request. This function is called by OpenFile
   // function to dispatch the task for creating a file
@@ -56,6 +64,10 @@ class MasterMetadataServiceImpl final
       std::string,
       std::shared_ptr<gfs::service::ChunkServerServiceMasterServerClient>>
       chunk_server_service_clients_;
+
+  // Reference to the config manager in order to access some configurable 
+  // params such as grpc timeout
+  common::ConfigManager* config_manager_;
 };
 
 // The asynchronous implementation for handling MasterMetadataService requests

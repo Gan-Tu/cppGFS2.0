@@ -21,10 +21,30 @@ message FileChunkMetadata {
   string chunk_handle = 1;
 
   // A version number associated with each chunk to distinguish between 
-  // up-to-date and stale replica
+  // up-to-date and stale replica.
+  // Most update-to-date chunk version known to master for this file chunk.
+  // The client, or another chunkserver, should always verify the chunk version
+  // number before performing file operations at any chunk location, so that it
+  // can always read/write the most up-to-date data.
+  //
+  // For newly created file chunks, chunk version is always 1.
   uint32 version = 2;
 
   // The primary chunk server selected for a given chunk. The primary dicates
   // mutation order among replicas and other replicas follo.
+  // If open request is for file mutation (i.e. write and append mode), this is
+  // the chunkserver location for the primary replica; otherwise, it is NULL.
+  //
+  // Client should send write requests to the primary chunkserver, so it can
+  // determine the serialization order of all mutations applied to the chunk,
+  // and forward the mutation order to all secondary replicas; The client
+  // should check with master again, if the primary no longer holds a lease for
+  // write mutations. (Ref: GFS paper section 3.1)
   ChunkServerLocation primary_location = 3;
+
+  // A list of chunk server locations indicating where the replica are that are
+  // holding this chunk. The client caches the returned location information
+  // so that it can directly communicates with chunk servers (within a time 
+  // frame before cache expires)
+  repeated ChunkServerLocation locations = 4;
 }
