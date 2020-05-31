@@ -43,29 +43,29 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
   }
 
   // Step 2. Create the first file chunk for this file
-  google::protobuf::util::StatusOr<std::string> chunk_or(
+  google::protobuf::util::StatusOr<std::string> chunk_handle_or(
       metadata_manager()->CreateChunkHandle(filename,0));
-  if (!chunk_or.ok()) {
+  if (!chunk_handle_or.ok()) {
     return common::utils::ConvertProtobufStatusToGrpcStatus(status);
   }
-  const std::string& chunk(chunk_or.ValueOrDie());
+  const std::string& chunk_handle(chunk_handle_or.ValueOrDie());
 
   // Step 3. Allocate chunk servers
   const ushort num_of_chunk_replica(3);
   // TODO(someone): make this number configurable via config.yml. Probably not
   // a priority right now
   auto chunk_server_locations(
-      chunk_server_manager().AllocateChunkServer(chunk, num_of_chunk_replica));
+      chunk_server_manager().AllocateChunkServer(chunk_handle, num_of_chunk_replica));
 
   // Prepare the InitChunkFileReply
   *reply->mutable_metadata() = FileChunkMetadata();
-  reply->mutable_metadata()->set_chunk_handle(chunk);
+  reply->mutable_metadata()->set_chunk_handle(chunk_handle);
   reply->mutable_metadata()->set_version(0);
 
   // Step 4. Coordinate with chunk servers to initialize the file chunk 
   for(auto chunk_server_location : chunk_server_locations) {
     const std::string server_address(chunk_server_location.server_hostname() +
-        std::to_string(chunk_server_location.server_port()));
+        ":" + std::to_string(chunk_server_location.server_port()));
     auto chunk_server_channel(grpc::CreateChannel(server_address,
         grpc::InsecureChannelCredentials()));
     // Register this chunk server Rpc client if not existed
@@ -81,7 +81,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
     auto chunk_server_service_client(try_get_client.first);
     // Prepare InitFileChunk Request to send to chunk server
     InitFileChunkRequest init_chunk_request;
-    init_chunk_request.set_chunk_handle(chunk);
+    init_chunk_request.set_chunk_handle(chunk_handle);
     grpc::ClientContext client_context;
     common::SetClientContextDeadline(client_context, config_manager_);
   
@@ -94,7 +94,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
     // init chunk request is not successful. Will come back and refine this 
     // once the chunk server grpc impl is in shape
     if (!init_chunk_or.ok()) {
-      common::utils::ConvertProtobufStatusToGrpcStatus(status);
+      return common::utils::ConvertProtobufStatusToGrpcStatus(status);
     }
 
     // Pick a primary chunk server. Just select the first one
