@@ -7,7 +7,7 @@
 
 using namespace gfs::server;
 
-// The fixture for testing ChunkServerManager. Handles setup and cleanup for the
+// The fixture for testing FileChunkManager. Handles setup and cleanup for the
 // test methods.
 class FileChunkManagerTest : public ::testing::Test {
  protected:
