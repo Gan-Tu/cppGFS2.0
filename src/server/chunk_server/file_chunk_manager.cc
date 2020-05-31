@@ -244,7 +244,7 @@ FileChunkManager::GetFileChunk(const std::string& chunk_handle) {
 google::protobuf::util::StatusOr<std::shared_ptr<protos::FileChunk>>
 FileChunkManager::GetFileChunk(const std::string& chunk_handle,
                                const uint32_t& version) {
-  auto result = GetFileChunk(chunk_handle, version);
+  auto result = GetFileChunk(chunk_handle);
 
   if (!result.ok()) {
     // Failed
