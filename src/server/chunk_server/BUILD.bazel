@@ -38,6 +38,20 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "file_chunk_manager",
+    srcs = ["file_chunk_manager.cc"],
+    hdrs = ["file_chunk_manager.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/protos:cc_chunk_server_proto",
+        "//src/protos:cc_metadata_proto",
+        "//src/common:system_logger",
+        "@com_google_leveldb//:leveldb",
+        "@com_github_grpc_grpc//:grpc++",
+    ],
+)
+
 cc_binary(
     name = "run_chunk_server_main",
     srcs = ["run_chunk_server_main.cc"],
@@ -48,6 +62,7 @@ cc_binary(
         ":chunk_server_file_service_impl",
         ":chunk_server_impl",
         ":chunk_server_lease_service_impl",
+        ":file_chunk_manager",
         "//src/common:config_manager",
         "//src/common:system_logger",
         "@com_google_absl//absl/flags:flag",
