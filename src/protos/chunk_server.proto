@@ -21,12 +21,12 @@ message ChunkServer {
   repeated string stored_chunk_handles = 3;
 }
 
-// Information about a chunk on a chunkserver.
-// This shouldn't include the chunk data.
-// Can be renamed to something better later.
+// The file chunk. Used for serializing/deserializing 
+// the data to/from binary for disk storage.
 message FileChunk {
-  string handle = 1;
+  // The version of the chunk.
+  uint32 version = 1;
 
-  // The version of the chunk on the chunkserver.
-  uint32 version = 2;
+  // The actual data for the chunk.
+  bytes data = 2;
 }
