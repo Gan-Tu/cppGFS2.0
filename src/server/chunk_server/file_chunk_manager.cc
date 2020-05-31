@@ -34,7 +34,7 @@ void FileChunkManager::Initialize(const std::string& chunk_database_name,
   leveldb::Status status =
       leveldb::DB::Open(options, chunk_database_name, &database);
 
-  LOG_ASSERT(status.ok());
+  LOG_ASSERT(status.ok()) << status.ToString();
 
   // Database is closed once pointer is deleted.
   this->chunk_database_ = std::unique_ptr<leveldb::DB>(database);
