@@ -1,6 +1,17 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 cc_library(
+    name = "grpc_client_utils",
+    srcs = ["grpc_client_utils.cc"],
+    hdrs = ["grpc_client_utils.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/common:config_manager",
+        "@com_github_grpc_grpc//:grpc++",
+    ],
+)
+
+cc_library(
     name = "master_metadata_service_client",
     srcs = ["master_metadata_service_client.cc"],
     hdrs = ["master_metadata_service_client.h"],
