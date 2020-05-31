@@ -8,8 +8,10 @@
 #include "src/common/system_logger.h"
 #include "src/server/chunk_server/chunk_server_file_service_impl.h"
 #include "src/server/chunk_server/chunk_server_lease_service_impl.h"
+#include "src/server/chunk_server/file_chunk_manager.h"
 
 using gfs::common::ConfigManager;
+using gfs::server::FileChunkManager;
 using gfs::service::ChunkServerFileServiceImpl;
 using gfs::service::ChunkServerLeaseServiceImpl;
 using grpc::Server;
@@ -39,11 +41,21 @@ int main(int argc, char** argv) {
 
   LOG(INFO) << "Running as chunk server: " << chunk_server_name;
   LOG(INFO) << "Server starting...";
+
+  // Initialize the file chunk manager
+  // TODO(bmokutub): Pass the chunk_database_name as part of config mgr.
+  auto chunk_database_name = "/tmp/" + chunk_server_name + "db";
+  auto max_chunk_size_bytes = config->GetFileChunkBlockSize() * 1024 * 1024;
+  FileChunkManager::GetInstance()->Initialize(chunk_database_name,
+                                              max_chunk_size_bytes);
+  LOG(INFO) << "File chunk manager initialized with chunk database: "
+            << chunk_database_name;
+
   ServerBuilder builder;
 
   std::string server_address(
       config->GetServerAddress(chunk_server_name, resolve_hostname));
-  
+
   // Listen on the given address without any authentication mechanism for now.
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
 
