@@ -4,7 +4,6 @@ package protos.grpc;
 
 import "google/protobuf/empty.proto";
 import "src/protos/metadata.proto";
-import "src/protos/chunk_server.proto";
 
 service MasterMetadataService {
   // Return the chunk handle, version, and associated replica locations
@@ -58,24 +57,8 @@ message OpenFileRequest {
 message OpenFileReply {
   // The original request associated with this reply.
   OpenFileRequest request = 1;
-  // Most update-to-date chunk version known to master for this file chunk.
-  // The client, or another chunkserver, should always verify the chunk version
-  // number before performing file operations at any chunk location, so that it
-  // can always read/write the most up-to-date data.
-  //
-  // For newly created file chunks, chunk version is always 1.
-  uint32 chunk_version = 2;
   // The metadata for the requested file chunk.
-  protos.FileChunkMetadata metadata = 3;
-  // If open request is for file mutation (i.e. write and append mode), this is
-  // the chunkserver location for the primary replica; otherwise, it is NULL.
-  //
-  // Client should send write requests to the primary chunkserver, so it can
-  // determine the serialization order of all mutations applied to the chunk,
-  // and forward the mutation order to all secondary replicas; The client
-  // should check with master again, if the primary no longer holds a lease for
-  // write mutations. (Ref: GFS paper section 3.1)
-  protos.ChunkServerLocation primary_location = 4;
+  protos.FileChunkMetadata metadata = 2;
 }
 
 message DeleteFileRequest {

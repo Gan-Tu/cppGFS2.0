@@ -334,7 +334,9 @@ TEST_F(MetadataManagerUnitTest, SingleSetAndGetFileChunkMetadata) {
   // primary_location : localhost:5000
   protos::FileChunkMetadata chunk_data;
   InitializeChunkMetadata(
-      chunk_data, chunk_handle, 0, std::make_pair("localhost", 5000));
+      chunk_data, chunk_handle, 0, std::make_pair("localhost", 5000),
+      {std::make_pair("localhost", 5000),std::make_pair("localhost", 5001),
+       std::make_pair("localhost", 5002)});
 
   metadata_manager_->SetFileChunkMetadata(chunk_data);
 
@@ -345,6 +347,9 @@ TEST_F(MetadataManagerUnitTest, SingleSetAndGetFileChunkMetadata) {
   EXPECT_EQ(chunk_data2.chunk_handle(), chunk_data.chunk_handle());
   EXPECT_EQ(chunk_data2.version(), 0);
   EXPECT_EQ(chunk_data2.primary_location().server_port(), 5000);
+  EXPECT_EQ(chunk_data2.locations().at(0).server_port(), 5000);
+  EXPECT_EQ(chunk_data2.locations().at(1).server_port(), 5001);
+  EXPECT_EQ(chunk_data2.locations().at(2).server_port(), 5002);
 }
 
 // Simple test case to verify that advance chunk version number, set primary
@@ -362,7 +367,9 @@ TEST_F(MetadataManagerUnitTest, AdvanceChunkVersionAndSetPrimaryLocationTest) {
   // primary_location : localhost:5000
   protos::FileChunkMetadata chunk_data;
   InitializeChunkMetadata(
-      chunk_data, chunk_handle, 0, std::make_pair("localhost", 5000));
+      chunk_data, chunk_handle, 0, std::make_pair("localhost", 5000),
+      {std::make_pair("localhost", 5000), std::make_pair("localhost", 5001),
+       std::make_pair("localhost", 5002)});
 
   EXPECT_EQ(chunk_data.version(), 0);
   metadata_manager_->SetFileChunkMetadata(chunk_data);
@@ -428,7 +435,13 @@ TEST_F(MetadataManagerUnitTest, UpdateChunkMetadataInParallelTest) {
      
         protos::FileChunkMetadata chunk_data;
         InitializeChunkMetadata(
-            chunk_data, chunk_handle, 0, std::make_pair("localhost", 5000));
+            chunk_data, chunk_handle, 0, std::make_pair("localhost", 5000),
+            // Create chunk server replicas, with the first port equal to
+            // 5000 + chunk_id, and second port 5001 + chunk_id and the 
+            // thirt 5002
+            {std::make_pair("localhost", 5000 + chunk_id), 
+             std::make_pair("localhost", 5001 + chunk_id),
+             std::make_pair("localhost", 5002)});
         metadata_manager_->SetFileChunkMetadata(chunk_data); 
       
         // Advance the chunk version {chunk_id} number of times
@@ -457,6 +470,10 @@ TEST_F(MetadataManagerUnitTest, UpdateChunkMetadataInParallelTest) {
                           chunk_handle).ValueOrDie());
       EXPECT_EQ(chunk_data.version(), chunk_id);
       EXPECT_EQ(chunk_data.primary_location().server_port(), 5002);
+      EXPECT_EQ(chunk_data.locations().size(), 3);
+      EXPECT_EQ(chunk_data.locations().at(0).server_port(), 5000 + chunk_id);
+      EXPECT_EQ(chunk_data.locations().at(1).server_port(), 5001 + chunk_id);
+      EXPECT_EQ(chunk_data.locations().at(2).server_port(), 5002);
     }
   }
 }

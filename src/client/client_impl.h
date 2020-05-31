@@ -10,6 +10,7 @@
 #include "src/common/config_manager.h"
 #include "src/common/protocol_client/chunk_server_service_gfs_client.h"
 #include "src/common/protocol_client/master_metadata_service_client.h"
+#include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
 namespace gfs {
 namespace client {
@@ -35,9 +36,11 @@ class ClientImpl {
              const std::string& master_name, 
              const bool resolve_hostname = false);
 
-  // Helper function to set deadline for a client context object using the 
-  // timeout configuration obtained from the config manager
-  void SetClientContextDeadline(grpc::ClientContext& client_context); 
+  // Internal function to cache file chunk metadata returned by master
+  void cache_file_chunk_metadata(
+      const std::string& filename,
+      const uint32_t chunk_index,
+      const protos::grpc::OpenFileReply& open_file_reply);
 
   // Reference to the configuration manager
   common::ConfigManager* config_manager_;

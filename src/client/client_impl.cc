@@ -1,5 +1,5 @@
+#include "src/common/protocol_client/grpc_client_utils.h"
 #include "src/client/client_impl.h"
-#include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
@@ -9,11 +9,39 @@ using protos::grpc::OpenFileReply;
 namespace gfs {
 namespace client {
 
-inline void ClientImpl::SetClientContextDeadline(
-    grpc::ClientContext& client_context) {
-  absl::Duration grpc_timeout(config_manager_->GetGrpcDeadline());
-  client_context.set_deadline(std::chrono::system_clock::now() + 
-      std::chrono::milliseconds(absl::ToInt64Milliseconds(grpc_timeout)));
+void ClientImpl::cache_file_chunk_metadata(
+    const std::string& filename,
+    const uint32_t chunk_index,
+    const OpenFileReply& open_file_reply) {
+  const std::string& chunk_handle(open_file_reply.metadata().chunk_handle());
+  
+  auto set_chunk_handle_status(cache_manager_->SetChunkHandle(
+      filename, chunk_index, chunk_handle));
+  
+  if (!set_chunk_handle_status.ok()) {
+    // TODO(Xi): if the above set fails, emit a log
+    return;
+  }
+
+  auto chunk_or(cache_manager_->GetChunkVersion(chunk_handle));
+  // If this chunk version has not been cached, or the replied version is 
+  // higher than the current one, we cache the version
+  if (!chunk_or.ok() || open_file_reply.metadata().version() > 
+          chunk_or.ValueOrDie()) {
+    cache_manager_->SetChunkVersion(chunk_handle, 
+                                    open_file_reply.metadata().version());
+  } else {
+    // TODO(Xi): Log error here
+    return;
+  }
+
+  // Cache the chunk server location 
+  CacheManager::ChunkServerLocationEntry cache_entry;
+  cache_entry.primary_location = open_file_reply.metadata().primary_location();
+  for (auto location : open_file_reply.metadata().locations()) {
+    cache_entry.locations.emplace_back(location);
+  }
+  cache_manager_->SetChunkServerLocation(chunk_handle, cache_entry);
 }
 
 google::protobuf::util::Status ClientImpl::CreateFile(
@@ -27,19 +55,20 @@ google::protobuf::util::Status ClientImpl::CreateFile(
   // Define a client context and set its deadline using the timeout value 
   // obtained from the config manager
   grpc::ClientContext client_context;  
-  SetClientContextDeadline(client_context); 
+  common::SetClientContextDeadline(client_context, config_manager_); 
 
   // Issue OpenFileReply rpc and check status
-  StatusOr<OpenFileReply> status_or(
+  StatusOr<OpenFileReply> open_file_or(
       master_metadata_service_client_->SendRequest(
           open_file_request, client_context));
 
-  if (!status_or.ok()) {
-    return status_or.status();
+  if (!open_file_or.ok()) {
+    return open_file_or.status();
   }
 
-  // TODO(Xi): the master creates the first chunk for this file, and the client 
-  // should cache the FileChunkMetadata 
+  // The master creates the first chunk for this file, and the client 
+  // should cache the FileChunkMetadata for this chunk
+  cache_file_chunk_metadata(filename, 0, open_file_or.ValueOrDie());
   return google::protobuf::util::Status::OK;
 }
 
