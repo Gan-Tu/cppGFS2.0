@@ -6,14 +6,19 @@
 #include "grpcpp/grpcpp.h"
 #include "src/common/config_manager.h"
 #include "src/common/system_logger.h"
+#include "src/server/chunk_server/chunk_server_control_service_impl.h"
 #include "src/server/chunk_server/chunk_server_file_service_impl.h"
+#include "src/server/chunk_server/chunk_server_impl.h"
 #include "src/server/chunk_server/chunk_server_lease_service_impl.h"
 #include "src/server/chunk_server/file_chunk_manager.h"
 
 using gfs::common::ConfigManager;
+using gfs::server::ChunkServerImpl;
+using gfs::service::ChunkServerControlServiceImpl;
 using gfs::server::FileChunkManager;
 using gfs::service::ChunkServerFileServiceImpl;
 using gfs::service::ChunkServerLeaseServiceImpl;
+using google::protobuf::util::StatusOr;
 using grpc::Server;
 using grpc::ServerBuilder;
 
@@ -59,13 +64,30 @@ int main(int argc, char** argv) {
   // Listen on the given address without any authentication mechanism for now.
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
 
+  // Chunk Server implementation
+  LOG(INFO) << "Initializing main chunk server...";
+  StatusOr<ChunkServerImpl*> chunk_server_impl_or =
+      ChunkServerImpl::ConstructChunkServerImpl(config_path, chunk_server_name,
+                                                resolve_hostname);
+
+  if (!chunk_server_impl_or.ok()) {
+    LOG(ERROR) << "Failed to create a chunk server: "
+               << chunk_server_impl_or.status();
+    return 1;
+  }
+  ChunkServerImpl* chunk_server_impl = chunk_server_impl_or.ValueOrDie();
+  LOG(INFO) << "Chunk server initialized...";
+
   // Register synchronous services for handling clients' metadata requests
   // Note that gRPC only support providing services through via a single port.
-  ChunkServerLeaseServiceImpl lease_service;
+  ChunkServerLeaseServiceImpl lease_service(chunk_server_impl);
   builder.RegisterService(&lease_service);
 
-  ChunkServerFileServiceImpl file_service;
+  ChunkServerFileServiceImpl file_service(chunk_server_impl);
   builder.RegisterService(&file_service);
+
+  ChunkServerControlServiceImpl control_service(chunk_server_impl);
+  builder.RegisterService(&control_service);
 
   // Assemble and start the server
   std::unique_ptr<Server> server(builder.BuildAndStart());

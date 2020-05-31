@@ -1,19 +1,20 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary")
-load("@rules_python//python:defs.bzl", "py_test")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 cc_binary(
     name = "file_creation_client",
     srcs = ["file_creation_client.cc"],
     deps = [
-        "//src/common:system_logger",
         "//src/client:gfs_client",
+        "//src/common:system_logger",
         "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:parse"]
+        "@com_google_absl//absl/flags:parse",
+    ],
 )
 
 py_library(
     name = "end_to_end_lib",
-    srcs = ["end_to_end_lib.py"]
+    srcs = ["end_to_end_lib.py"],
 )
 
 py_test(
@@ -23,6 +24,7 @@ py_test(
     data = [
         ":file_creation_client",
         "//src/server/chunk_server:run_chunk_server_main",
-        "//src/server/master_server:run_master_server_main"],
-    deps = [":end_to_end_lib"]
+        "//src/server/master_server:run_master_server_main",
+    ],
+    deps = [":end_to_end_lib"],
 )

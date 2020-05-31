@@ -22,7 +22,7 @@ void init() {
   auto init_status(gfs::client::init_client(config_path, master_name, 
                                             resolve_hostname));
   if (!init_status.ok()) {
-    LOG(ERROR) << "Client initialiation failed with error: " 
+    LOG(ERROR) << "Client initialization failed with error: " 
                << init_status.error_message();
     exit(-1);
   }

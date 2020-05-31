@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
   GrantLeaseRequest grant_lease_request;
   grant_lease_request.set_chunk_handle("9d2a2342-97f9-11ea");
   grant_lease_request.set_chunk_version(1);
-  grant_lease_request.mutable_lease_expiration_time()->set_seconds(1000);
+  grant_lease_request.mutable_lease_expiration_time()->set_seconds(1690735960);
 
   grpc::ClientContext client_context3;
   LogRequestAndResponse(grant_lease_request,
@@ -132,7 +132,7 @@ int main(int argc, char** argv) {
   RevokeLeaseRequest revoke_lease_request;
   revoke_lease_request.set_chunk_handle("9d2a2342-97f9-11ea");
   revoke_lease_request.mutable_original_lease_expiration_time()->set_seconds(
-      1000);
+      1690735960);
 
   grpc::ClientContext client_context4;
   LogRequestAndResponse(revoke_lease_request,

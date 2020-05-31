@@ -2,11 +2,12 @@
 
 #include "grpcpp/grpcpp.h"
 #include "src/common/protocol_client/grpc_client_utils.h"
+#include "src/common/system_logger.h"
 #include "src/common/utils.h"
 #include "src/protos/chunk_server.pb.h"
-#include "src/protos/metadata.pb.h"
-#include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
+#include "src/protos/grpc/master_metadata_service.grpc.pb.h"
+#include "src/protos/metadata.pb.h"
 
 using gfs::service::ChunkServerServiceMasterServerClient;
 using google::protobuf::Empty;
@@ -14,8 +15,8 @@ using grpc::ServerContext;
 using protos::ChunkServerLocation;
 using protos::FileChunkMetadata;
 using protos::grpc::DeleteFileRequest;
-using protos::grpc::InitFileChunkRequest;
 using protos::grpc::InitFileChunkReply;
+using protos::grpc::InitFileChunkRequest;
 using protos::grpc::OpenFileReply;
 using protos::grpc::OpenFileRequest;
 
@@ -26,8 +27,8 @@ inline server::MetadataManager* MasterMetadataServiceImpl::metadata_manager() {
   return server::MetadataManager::GetInstance();
 }
 
-inline server::ChunkServerManager& MasterMetadataServiceImpl
-    ::chunk_server_manager() {
+inline server::ChunkServerManager&
+MasterMetadataServiceImpl ::chunk_server_manager() {
   return server::ChunkServerManager::GetInstance();
 }
 
@@ -44,7 +45,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
 
   // Step 2. Create the first file chunk for this file
   google::protobuf::util::StatusOr<std::string> chunk_handle_or(
-      metadata_manager()->CreateChunkHandle(filename,0));
+      metadata_manager()->CreateChunkHandle(filename, 0));
   if (!chunk_handle_or.ok()) {
     return common::utils::ConvertProtobufStatusToGrpcStatus(status);
   }
@@ -54,44 +55,35 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
   const ushort num_of_chunk_replica(3);
   // TODO(someone): make this number configurable via config.yml. Probably not
   // a priority right now
-  auto chunk_server_locations(
-      chunk_server_manager().AllocateChunkServer(chunk_handle, num_of_chunk_replica));
+  auto chunk_server_locations(chunk_server_manager().AllocateChunkServer(
+      chunk_handle, num_of_chunk_replica));
 
   // Prepare the InitChunkFileReply
   *reply->mutable_metadata() = FileChunkMetadata();
   reply->mutable_metadata()->set_chunk_handle(chunk_handle);
   reply->mutable_metadata()->set_version(0);
 
-  // Step 4. Coordinate with chunk servers to initialize the file chunk 
-  for(auto chunk_server_location : chunk_server_locations) {
-    const std::string server_address(chunk_server_location.server_hostname() +
-        ":" + std::to_string(chunk_server_location.server_port()));
-    auto chunk_server_channel(grpc::CreateChannel(server_address,
-        grpc::InsecureChannelCredentials()));
-    // Register this chunk server Rpc client if not existed
-    RegisterChunkServerRpcClient(server_address, chunk_server_channel);
-    auto try_get_client(chunk_server_service_clients_.
-                            TryGetValue(server_address)); 
-    // Not really possible case right now because we are not removing clients
-    // But may happen somewhere down the line. 
-    if (!try_get_client.second) {
-       // TODO(Xi): log such instance
-       continue;  
-    }
-    auto chunk_server_service_client(try_get_client.first);
+  // Step 4. Coordinate with chunk servers to initialize the file chunk
+  for (auto chunk_server_location : chunk_server_locations) {
+    const std::string server_address(
+        chunk_server_location.server_hostname() + ":" +
+        std::to_string(chunk_server_location.server_port()));
+    // Create and return this chunk server Rpc client if not exist
+    auto chunk_server_service_client =
+        GetOrCreateChunkServerProtocolClient(server_address);
     // Prepare InitFileChunk Request to send to chunk server
     InitFileChunkRequest init_chunk_request;
     init_chunk_request.set_chunk_handle(chunk_handle);
     grpc::ClientContext client_context;
     common::SetClientContextDeadline(client_context, config_manager_);
-  
+
     // Issue InitFileChunk request and check status
     google::protobuf::util::StatusOr<InitFileChunkReply> init_chunk_or(
-        chunk_server_service_client->SendRequest(init_chunk_request, 
-            client_context));
+        chunk_server_service_client->SendRequest(init_chunk_request,
+                                                 client_context));
 
     // TODO(Xi): we probably don't have to fail this request just because one
-    // init chunk request is not successful. Will come back and refine this 
+    // init chunk request is not successful. Will come back and refine this
     // once the chunk server grpc impl is in shape
     if (!init_chunk_or.ok()) {
       return common::utils::ConvertProtobufStatusToGrpcStatus(status);
@@ -100,8 +92,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
     // Pick a primary chunk server. Just select the first one
     if (reply->metadata().primary_location().server_hostname().empty()) {
       auto primary_location(chunk_server_location);
-      *(reply->mutable_metadata()->mutable_primary_location()) 
-          = primary_location; 
+      *(reply->mutable_metadata()->mutable_primary_location()) =
+          primary_location;
     }
 
     // Prepare the InitFileChunk reply with the chunk metadata
@@ -124,10 +116,20 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
   return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
 }
 
-bool MasterMetadataServiceImpl::RegisterChunkServerRpcClient(
-    std::string server_name, std::shared_ptr<grpc::Channel> channel) {
-  return chunk_server_service_clients_.TryInsert(server_name,
-             std::make_shared<ChunkServerServiceMasterServerClient>(channel));
+std::shared_ptr<ChunkServerServiceMasterServerClient>
+MasterMetadataServiceImpl::GetOrCreateChunkServerProtocolClient(
+    const std::string& server_address) {
+  if (chunk_server_service_clients_.contains(server_address)) {
+    return chunk_server_service_clients_[server_address];
+  } else {
+    LOG(INFO) << "Estabalishing new connection to chunk server at: "
+              << server_address;
+    chunk_server_service_clients_[server_address] =
+        std::make_shared<ChunkServerServiceMasterServerClient>(
+            grpc::CreateChannel(server_address,
+                                grpc::InsecureChannelCredentials()));
+    return chunk_server_service_clients_[server_address];
+  }
 }
 
 grpc::Status MasterMetadataServiceImpl::OpenFile(ServerContext* context,
