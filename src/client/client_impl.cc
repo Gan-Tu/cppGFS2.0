@@ -15,8 +15,13 @@ void ClientImpl::cache_file_chunk_metadata(
     const OpenFileReply& open_file_reply) {
   const std::string& chunk_handle(open_file_reply.metadata().chunk_handle());
   
-  cache_manager_->SetChunkHandle(filename, chunk_index, chunk_handle);
-  // TODO(Xi): if the above set fails, emit a log
+  auto set_chunk_handle_status(cache_manager_->SetChunkHandle(
+      filename, chunk_index, chunk_handle));
+  
+  if (!set_chunk_handle_status.ok()) {
+    // TODO(Xi): if the above set fails, emit a log
+    return;
+  }
 
   auto chunk_or(cache_manager_->GetChunkVersion(chunk_handle));
   // If this chunk version has not been cached, or the replied version is 
@@ -26,7 +31,8 @@ void ClientImpl::cache_file_chunk_metadata(
     cache_manager_->SetChunkVersion(chunk_handle, 
                                     open_file_reply.metadata().version());
   } else {
-    // TODO(Xi): Log error here...
+    // TODO(Xi): Log error here
+    return;
   }
 
   // Cache the chunk server location 

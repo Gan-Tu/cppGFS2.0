@@ -70,8 +70,15 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
         grpc::InsecureChannelCredentials()));
     // Register this chunk server Rpc client if not existed
     RegisterChunkServerRpcClient(server_address, chunk_server_channel);
-    auto chunk_server_service_client(
-        chunk_server_service_clients_.TryGetValue(server_address).first);
+    auto try_get_client(chunk_server_service_clients_.
+                            TryGetValue(server_address)); 
+    // Not really possible case right now because we are not removing clients
+    // But may happen somewhere down the line. 
+    if (!try_get_client.second) {
+       // TODO(Xi): log such instance
+       continue;  
+    }
+    auto chunk_server_service_client(try_get_client.first);
     // Prepare InitFileChunk Request to send to chunk server
     InitFileChunkRequest init_chunk_request;
     init_chunk_request.set_chunk_handle(chunk);
