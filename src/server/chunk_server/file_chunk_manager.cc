@@ -34,7 +34,7 @@ void FileChunkManager::Initialize(const std::string& chunk_database_name,
   leveldb::Status status =
       leveldb::DB::Open(options, chunk_database_name, &database);
 
-  LOG_ASSERT(status.ok());
+  LOG_ASSERT(status.ok()) << status.ToString();
 
   // Database is closed once pointer is deleted.
   this->chunk_database_ = std::unique_ptr<leveldb::DB>(database);
@@ -248,7 +248,7 @@ FileChunkManager::GetFileChunk(const std::string& chunk_handle,
 
   if (!result.ok()) {
     // Failed
-    return result;
+    return result.status();
   }
 
   auto& file_chunk = result.ValueOrDie();
@@ -258,7 +258,8 @@ FileChunkManager::GetFileChunk(const std::string& chunk_handle,
     // wrong version
     return google::protobuf::util::Status(
         google::protobuf::util::error::NOT_FOUND,
-        "Specified version doesn't match current version. Specified=" +
+        "Specified version for " + chunk_handle +
+            " doesn't match current version. Specified=" +
             std::to_string(version) +
             " Current=" + std::to_string(file_chunk->version()));
   }
