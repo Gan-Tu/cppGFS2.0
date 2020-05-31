@@ -11,12 +11,19 @@ using namespace gfs::server;
 // test methods.
 class FileChunkManagerTest : public ::testing::Test {
  protected:
-  void SetUp() override {
-    file_chunk_mgr = FileChunkManager::GetInstance();
+  static void SetUpTestSuite() {
+    // The DB can only be initialized and open once by each thread, so we put
+    // it in SetUpTestSuite for one-time setup
+    FileChunkManager* file_chunk_mgr = FileChunkManager::GetInstance();
     file_chunk_mgr->Initialize(
-        /*chunk_database_name=*/"/tmp/file_chunk_mgr_test_db",
+        // Do NOT use /tmp as the test artifacts will persist this way
+        // Instead, use relative directory for Bazel test so it will be cleaned
+        // up after the test finishes
+        /*chunk_database_name=*/"file_chunk_mgr_test_db",
         /*max_chunk_size_bytes=*/100);
   }
+
+  void SetUp() override { file_chunk_mgr = FileChunkManager::GetInstance(); }
 
   FileChunkManager* file_chunk_mgr;
 };
@@ -33,7 +40,8 @@ TEST_F(FileChunkManagerTest, BasicCrudOperationTest) {
 
   // bump version before write
   EXPECT_TRUE(
-      file_chunk_mgr->UpdateChunkVersion(handle, version, ++version).ok());
+      file_chunk_mgr->UpdateChunkVersion(handle, version, version+1).ok());
+  version++;
 
   // write new data to chunk
   auto write_result = file_chunk_mgr->WriteToChunk(
@@ -53,7 +61,8 @@ TEST_F(FileChunkManagerTest, BasicCrudOperationTest) {
 
   // bump the chunk version
   EXPECT_TRUE(
-      file_chunk_mgr->UpdateChunkVersion(handle, version, ++version).ok());
+      file_chunk_mgr->UpdateChunkVersion(handle, version, version+1).ok());
+  version++;
 
   // make another write at a different offset
   const uint32_t update_offset = 10;
@@ -95,7 +104,9 @@ TEST_F(FileChunkManagerTest, GetAllFileChunkMetadata) {
     EXPECT_TRUE(file_chunk_mgr->CreateChunk(handle, version).ok());
 
     EXPECT_TRUE(
-        file_chunk_mgr->UpdateChunkVersion(handle, version, ++version).ok());
+        file_chunk_mgr->UpdateChunkVersion(handle, version, version+1).ok());
+    
+    version++;
 
     auto write_result = file_chunk_mgr->WriteToChunk(
         handle, version, /*start_offset=*/0, data.size(), data);
