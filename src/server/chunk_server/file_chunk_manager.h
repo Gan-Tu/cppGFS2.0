@@ -93,7 +93,7 @@ class FileChunkManager {
   void operator=(const FileChunkManager&) = delete;
 
   // The file chunk manager must be initialized only once for a process, before
-  // any chunk operation is perfomed. This does the setup for the internal
+  // any chunk operation is performed. This does the setup for the internal
   // database needed by the manager. The database name (path plus name e.g.
   // /tmp/mydb) passed can be an existing chunk database, or name for a new one
   // to be created.

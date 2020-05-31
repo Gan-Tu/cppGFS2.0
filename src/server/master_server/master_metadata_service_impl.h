@@ -20,11 +20,11 @@ class MasterMetadataServiceImpl final
   MasterMetadataServiceImpl(common::ConfigManager* config_manager) : 
       config_manager_(config_manager) {}
 
-  // Register a protocol client for talking to the lease and file service
-  // of given |server_name| chunk server, using the gRPC |channel|.
-  // If the client already exits, return false.
-  bool RegisterChunkServerRpcClient(std::string server_name,
-                                    std::shared_ptr<grpc::Channel> channel);
+  // Return the protocol client for talking to the chunk server at
+  // |server_address|.  If the connection is already established, reuse the
+  // connection and return the existing client.
+  std::shared_ptr<gfs::service::ChunkServerServiceMasterServerClient>
+  GetOrCreateChunkServerProtocolClient(const std::string& server_address);
 
  protected:
   // Accessor to the MetadataManager instance
@@ -59,10 +59,8 @@ class MasterMetadataServiceImpl final
                           const protos::grpc::DeleteFileRequest* request,
                           google::protobuf::Empty* reply) override;
 
-  // Chunk server name and its corresponding GFS protocol client. Use a thread
-  // safe hashmap as the server code is intrinsically multi-threaded and this
-  // data structure needs to be protected
-  common::parallel_hash_map<
+  // Chunk server name and its corresponding GFS protocol client
+  gfs::common::thread_safe_flat_hash_map<
       std::string,
       std::shared_ptr<gfs::service::ChunkServerServiceMasterServerClient>>
       chunk_server_service_clients_;

@@ -44,6 +44,8 @@ message GrantLeaseRequest {
   // By default, the lease expires 60 seconds after the master issued
   // the lease grant/extension, so this is the absolute UNIX time when the
   // lease is no longer valid, at master's NOW() + 60 seconds upon grant.
+  //
+  // Use seconds field for UNIX seconds. nanos will be ignored
   google.protobuf.Timestamp lease_expiration_time = 3;
 }
 
