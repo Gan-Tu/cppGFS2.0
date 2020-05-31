@@ -1,10 +1,6 @@
 #include "src/server/chunk_server/file_chunk_manager.h"
 
-#include <future>
-#include <iostream>  //remove??
 #include <memory>
-#include <thread>
-#include <vector>
 
 #include "absl/container/flat_hash_set.h"
 #include "gtest/gtest.h"
@@ -25,12 +21,13 @@ class FileChunkManagerTest : public ::testing::Test {
   FileChunkManager* file_chunk_mgr;
 };
 
-// Test registering a chunk server with no chunks. Happens when a new
-// chunkserver is being registered.
+// Test basic create, read, update and delete operations with the file chunk
+// manager.
 TEST_F(FileChunkManagerTest, BasicCrudOperationTest) {
   std::string data = "Testing the filechunkmanager.";
-  std::string handle = "BasicCrudOperationTest";
+  const std::string handle = "BasicCrudOperationTest";
 
+  // create the v1 of the chunk
   uint32_t version = 1;
   EXPECT_TRUE(file_chunk_mgr->CreateChunk(handle, version).ok());
 
@@ -38,52 +35,53 @@ TEST_F(FileChunkManagerTest, BasicCrudOperationTest) {
   EXPECT_TRUE(
       file_chunk_mgr->UpdateChunkVersion(handle, version, ++version).ok());
 
-  auto write_result =
-      file_chunk_mgr->WriteToChunk(handle, version, 0, data.size(), data);
+  // write new data to chunk
+  auto write_result = file_chunk_mgr->WriteToChunk(
+      handle, version, /*start_offset=*/0, data.size(), data);
 
-  EXPECT_TRUE(write_result.ok());
-
+  // verify that all the data was written.
   EXPECT_EQ(data.size(), write_result.ValueOrDie());
 
+  // Read the data
   const uint32_t read_start_offset = 5;
   const uint32_t read_length = 7;
   auto read_result = file_chunk_mgr->ReadFromChunk(
       handle, version, read_start_offset, read_length);
 
-  EXPECT_TRUE(read_result.ok());
-
   EXPECT_EQ(data.substr(read_start_offset, read_length),
             read_result.ValueOrDie());
 
+  // bump the chunk version
   EXPECT_TRUE(
       file_chunk_mgr->UpdateChunkVersion(handle, version, ++version).ok());
 
+  // make another write at a different offset
   const uint32_t update_offset = 10;
   const std::string update_data = " Updating the previous write.";
   auto update_result = file_chunk_mgr->WriteToChunk(
       handle, version, update_offset, update_data.size(), update_data);
 
-  EXPECT_TRUE(update_result.ok());
-
   EXPECT_EQ(update_data.size(), update_result.ValueOrDie());
 
+  // Read the last data we wrote
   auto update_read_result = file_chunk_mgr->ReadFromChunk(
       handle, version, update_offset, update_data.size());
 
-  EXPECT_TRUE(update_read_result.ok());
-
   EXPECT_EQ(update_data, update_read_result.ValueOrDie());
+
+  // Verify chunk version
+  EXPECT_EQ(version, file_chunk_mgr->GetChunkVersion(handle).ValueOrDie());
 
   EXPECT_TRUE(file_chunk_mgr->DeleteChunk(handle).ok());
 
+  // Can't read deleted chunk
   EXPECT_FALSE(
       file_chunk_mgr
           ->ReadFromChunk(handle, version, update_offset, update_data.size())
           .ok());
 }
 
-// Test registering a chunk server with no chunks. Happens when a new
-// chunkserver is being registered.
+// Test that we can get all the stored chunks metadata (handle, version).
 TEST_F(FileChunkManagerTest, GetAllFileChunkMetadata) {
   const std::string data = "Testing the filechunkmanager.";
   const std::string handle_prefix = "GetAllFileChunkMetadata";
@@ -99,10 +97,8 @@ TEST_F(FileChunkManagerTest, GetAllFileChunkMetadata) {
     EXPECT_TRUE(
         file_chunk_mgr->UpdateChunkVersion(handle, version, ++version).ok());
 
-    auto write_result =
-        file_chunk_mgr->WriteToChunk(handle, version, 0, data.size(), data);
-
-    EXPECT_TRUE(write_result.ok());
+    auto write_result = file_chunk_mgr->WriteToChunk(
+        handle, version, /*start_offset=*/0, data.size(), data);
 
     EXPECT_EQ(data.size(), write_result.ValueOrDie());
 

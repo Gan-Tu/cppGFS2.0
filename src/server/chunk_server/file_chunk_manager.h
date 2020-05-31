@@ -51,10 +51,15 @@ namespace server {
 //    file_chunk_mgr->Initialize(
 //        /*chunk_database_name=*/"/tmp/file_chunk_mgr_test_db",
 //        /*max_chunk_size_bytes=*/100);
+// Already initialized for chunk server on startup, so no need to initialize
+// again. Just get the manager instance and use.
 //
 // New empty chunk creation: auto result =
 // file_chunk_mgr->CreateChunk("chunk_handle",
 // /*create_version=*/1);
+//
+// Get chunk version: auto result =
+// file_chunk_mgr->GetChunkVersion("chunk_handle");
 //
 // Update the chunk version: auto result =
 // file_chunk_mgr->UpdateChunkVersion("chunk_handle",
@@ -123,8 +128,10 @@ class FileChunkManager {
   //
   // Fails (Error: NOT_FOUND), if a chunk with the specified handle isn't found
   // or if the specified read_version doesn't match the version of the stored
-  // chunk. Fails (Error: INTERNAL), if it is unable to deserialize the binary
-  // data from disk. Fails (Error: OUT_OF_RANGE), if the start_offset is greater
+  // chunk.
+  // Fails (Error: INTERNAL), if it is unable to deserialize the binary
+  // data from disk. Fails
+  // (Error: OUT_OF_RANGE), if the start_offset is greater
   // than the offset of the end of the chunk.
   google::protobuf::util::StatusOr<std::string> ReadFromChunk(
       const std::string& chunk_handle, const uint32_t& read_version,
@@ -163,6 +170,14 @@ class FileChunkManager {
       const std::string& chunk_handle, const uint32_t& from_version,
       const uint32_t& to_version);
 
+  // Returns the stored version of the specified chunk handle.
+  //
+  // Fails (Error: NOT_FOUND), if a chunk with the specified handle isn't found.
+  // Fails (Error: INTERNAL), if it is unable to deserialize the binary
+  // data from disk.
+  google::protobuf::util::StatusOr<uint32_t> GetChunkVersion(
+      const std::string& chunk_handle);
+
   // Not yet implemented.
   // Append the specified data of the specified length to the end of the chunk
   // with the specified handle with the specified version. Returns the actual
@@ -172,13 +187,22 @@ class FileChunkManager {
       const std::string& chunk_handle, const uint32_t& append_version,
       const uint32_t& length, const std::string& new_data);
 
-  // Delete the chunk with the specified handle from the chunk database. Returns
-  // successfully, if chunk has been deleted.
+  // Delete the chunk (asynchronously) with the specified handle from the chunk
+  // database. Returns successfully, if chunk has been deleted.
   // Fails (Error: UNKNOWN), if deletion, failed. Could be the chunk with
   // specified handle doesn't exist.
   google::protobuf::util::Status DeleteChunk(const std::string& chunk_handle);
 
  private:
+  // Helper to get a file chunk from database. Returns the file chunk if
+  // successful.
+  // Fails (Error: NOT_FOUND), if a chunk with the specified handle
+  // isn't found.
+  // Fails (Error: INTERNAL), if it is unable to deserialize the
+  // binary data from disk.
+  google::protobuf::util::StatusOr<std::shared_ptr<protos::FileChunk>>
+  GetFileChunk(const std::string& chunk_handle);
+
   // Helper used by couple of the public interfaces to get a file chunk from
   // database for a specific version. Returns the file chunk if successful.
   // Fails (Error: NOT_FOUND), if a chunk with the specified handle isn't found
@@ -188,6 +212,14 @@ class FileChunkManager {
   // data from disk.
   google::protobuf::util::StatusOr<std::shared_ptr<protos::FileChunk>>
   GetFileChunk(const std::string& chunk_handle, const uint32_t& version);
+
+  // Serialize the file chunk to binary and write to disk.
+  // Synchronous at the moment, and returns when update is applied to disk. This
+  // isn't the best, but we can improve this and do asynchronous writes, by
+  // using a Write Ahead Log (WAL) to maintain durability. Since we want
+  // successful writes to be on disk even if machine crashes/restart.
+  leveldb::Status WriteFileChunk(const std::string& chunk_handle,
+                                 const protos::FileChunk* file_chunk);
 
   // The leveldb database used internally for chunk storage.
   // Since the underlying database is abstracted, we can change it while still

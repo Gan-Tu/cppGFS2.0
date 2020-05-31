@@ -75,14 +75,7 @@ google::protobuf::util::Status FileChunkManager::CreateChunk(
   protos::FileChunk new_chunk;
   new_chunk.set_version(create_version);
 
-  leveldb::WriteOptions write_options;
-  // Synchronous at the moment, and returns when update is applied to disk. This
-  // isn't the best, but we can improve this and do asynchronous writes, by
-  // using a Write Ahead Log (WAL) to maintain durability.
-  write_options.sync = true;
-
-  leveldb::Status status = this->chunk_database_->Put(
-      write_options, chunk_handle, new_chunk.SerializeAsString());
+  leveldb::Status status = WriteFileChunk(chunk_handle, &new_chunk);
 
   if (!status.ok()) {
     // write failed
@@ -107,7 +100,7 @@ google::protobuf::util::StatusOr<std::string> FileChunkManager::ReadFromChunk(
   auto file_chunk = result.ValueOrDie();
 
   // Check that we aren't trying to read data that isn't there
-  if (start_offset > file_chunk->data().length()) {
+  if (start_offset >= file_chunk->data().length()) {
     return google::protobuf::util::Status(
         google::protobuf::util::error::OUT_OF_RANGE,
         "Read start offset is after end of chunk. End of chunk (bytes): " +
@@ -163,14 +156,7 @@ google::protobuf::util::StatusOr<uint32_t> FileChunkManager::WriteToChunk(
       start_offset, actual_write_length, new_data.data(),
       /*start_position_in_new_data=*/0, actual_write_length);
 
-  leveldb::WriteOptions write_options;
-  // Synchronous at the moment, and returns when update is applied to disk. This
-  // isn't the best, but we can improve this and do asynchronous writes, by
-  // using a Write Ahead Log (WAL) to maintain durability.
-  write_options.sync = true;
-
-  leveldb::Status status = this->chunk_database_->Put(
-      write_options, chunk_handle, file_chunk->SerializeAsString());
+  leveldb::Status status = WriteFileChunk(chunk_handle, file_chunk.get());
 
   if (!status.ok()) {
     // write failed
@@ -194,17 +180,11 @@ google::protobuf::util::Status FileChunkManager::UpdateChunkVersion(
 
   auto file_chunk = result.ValueOrDie();
 
-  // Update the version, since we found the chunk with the from_version
+  // Update the version in memory, since we found the chunk with the
+  // from_version
   file_chunk->set_version(to_version);
 
-  leveldb::WriteOptions write_options;
-  // Synchronous at the moment, and returns when update is applied to disk. This
-  // isn't the best, but we can improve this and do asynchronous writes, by
-  // using a Write Ahead Log (WAL) to maintain durability.
-  write_options.sync = true;
-
-  leveldb::Status status = this->chunk_database_->Put(
-      write_options, chunk_handle, file_chunk->SerializeAsString());
+  leveldb::Status status = WriteFileChunk(chunk_handle, file_chunk.get());
 
   if (!status.ok()) {
     // version update failed
@@ -216,6 +196,18 @@ google::protobuf::util::Status FileChunkManager::UpdateChunkVersion(
   return google::protobuf::util::Status::OK;
 }
 
+google::protobuf::util::StatusOr<uint32_t> FileChunkManager::GetChunkVersion(
+    const std::string& chunk_handle) {
+  auto result = GetFileChunk(chunk_handle);
+
+  if (!result.ok()) {
+    // Read failed
+    return result.status();
+  }
+
+  return result.ValueOrDie()->version();
+}
+
 google::protobuf::util::StatusOr<uint32_t> FileChunkManager::AppendToChunk(
     const std::string& chunk_handle, const uint32_t& append_version,
     const uint32_t& length, const std::string& new_data) {
@@ -225,8 +217,7 @@ google::protobuf::util::StatusOr<uint32_t> FileChunkManager::AppendToChunk(
 }
 
 google::protobuf::util::StatusOr<std::shared_ptr<protos::FileChunk>>
-FileChunkManager::GetFileChunk(const std::string& chunk_handle,
-                               const uint32_t& version) {
+FileChunkManager::GetFileChunk(const std::string& chunk_handle) {
   std::string existing_data;
   leveldb::Status status = this->chunk_database_->Get(
       leveldb::ReadOptions(), chunk_handle, &existing_data);
@@ -247,6 +238,21 @@ FileChunkManager::GetFileChunk(const std::string& chunk_handle,
         "Failed to parse data from disk.");
   }
 
+  return file_chunk;
+}
+
+google::protobuf::util::StatusOr<std::shared_ptr<protos::FileChunk>>
+FileChunkManager::GetFileChunk(const std::string& chunk_handle,
+                               const uint32_t& version) {
+  auto result = GetFileChunk(chunk_handle, version);
+
+  if (!result.ok()) {
+    // Failed
+    return result;
+  }
+
+  auto& file_chunk = result.ValueOrDie();
+
   // check version
   if (file_chunk->version() != version) {
     // wrong version
@@ -260,8 +266,22 @@ FileChunkManager::GetFileChunk(const std::string& chunk_handle,
   return file_chunk;
 }
 
+leveldb::Status FileChunkManager::WriteFileChunk(
+    const std::string& chunk_handle, const protos::FileChunk* file_chunk) {
+  leveldb::WriteOptions write_options;
+
+  // Synchronous at the moment, and returns when update is applied to disk. This
+  // isn't the best, but we can improve this and do asynchronous writes, by
+  // using a Write Ahead Log (WAL) to maintain durability.
+  write_options.sync = true;
+
+  return this->chunk_database_->Put(write_options, chunk_handle,
+                                    file_chunk->SerializeAsString());
+}
+
 google::protobuf::util::Status FileChunkManager::DeleteChunk(
     const std::string& chunk_handle) {
+  // Doing delete asynchronously
   leveldb::Status status =
       this->chunk_database_->Delete(leveldb::WriteOptions(), chunk_handle);
 

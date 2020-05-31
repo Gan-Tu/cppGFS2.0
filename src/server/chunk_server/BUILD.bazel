@@ -51,6 +51,7 @@ cc_binary(
     deps = [
         ":chunk_server_file_service_impl",
         ":chunk_server_lease_service_impl",
+        ":file_chunk_manager",
         "//src/common:config_manager",
         "//src/common:system_logger",
         "@com_google_absl//absl/flags:flag",
