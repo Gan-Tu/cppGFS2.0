@@ -125,7 +125,10 @@ google::protobuf::util::StatusOr<ReadFileChunkReply>
     open_file_request.set_mode(OpenFileRequest::READ);
     grpc::ClientContext client_context;
     common::SetClientContextDeadline(client_context, config_manager_);
-    
+
+    LOG(INFO) << "Issuing OpenFilRequest to read file " << filename
+              << "at chunk index " << chunk_index;
+
     // Issue OpenFileReply rpc and check stastus
     StatusOr<OpenFileReply> open_file_or(
           master_metadata_service_client_->SendRequest(
@@ -133,6 +136,8 @@ google::protobuf::util::StatusOr<ReadFileChunkReply>
 
     // Handle error
     if (!open_file_or.ok()) {
+      LOG(ERROR) << "OpenFileRequest failed due to " 
+                 << open_file_or.status().error_message();
       return open_file_or.status();
     }
 

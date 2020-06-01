@@ -28,7 +28,6 @@ class ClientImpl {
   google::protobuf::util::StatusOr<std::pair<size_t, void*>> ReadFile(
       const char* filename, size_t offset, size_t nbytes);
   
-
   // Construct and return a ClientImpl objects with proper configurations 
   // using the given config file. The ClientImpl object uses the config 
   // file to initialize the cache manager and two clients objects used to 
