@@ -22,6 +22,7 @@ cc_library(
     deps = [
         ":chunk_server_impl",
         "//src/protos/grpc:cc_chunk_server_file_service_grpc",
+        "//src/server/chunk_server:file_chunk_manager",
         "@com_github_grpc_grpc//:grpc++",
     ],
 )

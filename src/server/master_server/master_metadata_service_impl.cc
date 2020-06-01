@@ -50,8 +50,10 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
   google::protobuf::util::StatusOr<std::string> chunk_handle_or(
       metadata_manager()->CreateChunkHandle(filename, 0));
   if (!chunk_handle_or.ok()) {
-    LOG(ERROR) << "Chunk handle creation failed: " << status.error_message();
-    return common::utils::ConvertProtobufStatusToGrpcStatus(status);
+    LOG(ERROR) << "Chunk handle creation failed: " 
+               << chunk_handle_or.status().error_message();
+    return common::utils::ConvertProtobufStatusToGrpcStatus(
+               chunk_handle_or.status());
   }
   const std::string& chunk_handle(chunk_handle_or.ValueOrDie());
 
@@ -124,7 +126,34 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
 grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
     const protos::grpc::OpenFileRequest* request,
     protos::grpc::OpenFileReply* reply) {
-  return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+  // Step 1. Access the chunk_handle
+  const std::string& filename(request->filename());
+  const uint32_t chunk_index(request->chunk_index());
+
+  google::protobuf::util::StatusOr<std::string> chunk_handle_or(
+      metadata_manager()->GetChunkHandle(filename, chunk_index));
+
+  if (!chunk_handle_or.ok()) {
+    LOG(ERROR) << "Chunk handle not found: " 
+               << chunk_handle_or.status().error_message();
+    return common::utils::ConvertProtobufStatusToGrpcStatus(
+               chunk_handle_or.status());
+  }
+
+  // Step 2. Access the file chunk metadata
+  const std::string& chunk_handle(chunk_handle_or.ValueOrDie());
+  google::protobuf::util::StatusOr<FileChunkMetadata> file_chunk_metadata_or(
+      metadata_manager()->GetFileChunkMetadata(chunk_handle));
+
+  if (!file_chunk_metadata_or.ok()) {
+    LOG(ERROR) << "File chunk metadata not accessible for " << chunk_handle;
+    return common::utils::ConvertProtobufStatusToGrpcStatus(
+               file_chunk_metadata_or.status());
+  }
+
+  // Set the file chunk metadata in reply
+  *reply->mutable_metadata() = file_chunk_metadata_or.ValueOrDie();
+  return grpc::Status::OK;
 }
 
 grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
