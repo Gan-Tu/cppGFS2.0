@@ -31,11 +31,6 @@ class ChunkServerImpl {
   google::protobuf::util::StatusOr<absl::Time> GetLeaseExpirationTime(
       const std::string& file_handle);
 
-  // MOCK FUNCTIONS for chunk file manager
-  // Initialize, or update the chunk |version| for the given |file_handle|
-  // TODO(tugan,michael): use chunk file manager instead, when ready
-  void SetChunkVersion(const std::string& file_handle, const uint32_t version);
-
   // Returns the stored version of the specified chunk handle.
   // If the handle doesn't exist on the chunk server, return NOT_FOUND error.
   // If there are data corruption on the chunk server that it is not able to

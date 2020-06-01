@@ -66,9 +66,9 @@ TEST_F(ConfigManagerTest, GetServerAddressTest) {
 
 TEST_F(ConfigManagerTest, GetDatabaseNameTest) {
   EXPECT_EQ(config_->GetDatabaseName("test_chunk_server_01"),
-            "data/test-gfs-db/test_chunk_server_01");
+            "data/gfs_db_test_chunk_server_01");
   EXPECT_EQ(config_->GetDatabaseName("test_chunk_server_02"),
-            "data/test-gfs-db/test_chunk_server_02");
+            "data/gfs_db_test_chunk_server_02");
 }
 
 TEST_F(ConfigManagerTest, GetDiskMetadataTest) {
