@@ -39,8 +39,9 @@ class ChunkServerImpl {
       const std::string& file_handle);
 
   // Return the protocol client for talking to the master at |server_address|.
-  // If the connection is already established, reuse the connection. Otherwise,
-  // initialize and return a new protocol client connecting to |server_address|.
+  // If the connection is already established, reuse the connection.
+  // Otherwise, initialize and return a new protocol client connecting to
+  // |server_address|.
   std::shared_ptr<gfs::service::MasterChunkServerManagerServiceClient>
   GetMasterProtocolClient(const std::string& server_address);
 
@@ -66,12 +67,14 @@ class ChunkServerImpl {
   ~ChunkServerImpl();
 
   // Server address and its corresponding GFS protocol client
-  // A protocol client will be added the first time the connection is added, and
-  // subsequent calls will simply reuse this protocol client and connection.
-  // Currently we don't remove connections no longer in use, for simplicity.
+  // A protocol client will be added the first time the connection is added,
+  // and subsequent calls will simply reuse this protocol client and
+  // connection. Currently we don't remove connections no longer in use, for
+  // simplicity.
   //
-  // Note that this design makes it possible to dynamically add new connections
-  // to new servers that may not be present during startup configuration.
+  // Note that this design makes it possible to dynamically add new
+  // connections to new servers that may not be present during startup
+  // configuration.
   gfs::common::thread_safe_flat_hash_map<
       std::string,
       std::shared_ptr<gfs::service::MasterChunkServerManagerServiceClient>>
@@ -85,7 +88,8 @@ class ChunkServerImpl {
   // TODO(tugan,michael): use chunk file manager instead, when ready
   gfs::common::thread_safe_flat_hash_map<std::string, uint32_t> chunk_versions_;
 
-  // Write leases that chunk server holds, and their respective expiration time
+  // Write leases that chunk server holds, and their respective expiration
+  // time
   gfs::common::thread_safe_flat_hash_map<std::string, uint64_t>
       lease_and_expiration_unix_sec_;
 };
