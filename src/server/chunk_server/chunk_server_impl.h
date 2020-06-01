@@ -9,6 +9,7 @@
 #include "src/common/protocol_client/chunk_server_service_server_client.h"
 #include "src/common/protocol_client/master_chunk_server_manager_service_client.h"
 #include "src/common/utils.h"
+#include "src/server/chunk_server/file_chunk_manager.h"
 
 namespace gfs {
 namespace server {
@@ -34,7 +35,11 @@ class ChunkServerImpl {
   // Initialize, or update the chunk |version| for the given |file_handle|
   // TODO(tugan,michael): use chunk file manager instead, when ready
   void SetChunkVersion(const std::string& file_handle, const uint32_t version);
-  // Return NOT_FOUND, if no chunk exists on this chunk server
+
+  // Returns the stored version of the specified chunk handle.
+  // If the handle doesn't exist on the chunk server, return NOT_FOUND error.
+  // If there are data corruption on the chunk server that it is not able to
+  // determine the chunk version, return INTERNAL error.
   google::protobuf::util::StatusOr<uint32_t> GetChunkVersion(
       const std::string& file_handle);
 
@@ -59,6 +64,7 @@ class ChunkServerImpl {
         resolve_hostname_(resolve_hostname) {}
 
   gfs::common::ConfigManager* config_manager_ = nullptr;
+  FileChunkManager* file_manager_ = FileChunkManager::GetInstance();
   std::string chunk_server_name_ = nullptr;
   bool resolve_hostname_ = false;
 

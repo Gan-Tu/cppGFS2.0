@@ -82,13 +82,7 @@ void ChunkServerImpl::SetChunkVersion(const std::string& file_handle,
 
 google::protobuf::util::StatusOr<uint32_t> ChunkServerImpl::GetChunkVersion(
     const std::string& file_handle) {
-  // TODO(tugan,michael): use chunk file manager instead, when ready
-  if (!chunk_versions_.contains(file_handle)) {
-    return Status(google::protobuf::util::error::NOT_FOUND,
-                  absl::StrCat("File chunk is not found: ", file_handle));
-  } else {
-    return chunk_versions_[file_handle];
-  }
+   return file_manager_->GetChunkVersion(file_handle);
 }
 
 //

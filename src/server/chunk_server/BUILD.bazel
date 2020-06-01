@@ -44,11 +44,12 @@ cc_library(
     hdrs = ["file_chunk_manager.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//src/common:system_logger",
         "//src/protos:cc_chunk_server_proto",
         "//src/protos:cc_metadata_proto",
-        "//src/common:system_logger",
-        "@com_google_leveldb//:leveldb",
         "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/strings",
+        "@com_google_leveldb//:leveldb",
     ],
 )
 
@@ -76,6 +77,7 @@ cc_library(
     hdrs = ["chunk_server_impl.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":file_chunk_manager",
         "//src/common:config_manager",
         "//src/common:system_logger",
         "//src/common:utils",
