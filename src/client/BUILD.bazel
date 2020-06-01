@@ -21,6 +21,7 @@ cc_library(
     deps = [
         "//src/client:client_cache_manager",
         "//src/common:config_manager",
+        "//src/common:system_logger",
         "//src/common/protocol_client:chunk_server_service_gfs_client",
         "//src/common/protocol_client:grpc_client_utils",
         "//src/common/protocol_client:master_metadata_service_client",

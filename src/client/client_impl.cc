@@ -1,4 +1,5 @@
 #include "src/common/protocol_client/grpc_client_utils.h"
+#include "src/common/system_logger.h"
 #include "src/client/client_impl.h"
 
 using google::protobuf::util::Status;
@@ -19,19 +20,25 @@ void ClientImpl::cache_file_chunk_metadata(
       filename, chunk_index, chunk_handle));
   
   if (!set_chunk_handle_status.ok()) {
-    // TODO(Xi): if the above set fails, emit a log
+    LOG(ERROR) << "CacheManager failed to set chunk handle mapping for " 
+               << chunk_handle << "due to: " 
+               << set_chunk_handle_status.error_message();
     return;
   }
 
-  auto chunk_or(cache_manager_->GetChunkVersion(chunk_handle));
+  auto chunk_version_or(cache_manager_->GetChunkVersion(chunk_handle));
   // If this chunk version has not been cached, or the replied version is 
   // higher than the current one, we cache the version
-  if (!chunk_or.ok() || open_file_reply.metadata().version() > 
-          chunk_or.ValueOrDie()) {
-    cache_manager_->SetChunkVersion(chunk_handle, 
-                                    open_file_reply.metadata().version());
+  auto new_version(open_file_reply.metadata().version());
+  if (!chunk_version_or.ok() || new_version > chunk_version_or.ValueOrDie()) {
+    cache_manager_->SetChunkVersion(chunk_handle, new_version); 
   } else {
-    // TODO(Xi): Log error here
+    // Falling into this block means chnk_version_or.ok() is true and the 
+    // new version is less or equal than the current value
+    auto cur_version(chunk_version_or.ValueOrDie());
+    LOG(ERROR) << "Skip updating the version number for " << chunk_handle
+               << "because the current version " << cur_version 
+               << " >= " << "received " << new_version;
     return;
   }
 
