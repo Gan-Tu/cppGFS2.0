@@ -44,9 +44,22 @@ class ChunkServerImpl {
   std::shared_ptr<gfs::service::MasterChunkServerManagerServiceClient>
   GetMasterProtocolClient(const std::string& server_address);
 
+  // Register (create) a protocol client for talking to the master at |server_address|.
+  // Overwrite any existing connection.
+  void RegisterMasterProtocolClient(const std::string& server_address);
+
   // Similar to GetMasterProtocolClient, but for talking to chunk servers.
   std::shared_ptr<gfs::service::ChunkServerServiceChunkServerClient>
   GetChunkServerProtocolClient(const std::string& server_address);
+
+  // Report this chunkserver to master server. This is useful during chunk
+  // server startup to inform the master, that it is now available, report the
+  // stored chunks and available disk. This enables the master to start issuing
+  // chunk allocations to this server. This functionality enables chunkservers
+  // to be dynamically added to the cluster, they just need to report themselves
+  // and the master will become aware of them and start issuing chunk
+  // allocations to them. Returns true if successful and false otherwise.
+  bool ReportToMaster();
 
  private:
   ChunkServerImpl() = default;

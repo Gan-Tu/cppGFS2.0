@@ -1,7 +1,7 @@
+#include "src/client/client_impl.h"
 #include "src/common/protocol_client/grpc_client_utils.h"
 #include "src/common/system_logger.h"
 #include "src/common/utils.h"
-#include "src/client/client_impl.h"
 
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;

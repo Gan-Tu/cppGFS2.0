@@ -76,6 +76,7 @@ cc_library(
     hdrs = ["chunk_server_impl.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":file_chunk_manager",
         "//src/common:config_manager",
         "//src/common:system_logger",
         "//src/common:utils",

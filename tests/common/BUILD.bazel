@@ -1,5 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
 
+exports_files(["test_config.yml"])
+
 cc_test(
     name = "utils_test",
     srcs = ["utils_test.cc"],
