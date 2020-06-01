@@ -80,6 +80,7 @@ cc_library(
     name = "master_chunk_server_manager_service_impl",
     srcs = ["master_chunk_server_manager_service_impl.cc"],
     hdrs = ["master_chunk_server_manager_service_impl.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":chunk_server_manager",
         "//src/protos/grpc:cc_master_chunk_server_manager_service_grpc",
