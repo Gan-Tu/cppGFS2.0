@@ -127,7 +127,7 @@ google::protobuf::util::StatusOr<ReadFileChunkReply>
     common::SetClientContextDeadline(client_context, config_manager_);
 
     LOG(INFO) << "Issuing OpenFilRequest to read file " << filename
-              << "at chunk index " << chunk_index;
+              << " at chunk index " << chunk_index;
 
     // Issue OpenFileReply rpc and check stastus
     StatusOr<OpenFileReply> open_file_or(
@@ -182,27 +182,27 @@ google::protobuf::util::StatusOr<ReadFileChunkReply>
         chunk_server_service_client_[server_address]->SendRequest(
             read_file_chunk_request, client_context));
     
-    // Handle grpc error
+    // Handle grpc error, log and continue to try the next chunk server
     if (!read_file_chunk_reply_or.ok()) {
-      return read_file_chunk_reply_or.status();
+      LOG(ERROR) << "Read file chunk " << chunk_handle << " from "
+                 << server_address << " failed due to " 
+                 << read_file_chunk_reply_or.status().error_message();
+      continue;
     }
 
-    // Handle chunk status error
+    // Handle chunk status error, log and continue
     auto read_file_chunk_reply(read_file_chunk_reply_or.ValueOrDie());
     switch (read_file_chunk_reply.status()) {
       case ReadFileChunkReply::UNKNOWN:
-        return google::protobuf::util::Status(
-               google::protobuf::util::error::UNKNOWN,
-               "Unknown error while reading " + chunk_handle);
+        LOG(ERROR) << "Unknown error while reading " + chunk_handle;
+        continue; 
       case ReadFileChunkReply::FAILED_NOT_FOUND:
-        return google::protobuf::util::Status(
-               google::protobuf::util::error::NOT_FOUND,
-               "Chunk not found: " + chunk_handle);
+        LOG(ERROR) << "Chunk not found: " + chunk_handle;
+        continue;
       case ReadFileChunkReply::FAILED_STALE_VERSION:
-        return google::protobuf::util::Status(
-               google::protobuf::util::error::OUT_OF_RANGE,
-               "Reading stale version " + std::to_string(chunk_version) + 
-                   " for chunk " + chunk_handle);
+        LOG(ERROR) << "Reading stale version " << std::to_string(chunk_version)
+                   << " for chunk " + chunk_handle;
+        continue;
       default: break;
     }
 
@@ -213,10 +213,10 @@ google::protobuf::util::StatusOr<ReadFileChunkReply>
     return read_file_chunk_reply;
   }
 
-  // Not having this line results in copmiler warning (at least with g++)
+  // Failed to read from all chunk servers
   return google::protobuf::util::Status(
              google::protobuf::util::error::INTERNAL,
-             "Unknown error while reading " + chunk_handle);
+             "Failed to read from all chunk servers for " + chunk_handle);
 }
 
 google::protobuf::util::StatusOr<std::pair<size_t, void*>> 
