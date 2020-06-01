@@ -5,7 +5,7 @@
 #include "gtest/gtest.h"
 #include "src/server/chunk_server/file_chunk_manager.h"
 
-    using gfs::server::ChunkServerImpl;
+using gfs::server::ChunkServerImpl;
 using gfs::server::FileChunkManager;
 using google::protobuf::util::StatusOr;
 
