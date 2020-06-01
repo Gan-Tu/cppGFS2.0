@@ -14,6 +14,7 @@
 #include "src/server/master_server/metadata_manager.h"
 #include "tests/utils.h"
 
+// Config info for a semi-mocked chunk server
 const std::string kTestConfigPath = "tests/server/chunk_server/test_config.yml";
 const std::string kTestChunkServerName = "chunk_server_02";
 const uint32_t kTestChunkServerPort = 50053;
@@ -21,6 +22,7 @@ const std::string kTestChunkServerHostName = "0.0.0.0";
 const std::string kTestChunkServerAddress 
     = kTestChunkServerHostName + ":" + std::to_string(kTestChunkServerPort);
 
+// Config info for a semi-mocked master server
 const uint32_t kTestMasterServerPort = 50051;
 const std::string kTestMasterServerHostName = "0.0.0.0";
 const std::string kTestMasterServerName = "master_server_01";
@@ -123,17 +125,40 @@ void StartClient() {
   EXPECT_TRUE(init_status.ok());
 }
 
-class ChunkServerFileServiceTest : public ::testing::Test {
-};
-
-TEST_F(ChunkServerFileServiceTest, SimpleReadTest) {
-  StartClient();
+void SingleClientReadShortData() {
   auto read_result(gfs::client::read(short_data_filename.c_str(), 
                                      0, short_data.size()));
   if (!read_result.ok()) {
     std::cerr << read_result.status().error_message() << std::endl;
   }
   EXPECT_TRUE(read_result.ok());
+  // Make sure that the read data is expected
+  auto read_data(read_result.ValueOrDie());
+  EXPECT_EQ(read_data.bytes_read, short_data.size());
+  EXPECT_EQ(memcmp(read_data.buffer, short_data.c_str(), short_data.size()), 0);
+}
+
+class ChunkServerFileServiceTest : public ::testing::Test {
+};
+
+// Test a single client makes a read request of small data
+TEST_F(ChunkServerFileServiceTest, SimpleClientReadShortDataTest) {
+  StartClient();
+  SingleClientReadShortData();
+}
+
+// Test multiple clients conrrently make read request of small data
+TEST_F(ChunkServerFileServiceTest, ConcurrentClientReadShortDataTest) {
+  auto num_of_threads(20);
+  std::vector<std::thread> threads;
+  for (int i = 0; i < num_of_threads; i++) {
+    threads.push_back(std::thread([]() {
+        StartClient();
+        SingleClientReadShortData();
+    }));
+  }
+
+  tests::JoinAndClearThreads(threads);
 }
 
 int main(int argc, char** argv) {
