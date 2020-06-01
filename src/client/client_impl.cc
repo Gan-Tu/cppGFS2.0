@@ -20,9 +20,9 @@ void ClientImpl::cache_file_chunk_metadata(
       filename, chunk_index, chunk_handle));
   
   if (!set_chunk_handle_status.ok()) {
-    LOG(WARNING) << "CacheManager failed to set chunk handle mapping for " 
-                 << chunk_handle << "due to: " 
-                 << set_chunk_handle_status.error_message();
+    LOG(ERROR) << "CacheManager failed to set chunk handle mapping for " 
+               << chunk_handle << "due to: " 
+               << set_chunk_handle_status.error_message();
     return;
   }
 
@@ -36,9 +36,9 @@ void ClientImpl::cache_file_chunk_metadata(
     // Falling into this block means chnk_version_or.ok() is true and the 
     // new version is less or equal than the current value
     auto cur_version(chunk_version_or.ValueOrDie());
-    LOG(WARNING) << "Skip updating the version number for " << chunk_handle
-                 << "because the current version " << cur_version 
-                 << " >= " << "received " << new_version;
+    LOG(ERROR) << "Skip updating the version number for " << chunk_handle
+               << "because the current version " << cur_version 
+               << " >= " << "received " << new_version;
     return;
   }
 
