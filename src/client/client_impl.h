@@ -21,7 +21,14 @@ class ClientImpl {
  public:
   // Internal impl call that issues an OpenFileRequest to the master. 
   google::protobuf::util::Status CreateFile(const std::string& filename);
-    
+  
+  // Internal impl call that reads data from a file, the first return field
+  // is the bytes that actual got read and the second field is a pointer 
+  // to the actual data buffer
+  google::protobuf::util::StatusOr<std::pair<size_t, void*>> ReadFile(
+      const char* filename, size_t offset, size_t nbytes);
+  
+
   // Construct and return a ClientImpl objects with proper configurations 
   // using the given config file. The ClientImpl object uses the config 
   // file to initialize the cache manager and two clients objects used to 
@@ -41,6 +48,10 @@ class ClientImpl {
       const std::string& filename,
       const uint32_t chunk_index,
       const protos::grpc::OpenFileReply& open_file_reply);
+
+  // Internal function to read a file chunk
+  google::protobuf::util::StatusOr<protos::grpc::ReadFileChunkReply>
+      ReadFileChunk(const char* filename, size_t chunk_index, size_t nbytes); 
 
   // Reference to the configuration manager
   common::ConfigManager* config_manager_;
