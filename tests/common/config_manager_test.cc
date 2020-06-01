@@ -64,6 +64,13 @@ TEST_F(ConfigManagerTest, GetServerAddressTest) {
             "92.0.2.1:50051");
 }
 
+TEST_F(ConfigManagerTest, GetDatabaseNameTest) {
+  EXPECT_EQ(config_->GetDatabaseName("test_chunk_server_01"),
+            "data/test-gfs-db/test_chunk_server_01");
+  EXPECT_EQ(config_->GetDatabaseName("test_chunk_server_02"),
+            "data/test-gfs-db/test_chunk_server_02");
+}
+
 TEST_F(ConfigManagerTest, GetDiskMetadataTest) {
   EXPECT_EQ(config_->GetFileChunkBlockSize(), 64);
   EXPECT_EQ(config_->GetRequiredDiskSpaceToMaintain(), 100);

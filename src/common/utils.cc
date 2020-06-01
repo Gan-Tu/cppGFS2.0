@@ -193,6 +193,10 @@ google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node) {
     return google::protobuf::util::Status(
         google::protobuf::util::error::Code::INVALID_ARGUMENT,
         "missing: disk.min_free_disk_space_mb");
+  } else if (!node["disk"]["leveldb"].IsDefined()) {
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::Code::INVALID_ARGUMENT,
+        "missing: disk.leveldb");
   } else if (!node["timeout"]["grpc"].IsDefined()) {
     return google::protobuf::util::Status(
         google::protobuf::util::error::Code::INVALID_ARGUMENT,
@@ -228,6 +232,11 @@ google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node) {
         return google::protobuf::util::Status(
             google::protobuf::util::error::Code::INVALID_ARGUMENT,
             "missing: port for " + server_name);
+      } else if (server_type == "chunk_servers" &&
+                 !node["disk"]["leveldb"][server_name].IsDefined()) {
+        return google::protobuf::util::Status(
+            google::protobuf::util::error::Code::INVALID_ARGUMENT,
+            "missing: leveldb database name for " + server_name);
       }
       std::string hostname =
           node["network"][server_name]["hostname"].as<std::string>();

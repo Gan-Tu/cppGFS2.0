@@ -84,6 +84,10 @@ std::string ConfigManager::GetServerAddress(const std::string& server_name,
   }
 }
 
+std::string ConfigManager::GetDatabaseName(const std::string& server_name) {
+  return config_["disk"]["leveldb"][server_name].as<std::string>();
+}
+
 uint64_t ConfigManager::GetFileChunkBlockSize() {
   return config_["disk"]["block_size_mb"].as<uint64_t>();
 }

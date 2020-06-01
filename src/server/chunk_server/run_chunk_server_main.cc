@@ -48,8 +48,7 @@ int main(int argc, char** argv) {
   LOG(INFO) << "Server starting...";
 
   // Initialize the file chunk manager
-  // TODO(bmokutub): Pass the chunk_database_name as part of config mgr.
-  auto chunk_database_name = "/tmp/" + chunk_server_name + "db";
+  auto chunk_database_name = config->GetDatabaseName(chunk_server_name);
   auto max_chunk_size_bytes = config->GetFileChunkBlockSize() * 1024 * 1024;
   FileChunkManager::GetInstance()->Initialize(chunk_database_name,
                                               max_chunk_size_bytes);
