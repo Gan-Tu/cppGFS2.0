@@ -102,7 +102,7 @@ google::protobuf::util::StatusOr<std::string> FileChunkManager::ReadFromChunk(
   auto file_chunk = result.ValueOrDie();
 
   // Check that we aren't trying to read data that isn't there
-  if (start_offset >= file_chunk->data().length()) {
+  if (start_offset > file_chunk->data().length()) {
     return google::protobuf::util::Status(
         google::protobuf::util::error::OUT_OF_RANGE,
         absl::StrCat(

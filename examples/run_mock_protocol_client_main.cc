@@ -151,6 +151,9 @@ int main(int argc, char** argv) {
   // Prepare a mock gRPC: ReadFileChunk
   ReadFileChunkRequest read_file_request;
   read_file_request.set_chunk_handle("9d2a2342-97f9-11ea");
+  read_file_request.set_chunk_version(1);
+  read_file_request.set_offset_start(0);
+  read_file_request.set_length(10);
 
   grpc::ClientContext client_context6;
   LogRequestAndResponse(
@@ -186,6 +189,7 @@ int main(int argc, char** argv) {
   // Prepare a mock gRPC: AdvanceFileChunkVersion
   AdvanceFileChunkVersionRequest advance_version_request;
   advance_version_request.set_chunk_handle("9d2a2342-97f9-11ea");
+  advance_version_request.set_new_chunk_version(2);
 
   grpc::ClientContext client_context10;
   LogRequestAndResponse(advance_version_request,

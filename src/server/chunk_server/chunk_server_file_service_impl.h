@@ -4,6 +4,7 @@
 #include "grpcpp/grpcpp.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
 #include "src/server/chunk_server/chunk_server_impl.h"
+#include "src/server/chunk_server/file_chunk_manager.h"
 
 namespace gfs {
 namespace service {
@@ -50,6 +51,8 @@ class ChunkServerFileServiceImpl final
       protos::grpc::AdvanceFileChunkVersionReply* reply) override;
 
   gfs::server::ChunkServerImpl* chunk_server_impl_;
+  gfs::server::FileChunkManager* file_manager_ =
+      gfs::server::FileChunkManager::GetInstance();
 };
 
 // The asynchronous implementation for handling ChunkServerFileService requests

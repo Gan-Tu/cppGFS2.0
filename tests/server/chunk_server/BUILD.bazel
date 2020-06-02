@@ -49,6 +49,26 @@ cc_test(
 )
 
 cc_test(
+    name = "chunk_server_file_impl_test",
+    srcs = ["chunk_server_file_impl_test.cc"],
+    data = ["test_config.yml"],
+    deps = [
+        "//src/common/protocol_client:chunk_server_service_gfs_client",
+        "//src/common/protocol_client:chunk_server_service_server_client",
+        "//src/protos/grpc:cc_chunk_server_file_service_grpc",
+        "//src/protos/grpc:cc_chunk_server_lease_service_grpc",
+        "//src/server/chunk_server:chunk_server_file_service_impl",
+        "//src/server/chunk_server:chunk_server_impl",
+        "//src/server/chunk_server:chunk_server_lease_service_impl",
+        "//src/server/chunk_server:file_chunk_manager",
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/time",
+        "@com_google_protobuf//:protobuf_lite",
+        "@com_google_test//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "file_chunk_manager_test",
     srcs = ["file_chunk_manager_test.cc"],
     deps = [

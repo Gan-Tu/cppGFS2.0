@@ -115,7 +115,7 @@ MetadataManager::CreateChunkHandle(const std::string& filename,
     file_metadata->set_filename(filename);
     auto& chunk_handle_map(*file_metadata->mutable_chunk_handles());
 
-    // Return null UIDD if this chunk_index exists
+    // Return null UUID if this chunk_index exists
     if (chunk_handle_map.contains(chunk_index)) {
       return google::protobuf::util::Status(
           google::protobuf::util::error::ALREADY_EXISTS,
@@ -166,7 +166,7 @@ MetadataManager::GetChunkHandle(
   // Step 4. fetch the chunk handle
   auto const& chunk_handle_map(file_metadata->chunk_handles());
 
-  // If chunk_inde does not exist, return error
+  // If chunk_index does not exist, return error
   if (!chunk_handle_map.contains(chunk_index)) {
     return google::protobuf::util::Status(
         google::protobuf::util::error::NOT_FOUND,
@@ -238,7 +238,7 @@ google::protobuf::util::Status
 MetadataManager::RemovePrimaryChunkServerLocation(
     const std::string& chunk_handle) {
   // Remove the primary chunk server location by setting it to a default 
-  // loation, which has a null server host
+  // location, which has a null server host
   return SetPrimaryChunkServerLocation(
              chunk_handle, protos::ChunkServerLocation()); 
 }
@@ -253,8 +253,8 @@ MetadataManager::RemovePrimaryChunkServerLocation(
 //
 // We defer the removal of these entries from the above collections to
 // when the chunks have been garbage collected. By then we
-// 1) Remove the entry in file_metadata_ (TODO) there is stil a bit of 
-// detailed quesiton here as to how to detect the filename when garbage
+// 1) Remove the entry in file_metadata_ (TODO) there is still a bit of 
+// detailed question here as to how to detect the filename when garbage
 // collection occurs on chunk level
 // 2) Remove the entry in chunk_version_ and chunk_metadata_
 void MetadataManager::DeleteFileMetadata(const std::string& filename) {
