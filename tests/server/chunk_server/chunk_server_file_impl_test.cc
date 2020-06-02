@@ -38,7 +38,7 @@ const std::string kTestServerName = "chunk_server_03";
 const std::string kTestServerAddress = "0.0.0.0:50054";
 
 // Since we share the same test chunk server in the background, we let differnet
-// unit tests issue requests to *differnet* file handles, so the mutations
+// unit tests issue requests to *different* file handles, so the mutations
 // created by unit tests themselves don't interfere each other
 //
 // This is indeed not ideal, but does ther job for now
