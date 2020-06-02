@@ -288,12 +288,12 @@ void ClientImpl::RegisterChunkServerServiceClient(
     const std::string& server_address) {
   LOG(INFO) << "Establishing new connection to chunk server:" << server_address;
   chunk_server_service_client_[server_address] = 
-      new service::ChunkServerServiceGfsClient(grpc::CreateChannel(
+      std::make_shared<service::ChunkServerServiceGfsClient>(grpc::CreateChannel(
           server_address, grpc::InsecureChannelCredentials()));
 }
 
-service::ChunkServerServiceGfsClient* ClientImpl::GetChunkServerServiceClient(
-    const std::string& server_address) {
+std::shared_ptr<service::ChunkServerServiceGfsClient> 
+    ClientImpl::GetChunkServerServiceClient(const std::string& server_address) {
   if (!chunk_server_service_client_.contains(server_address)) {
     RegisterChunkServerServiceClient(server_address); 
   }
@@ -312,8 +312,8 @@ ClientImpl::ClientImpl(common::ConfigManager* config_manager,
                           master_name, resolve_hostname));
   auto credentials = grpc::InsecureChannelCredentials();
   auto master_channel(grpc::CreateChannel(master_address, credentials));
-  master_metadata_service_client_ = new service::MasterMetadataServiceClient(
-                                        master_channel); 
+  master_metadata_service_client_ = 
+      std::make_shared<service::MasterMetadataServiceClient>(master_channel); 
 
   // Instantiate the list of chunk service clients
   auto chunk_server_names(config_manager_->GetAllChunkServers());

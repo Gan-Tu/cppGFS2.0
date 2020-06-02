@@ -134,7 +134,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
       metadata_manager()->GetChunkHandle(filename, chunk_index));
 
   if (!chunk_handle_or.ok()) {
-    LOG(ERROR) << "Chunk handle not found: " 
+    LOG(ERROR) << "Error encountered when accessing chunk handle : " 
                << chunk_handle_or.status().error_message();
     return common::utils::ConvertProtobufStatusToGrpcStatus(
                chunk_handle_or.status());

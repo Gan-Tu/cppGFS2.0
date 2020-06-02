@@ -54,8 +54,8 @@ class ClientImpl {
                     size_t nbytes); 
 
   // Get the client end point for chunk server service client. 
-  service::ChunkServerServiceGfsClient* GetChunkServerServiceClient(
-      const std::string& server_address);
+  std::shared_ptr<service::ChunkServerServiceGfsClient> 
+      GetChunkServerServiceClient(const std::string& server_address);
 
   // Register a client end-point for chunk server service client
   void RegisterChunkServerServiceClient(const std::string& server_address);
@@ -67,13 +67,15 @@ class ClientImpl {
   CacheManager* cache_manager_;
   
   // Reference to the MasterMetadataService client
-  service::MasterMetadataServiceClient* master_metadata_service_client_;
+  std::shared_ptr<service::MasterMetadataServiceClient> 
+      master_metadata_service_client_;
 
   // Reference to ChunkServerServiceGfs clients which can be accessed by the
   // chunk server addresses, the client will have to connect to different 
   // chunk servers. 
-  absl::flat_hash_map<std::string, service::ChunkServerServiceGfsClient*> 
-      chunk_server_service_client_;
+  absl::flat_hash_map<std::string, 
+                      std::shared_ptr<service::ChunkServerServiceGfsClient>> 
+                          chunk_server_service_client_;
 };
 
 } // namespace client

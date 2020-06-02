@@ -30,8 +30,10 @@ const std::string kTestMasterServerAddress
     = kTestMasterServerHostName + ":" + std::to_string(kTestMasterServerPort);
 
 // Sample data used for testing
-const std::string short_data_filename("/short_data");
-const std::string short_data("Testing short data for read");
+const std::string kSmallDataFileName("/kSmallData");
+const std::string kSmallData("Testing short data for read");
+const std::string kSmallDataFileChunkHandle("0");
+const uint32_t kSmallDataFileChunkVersion(2);
 
 using gfs::common::ConfigManager;
 using gfs::server::ChunkServerImpl;
@@ -48,34 +50,32 @@ void SeedTestChunkData() {
   auto file_chunk_manager(FileChunkManager::GetInstance());
   file_chunk_manager->Initialize("file_service_test_db", 1000000);
   // Set up a short data for chunk_handle "0"
-  const std::string chunk_handle("0");
-  uint32_t version(1);
-  // Create a chunk
-  EXPECT_TRUE(file_chunk_manager->CreateChunk(chunk_handle, version).ok());
-  // Bump up the version
-  EXPECT_TRUE(
-      file_chunk_manager->UpdateChunkVersion(chunk_handle, 
-                                             version, version+1).ok());
-  version++;
+  const std::string chunk_handle(kSmallDataFileChunkHandle);
+  const uint32_t version(kSmallDataFileChunkVersion);
+  // Create a chunk with version 2
+  ASSERT_TRUE(file_chunk_manager->CreateChunk(chunk_handle, version).ok());
+  
   // Write to the chunk
   auto write_result = file_chunk_manager->WriteToChunk(
-      chunk_handle, version, /*start_offset=*/0, short_data.size(), short_data);
+      chunk_handle, version, /*start_offset=*/0, kSmallData.size(), kSmallData);
 
   // verify that all the data was written.
-  EXPECT_EQ(short_data.size(), write_result.ValueOrDie());
+  ASSERT_EQ(kSmallData.size(), write_result.ValueOrDie());
 }
 
 void SeedTestMetadata() {
   auto metadata_manager(MetadataManager::GetInstance());
-  // Create a chunk handle for short_data, and this chunk_handle will be "0"
-  EXPECT_TRUE(metadata_manager->CreateFileMetadata(short_data_filename).ok());
-  EXPECT_TRUE(metadata_manager->CreateChunkHandle(short_data_filename, 0).ok());
+  // Create a chunk handle for kSmallData, and this chunk_handle will be "0"
+  EXPECT_TRUE(metadata_manager->CreateFileMetadata(kSmallDataFileName).ok());
+  EXPECT_TRUE(metadata_manager->CreateChunkHandle(kSmallDataFileName, 0).ok());
   // Bump up the version to 2
-  EXPECT_TRUE(metadata_manager->AdvanceChunkVersion("0").ok());
-  EXPECT_TRUE(metadata_manager->AdvanceChunkVersion("0").ok());
+  EXPECT_TRUE(metadata_manager->AdvanceChunkVersion(kSmallDataFileChunkHandle)
+                  .ok());
+  EXPECT_TRUE(metadata_manager->AdvanceChunkVersion(kSmallDataFileChunkHandle)
+                  .ok());
   // Set the chunk server location to be the one used in this test
-  auto file_chunk_metadata(metadata_manager->GetFileChunkMetadata("0")
-                               .ValueOrDie());
+  auto file_chunk_metadata(metadata_manager->GetFileChunkMetadata(
+                               kSmallDataFileChunkHandle).ValueOrDie());
   file_chunk_metadata.mutable_locations()->Add(
       tests::ChunkServerLocationBuilder(kTestChunkServerHostName,
                                         kTestChunkServerPort));
@@ -126,24 +126,26 @@ void StartClient() {
 }
 
 // Helper funtion to perform a read request of a piece of data. It performs a
-// read request for the filename {data_filename}, at {offset} for {bytes}
+// read request for the filename {data_filename}, at {offset} for {length}
 // of data.       
 void SingleClientReadData(const std::string& data_filename,
                           const std::string& data, size_t offset, 
-                          size_t bytes) {
+                          size_t length) {
   size_t actual_read_bytes;
-  // Compute the actual bytes that we will read here
+  // Compute the actual bytes that we will read here. The reason of adding 
+  // an explicit check below is because data.size() and offset are unsigned int
+  // and directly minus may result in overflow and incorrect result.
+  // One could use the following expression for short (less reasable though):
+  //   actual_read_bytes = offset >= data.size() ? 0 : 
+  //                           std::min(data.size() - offset, length);
   if (offset >= data.size()) {
     actual_read_bytes = 0;
   } else {
-    actual_read_bytes = std::min(data.size() - offset, bytes);
+    actual_read_bytes = std::min(data.size() - offset, length);
   }
 
-  auto read_result(gfs::client::read(data_filename.c_str(), offset, bytes));
-  if (!read_result.ok()) {
-    std::cerr << read_result.status().error_message() << std::endl;
-  }
-  EXPECT_TRUE(read_result.ok());
+  auto read_result(gfs::client::read(data_filename.c_str(), offset, length));
+  EXPECT_TRUE(read_result.ok()) << "Failed to read: " << read_result.status();
   // Make sure that the read data is expected
   auto read_data(read_result.ValueOrDie());
   EXPECT_EQ(read_data.bytes_read, actual_read_bytes);
@@ -154,14 +156,14 @@ void SingleClientReadData(const std::string& data_filename,
 }
 
 void SingleClientReadShortData() {
-  size_t data_len(short_data.size());
+  size_t data_len(kSmallData.size());
   // Read full length
-  SingleClientReadData(short_data_filename, short_data, 0, data_len);
+  SingleClientReadData(kSmallDataFileName, kSmallData, 0, data_len);
   // Read second half length
-  SingleClientReadData(short_data_filename, short_data, data_len / 2, 
+  SingleClientReadData(kSmallDataFileName, kSmallData, data_len / 2, 
                        data_len - data_len / 2);  
   // Start from last quarter but try to read full length
-  SingleClientReadData(short_data_filename, short_data, data_len - data_len / 4,
+  SingleClientReadData(kSmallDataFileName, kSmallData, data_len - data_len / 4,
                        data_len);
 }
 
