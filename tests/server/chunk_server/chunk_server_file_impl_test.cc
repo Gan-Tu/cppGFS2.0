@@ -49,6 +49,10 @@ const std::string kTestData = "Hello, World! This is a dope test";
 
 namespace {
 void SeedTestData(ChunkServerImpl* chunk_server) {
+  // TODO(tugan): chunk_server is not used for now, but will be added in future
+  // pull request for seeding lease service's test data; I leave it here for 
+  // ease of integration later
+
   // initial chunks
   FileChunkManager* test_file_manager = FileChunkManager::GetInstance();
   test_file_manager->CreateChunk(kTestFileHandle, kTestFileVersion);
