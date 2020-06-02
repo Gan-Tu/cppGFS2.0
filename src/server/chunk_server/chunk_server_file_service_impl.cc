@@ -33,7 +33,7 @@ grpc::Status ChunkServerFileServiceImpl::InitFileChunk(
 grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
     ServerContext* context, const ReadFileChunkRequest* request,
     ReadFileChunkReply* reply) {
-  // TODO(someone): implement the GFS chunk server logic here
+  // TODO(Gan): implement the GFS chunk server logic here
   // The following impl may not be as complete as it should be as Xi needs
   // to get a minimal impl here so that the client's read can be tested
   auto file_chunk_manager = server::FileChunkManager::GetInstance();

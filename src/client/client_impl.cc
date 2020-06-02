@@ -254,6 +254,10 @@ google::protobuf::util::StatusOr<std::pair<size_t, void*>>
     auto file_chunk_data_or(ReadFileChunk(filename, chunk_index, 
                                           chunk_start_offset, bytes_to_read)); 
     // If one of the chunk's read fails, free the buffer and return 
+    // TODO(someone): there is a corner case here if the EOF happens to be
+    // the last byte of a chunk, then if we read the next chunk we ended up
+    // with reading pass EOF. A fix for this is to include a Status in 
+    // ReadFileChunkReply to indicate an EOF
     if (!file_chunk_data_or.ok()) {
       free(buffer);
       return file_chunk_data_or.status();
