@@ -153,6 +153,7 @@ grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
     LOG(INFO) << "Successfully updated file chunk " << request->chunk_handle()
               << " to version " << request->new_chunk_version();
     reply->set_status(AdvanceFileChunkVersionReply::OK);
+    reply->set_chunk_version(request->new_chunk_version());
     return grpc::Status::OK;
   } else if (status.error_code() == StatusCode::NOT_FOUND) {
     StatusOr<uint32_t> version_or =
