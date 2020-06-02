@@ -3,6 +3,7 @@
 #include "grpcpp/grpcpp.h"
 #include "src/common/system_logger.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
+#include "src/server/chunk_server/file_chunk_manager.h"
 
 using gfs::common::utils::ConvertProtobufStatusToGrpcStatus;
 using google::protobuf::util::Status;

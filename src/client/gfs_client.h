@@ -18,8 +18,11 @@ namespace client {
 // Data type for the return of read operation. This includes how many bytes
 // have been read and a pointer of the buffer
 struct Data {
-  int bytesRead;
+  size_t bytes_read;
   void* buffer;
+  Data() : bytes_read(0), buffer(nullptr) {}
+  Data(size_t _bytes_read, void* _buffer) : bytes_read(_bytes_read), 
+                                            buffer(_buffer) {}
 };
 
 // Initialization function that a user should call before using any of the 

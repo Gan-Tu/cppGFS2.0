@@ -11,6 +11,9 @@
 namespace gfs {
 namespace common {
 
+// Constant values that are frequently referred to in the impls
+size_t const bytesPerMb = 1024 * 1024;
+
 // Define an intrinsically thread-safe flat hash map by parallel hashmap
 // The default definition assumes no internal lock and requires users
 // to pragmatically synchronize concurrent read and write to the parallel

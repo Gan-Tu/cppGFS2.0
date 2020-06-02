@@ -24,6 +24,7 @@ cc_library(
         ":file_chunk_manager",
         "//src/common:system_logger",
         "//src/protos/grpc:cc_chunk_server_file_service_grpc",
+        "//src/server/chunk_server:file_chunk_manager",
         "@com_github_grpc_grpc//:grpc++",
     ],
 )
