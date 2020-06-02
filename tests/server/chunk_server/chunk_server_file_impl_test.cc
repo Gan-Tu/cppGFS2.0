@@ -24,8 +24,12 @@ using gfs::service::ChunkServerServiceMasterServerClient;
 using google::protobuf::util::StatusOr;
 using grpc::Server;
 using grpc::ServerBuilder;
-using protos::grpc::GrantLeaseRequest;
-using protos::grpc::RevokeLeaseRequest;
+using protos::grpc::AdvanceFileChunkVersionReply;
+using protos::grpc::AdvanceFileChunkVersionRequest;
+using protos::grpc::InitFileChunkReply;
+using protos::grpc::InitFileChunkRequest;
+using protos::grpc::ReadFileChunkReply;
+using protos::grpc::ReadFileChunkRequest;
 
 const std::string kTestConfigPath = "tests/server/chunk_server/test_config.yml";
 const std::string kTestServerName = "chunk_server_01";
@@ -99,6 +103,24 @@ class ChunkServerFileImplTest : public ::testing::Test {
 };
 
 TEST_F(ChunkServerFileImplTest, Basic) { EXPECT_TRUE(true); }
+
+TEST_F(ChunkServerFileImplTest, InitFileChunk) {
+  InitFileChunkRequest req;
+  req.set_chunk_handle("init-chunk-test-handle");
+
+  // The chunk handle doesn't exist yet, so it should succeed
+  grpc::ClientContext client_context;
+  auto reply_or = master_server_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(), InitFileChunkReply::CREATED);
+
+  // We just initialized the chunk, so re-initialize it should error
+  grpc::ClientContext client_context_2;
+  auto reply_or2 = master_server_client_->SendRequest(req, client_context_2);
+  EXPECT_TRUE(reply_or2.ok());
+  EXPECT_EQ(reply_or2.ValueOrDie().status(),
+            InitFileChunkReply::ALREADY_EXISTS);
+}
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
