@@ -14,6 +14,24 @@ cc_test(
 )
 
 cc_test(
+    name = "chunk_server_file_impl_asyc_test",
+    srcs = ["chunk_server_file_impl_asyc_test.cc"],
+    data = ["test_config.yml"],
+    deps = [
+        "//src/client:gfs_client",
+        "//src/common:config_manager",
+        "//src/server/chunk_server:chunk_server_impl",
+        "//src/server/chunk_server:chunk_server_file_service_impl",
+        "//src/server/chunk_server:file_chunk_manager",
+        "//src/server/master_server:master_metadata_service_impl",
+        "//src/server/master_server:metadata_manager",
+        "//tests:utils",
+        "@com_google_protobuf//:protobuf_lite",
+        "@com_google_test//:gtest_main",
+    ]
+)
+
+cc_test(
     name = "chunk_server_lease_impl_test",
     srcs = ["chunk_server_lease_impl_test.cc"],
     data = ["test_config.yml"],

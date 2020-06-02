@@ -2,6 +2,7 @@
 
 #include "grpcpp/grpcpp.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
+#include "src/server/chunk_server/file_chunk_manager.h"
 
 using grpc::ServerContext;
 using protos::grpc::AdvanceFileChunkVersionReply;
@@ -32,8 +33,24 @@ grpc::Status ChunkServerFileServiceImpl::InitFileChunk(
 grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
     ServerContext* context, const ReadFileChunkRequest* request,
     ReadFileChunkReply* reply) {
-  // TODO(someone): implement the GFS chunk server logic here
-  return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+  // TODO(Gan): implement the GFS chunk server logic here
+  // The following impl may not be as complete as it should be as Xi needs
+  // to get a minimal impl here so that the client's read can be tested
+  auto file_chunk_manager = server::FileChunkManager::GetInstance();
+  auto read_from_chunk_or(file_chunk_manager->ReadFromChunk(
+                              request->chunk_handle(), request->chunk_version(),
+                              request->offset_start(), request->length()));
+  if (!read_from_chunk_or.ok()) {
+    return common::utils::ConvertProtobufStatusToGrpcStatus(
+               read_from_chunk_or.status()); 
+  }
+  
+  auto read_data(read_from_chunk_or.ValueOrDie());
+  reply->set_status(ReadFileChunkReply::OK);
+  reply->set_data(read_data);
+  reply->set_bytes_read(read_data.size());
+
+  return grpc::Status::OK;
 }
 
 grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(

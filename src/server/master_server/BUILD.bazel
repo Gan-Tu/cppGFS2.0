@@ -4,6 +4,8 @@ cc_library(
     name = "master_metadata_service_impl",
     srcs = ["master_metadata_service_impl.cc"],
     hdrs = ["master_metadata_service_impl.h"],
+    # Make this module public for testing purpose 
+    visibility = ["//visibility:public"],
     deps = [
         "//src/common:config_manager",
         "//src/common:system_logger",

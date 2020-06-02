@@ -40,9 +40,9 @@ google::protobuf::util::Status init_client(const std::string& config_filename,
 google::protobuf::util::Status open(const char* filename, unsigned int flags) {
   // Make sure that init_client is called as a pre-condition
   if (!client_impl_) {
-    return  google::protobuf::util::Status(
-                google::protobuf::util::error::FAILED_PRECONDITION,
-                "init_client must be called before calling client APIs");
+    return google::protobuf::util::Status(
+               google::protobuf::util::error::FAILED_PRECONDITION,
+               "init_client must be called before calling client APIs");
   }
    
   // Check and validate the flags, e.g. it doesn't make sense to 
@@ -80,7 +80,28 @@ google::protobuf::util::Status close(const char* filename) {
 
 google::protobuf::util::StatusOr<Data> read(const char* filename, size_t offset,
                                             size_t nbytes) {
-  return Data();
+  // Make sure that init_client is called as a pre-condition
+  if (!client_impl_) {
+    return google::protobuf::util::Status(
+               google::protobuf::util::error::FAILED_PRECONDITION,
+               "init_client must be called before calling client APIs");
+  }
+
+  // Check and validate the filename
+  auto check_filename_status(common::utils::CheckFilenameValidity(filename));
+  if (!check_filename_status.ok()) {
+    return check_filename_status;
+
+  }
+
+  auto read_data_or(client_impl_->ReadFile(filename, offset, nbytes));
+  // Return error status if read fails
+  if (!read_data_or.ok()) {
+    return read_data_or.status();
+  }
+
+  return Data(read_data_or.ValueOrDie().first, 
+              read_data_or.ValueOrDie().second);
 }
 
 google::protobuf::util::Status write(const char* path, void* buffer,
