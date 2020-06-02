@@ -50,7 +50,8 @@ class ClientImpl {
 
   // Internal function to read a file chunk
   google::protobuf::util::StatusOr<protos::grpc::ReadFileChunkReply>
-      ReadFileChunk(const char* filename, size_t chunk_index, size_t nbytes); 
+      ReadFileChunk(const char* filename, size_t chunk_index, size_t offset, 
+                    size_t nbytes); 
 
   // Reference to the configuration manager
   common::ConfigManager* config_manager_;

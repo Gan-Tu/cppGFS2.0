@@ -125,19 +125,44 @@ void StartClient() {
   EXPECT_TRUE(init_status.ok());
 }
 
-void SingleClientReadShortData() {
-  auto read_result(gfs::client::read(short_data_filename.c_str(), 
-                                     0, short_data.size()));
+// Helper funtion to perform a read request of a piece of data. It performs a
+// read request for the filename {data_filename}, at {offset} for {bytes}
+// of data.       
+void SingleClientReadData(const std::string& data_filename,
+                          const std::string& data, size_t offset, 
+                          size_t bytes) {
+  size_t actual_read_bytes;
+  // Compute the actual bytes that we will read here
+  if (offset >= data.size()) {
+    actual_read_bytes = 0;
+  } else {
+    actual_read_bytes = std::min(data.size() - offset, bytes);
+  }
+
+  auto read_result(gfs::client::read(data_filename.c_str(), offset, bytes));
   if (!read_result.ok()) {
     std::cerr << read_result.status().error_message() << std::endl;
   }
   EXPECT_TRUE(read_result.ok());
   // Make sure that the read data is expected
   auto read_data(read_result.ValueOrDie());
-  EXPECT_EQ(read_data.bytes_read, short_data.size());
-  EXPECT_EQ(memcmp(read_data.buffer, short_data.c_str(), short_data.size()), 0);
+  EXPECT_EQ(read_data.bytes_read, actual_read_bytes);
+  EXPECT_EQ(memcmp(read_data.buffer, data.c_str() + offset, 
+                   read_data.bytes_read), 0);
   // Cleanup to prevent memory leak
   free(read_data.buffer);
+}
+
+void SingleClientReadShortData() {
+  size_t data_len(short_data.size());
+  // Read full length
+  SingleClientReadData(short_data_filename, short_data, 0, data_len);
+  // Read second half length
+  SingleClientReadData(short_data_filename, short_data, data_len / 2, 
+                       data_len - data_len / 2);  
+  // Start from last quarter but try to read full length
+  SingleClientReadData(short_data_filename, short_data, data_len - data_len / 4,
+                       data_len);
 }
 
 // TODO(Gan): refactor / rewrite this test for more cases 

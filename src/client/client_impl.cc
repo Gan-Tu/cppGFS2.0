@@ -84,7 +84,7 @@ google::protobuf::util::Status ClientImpl::CreateFile(
 
 google::protobuf::util::StatusOr<ReadFileChunkReply>
     ClientImpl::ReadFileChunk(const char* filename, size_t chunk_index, 
-                              size_t nbytes) {
+                              size_t offset, size_t nbytes) {
   // First check if the cache manager has file chunk metadata for this chunk
   bool file_chunk_metadata_in_cache(true);
   std::string chunk_handle;
@@ -166,10 +166,7 @@ google::protobuf::util::StatusOr<ReadFileChunkReply>
     ReadFileChunkRequest read_file_chunk_request;
     read_file_chunk_request.set_chunk_handle(chunk_handle);
     read_file_chunk_request.set_chunk_version(chunk_version);
-    // We start reading from the beginning of this chunk, where the offset
-    // equals to chunk_index * common::bytesPerMb
-    read_file_chunk_request.set_offset_start(chunk_index * 
-                                                 common::bytesPerMb);
+    read_file_chunk_request.set_offset_start(offset);
     read_file_chunk_request.set_length(nbytes);
     // Access the client-end-point for contacting the chunk server
     auto server_address(location.server_hostname()+":" + 
@@ -221,10 +218,18 @@ google::protobuf::util::StatusOr<ReadFileChunkReply>
 
 google::protobuf::util::StatusOr<std::pair<size_t, void*>> 
     ClientImpl::ReadFile(const char* filename, size_t offset, size_t nbytes) {
+  const size_t chunk_block_size(config_manager_->GetFileChunkBlockSize() * 
+                              common::bytesPerMb);
   // Record the number of bytes that we already read
   size_t bytes_read(0);
   // Record the number of bytes to read
   size_t remain_bytes(nbytes);
+  // A flag to detect EOF
+  bool eof(false);
+  // A variable that keeps track of the start_offset for each chunk. This is
+  // equal to offset % chunk_block_size for the first chunk and 0 for the 
+  // following chunks
+  size_t chunk_start_offset(offset % chunk_block_size);
 
   // We simply allocate the necessary size for the buffer. There is a 
   // possibility that we may not read up to nbytes, but it is ok to pass
@@ -236,15 +241,13 @@ google::protobuf::util::StatusOr<std::pair<size_t, void*>>
                "Not enough memory: malloc fails");
   }
 
-  size_t chunk_block_size(config_manager_->GetFileChunkBlockSize() * 
-                              common::bytesPerMb);
-
   for (size_t chunk_index = offset / chunk_block_size; 
-       chunk_index * common::bytesPerMb < offset + nbytes;
-       chunk_index++) {
+       remain_bytes > 0 && !eof; chunk_index++) {
+    // Calculate the bytes to be read, which is the min value of the remaining
+    // bytes and the chunk size
+    size_t bytes_to_read(std::min(remain_bytes, chunk_block_size));
     auto file_chunk_data_or(ReadFileChunk(filename, chunk_index, 
-                                          std::min(remain_bytes, 
-                                                   common::bytesPerMb)));
+                                          chunk_start_offset, bytes_to_read)); 
     // If one of the chunk's read fails, free the buffer and return 
     if (!file_chunk_data_or.ok()) {
       free(buffer);
@@ -257,9 +260,16 @@ google::protobuf::util::StatusOr<std::pair<size_t, void*>>
         file_chunk_data_or.ValueOrDie().data().c_str());
     memmove((char*)buffer + bytes_read, chunk_buffer_read, chunk_bytes_read);
 
-    // Update the bytes_read and remain_bytes counts
+    // Update chunk_start_offset,  bytes_read and remain_bytes counts
+    // Starting from the second chunk, chunk_start_offset is zero
+    chunk_start_offset = 0;
     bytes_read += chunk_bytes_read;
     remain_bytes -= chunk_bytes_read;
+
+    // Detect EOF if the actual bytes read < bytes-to-read
+    // TODO(someone): maybe we should include a Status in the 
+    // ReadFileChunkReply to indicate an EOF
+    eof = chunk_bytes_read < bytes_to_read;
   }
 
   return std::make_pair(bytes_read, buffer);
