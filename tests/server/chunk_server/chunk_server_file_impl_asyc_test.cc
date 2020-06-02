@@ -66,12 +66,12 @@ void SeedTestChunkData() {
 void SeedTestMetadata() {
   auto metadata_manager(MetadataManager::GetInstance());
   // Create a chunk handle for kSmallData, and this chunk_handle will be "0"
-  EXPECT_TRUE(metadata_manager->CreateFileMetadata(kSmallDataFileName).ok());
-  EXPECT_TRUE(metadata_manager->CreateChunkHandle(kSmallDataFileName, 0).ok());
+  ASSERT_TRUE(metadata_manager->CreateFileMetadata(kSmallDataFileName).ok());
+  ASSERT_TRUE(metadata_manager->CreateChunkHandle(kSmallDataFileName, 0).ok());
   // Bump up the version to 2
-  EXPECT_TRUE(metadata_manager->AdvanceChunkVersion(kSmallDataFileChunkHandle)
+  ASSERT_TRUE(metadata_manager->AdvanceChunkVersion(kSmallDataFileChunkHandle)
                   .ok());
-  EXPECT_TRUE(metadata_manager->AdvanceChunkVersion(kSmallDataFileChunkHandle)
+  ASSERT_TRUE(metadata_manager->AdvanceChunkVersion(kSmallDataFileChunkHandle)
                   .ok());
   // Set the chunk server location to be the one used in this test
   auto file_chunk_metadata(metadata_manager->GetFileChunkMetadata(
