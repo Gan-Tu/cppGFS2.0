@@ -53,6 +53,13 @@ class ClientImpl {
       ReadFileChunk(const char* filename, size_t chunk_index, size_t offset, 
                     size_t nbytes); 
 
+  // Get the client end point for chunk server service client. 
+  service::ChunkServerServiceGfsClient* GetChunkServerServiceClient(
+      const std::string& server_address);
+
+  // Register a client end-point for chunk server service client
+  void RegisterChunkServerServiceClient(const std::string& server_address);
+
   // Reference to the configuration manager
   common::ConfigManager* config_manager_;
 

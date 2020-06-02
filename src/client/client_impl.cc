@@ -174,9 +174,14 @@ google::protobuf::util::StatusOr<ReadFileChunkReply>
     // Prepare the client context 
     grpc::ClientContext client_context;  
     common::SetClientContextDeadline(client_context, config_manager_); 
+    // Create a client end point if it does not exist, this can happen if
+    // a new chunk server joins
+    auto chunk_server_service_client(
+        GetChunkServerServiceClient(server_address));
+
     // Issue ReadFileChunkRequest and check status
     StatusOr<ReadFileChunkReply> read_file_chunk_reply_or(
-        chunk_server_service_client_[server_address]->SendRequest(
+        chunk_server_service_client->SendRequest(
             read_file_chunk_request, client_context));
     
     // Handle grpc error, log and continue to try the next chunk server
@@ -275,6 +280,22 @@ google::protobuf::util::StatusOr<std::pair<size_t, void*>>
   return std::make_pair(bytes_read, buffer);
 }
 
+void ClientImpl::RegisterChunkServerServiceClient(
+    const std::string& server_address) {
+  LOG(INFO) << "Establishing new connection to chunk server:" << server_address;
+  chunk_server_service_client_[server_address] = 
+      new service::ChunkServerServiceGfsClient(grpc::CreateChannel(
+          server_address, grpc::InsecureChannelCredentials()));
+}
+
+service::ChunkServerServiceGfsClient* ClientImpl::GetChunkServerServiceClient(
+    const std::string& server_address) {
+  if (!chunk_server_service_client_.contains(server_address)) {
+    RegisterChunkServerServiceClient(server_address); 
+  }
+  return chunk_server_service_client_[server_address];
+}
+
 ClientImpl::ClientImpl(common::ConfigManager* config_manager, 
     const std::string& master_name, const bool resolve_hostname) 
        : config_manager_(config_manager) {
@@ -295,10 +316,7 @@ ClientImpl::ClientImpl(common::ConfigManager* config_manager,
   for(auto const& chunk_server_name : chunk_server_names) {
     auto chunk_server_address(config_manager_->GetServerAddress(
                                   chunk_server_name, resolve_hostname));
-    auto chunk_server_channel(grpc::CreateChannel(
-                                  chunk_server_address, credentials));
-    chunk_server_service_client_[chunk_server_address] = 
-        new service::ChunkServerServiceGfsClient(chunk_server_channel);
+    RegisterChunkServerServiceClient(chunk_server_address);
   }
 }
 
