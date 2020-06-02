@@ -14,8 +14,8 @@ cc_test(
 )
 
 cc_test(
-    name = "chunk_server_file_service_test",
-    srcs = ["chunk_server_file_service_test.cc"],
+    name = "chunk_server_file_impl_asyc_test",
+    srcs = ["chunk_server_file_impl_asyc_test.cc"],
     data = ["test_config.yml"],
     deps = [
         "//src/client:gfs_client",
