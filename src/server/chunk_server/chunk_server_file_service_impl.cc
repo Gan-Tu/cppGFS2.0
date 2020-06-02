@@ -100,9 +100,10 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
         reply->set_status(ReadFileChunkReply::FAILED_NOT_FOUND);
         return grpc::Status::OK;
       } else {  // internal errors
-        LOG(ERROR) << "Unexpected error when reading the file chunk version: "
-                   << version_or.status();
-        return ConvertProtobufStatusToGrpcStatus(data_or.status());
+        LOG(ERROR) << "Unexpected error when reading the file chunk "
+                   << request->chunk_handle()
+                   << " of version: " << version_or.status();
+        return ConvertProtobufStatusToGrpcStatus(version_or.status());
       }
     } else {
       // NOT FOUND: stale version
@@ -131,8 +132,54 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
 grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
     ServerContext* context, const AdvanceFileChunkVersionRequest* request,
     AdvanceFileChunkVersionReply* reply) {
-  // TODO(someone): implement the GFS chunk server logic here
-  return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+  LOG(INFO) << "Received AdvanceFileChunkVersion:" << (*request).DebugString();
+  *reply->mutable_request() = *request;
+
+  // Per AdvanceFileVersion gRPC definition, we only advance version by one
+  const uint32_t from_version = request->new_chunk_version() - 1;
+  LOG(INFO) << "Trying to advance the version of file chunk "
+            << request->chunk_handle() << " from version " << from_version
+            << " to version " << request->new_chunk_version();
+  Status status = file_manager_->UpdateChunkVersion(
+      request->chunk_handle(), from_version, request->new_chunk_version());
+
+  if (status.ok()) {
+    LOG(INFO) << "Successfully updated file chunk " << request->chunk_handle()
+              << " to version " << request->new_chunk_version();
+    reply->set_status(AdvanceFileChunkVersionReply::OK);
+    return grpc::Status::OK;
+  } else if (status.error_code() == StatusCode::NOT_FOUND) {
+    StatusOr<uint32_t> version_or =
+        file_manager_->GetChunkVersion(request->chunk_handle());
+    if (!version_or.ok()) {
+      // NOT FOUND: file handle
+      if (version_or.status().error_code() == StatusCode::NOT_FOUND) {
+        LOG(ERROR)
+            << "Cannot advance file chunk version because it is not found: "
+            << request->chunk_handle();
+        reply->set_status(AdvanceFileChunkVersionReply::FAILED_NOT_FOUND);
+        return grpc::Status::OK;
+      } else {  // internal errors
+        LOG(ERROR) << "Unexpected error when reading the file chunk "
+                   << request->chunk_handle()
+                   << " of version: " << version_or.status();
+        return ConvertProtobufStatusToGrpcStatus(version_or.status());
+      }
+    } else {
+      // NOT FOUND: stale version
+      LOG(ERROR) << "Cannot advance file chunk, because version is out of sync "
+                 << request->chunk_handle();
+      LOG(ERROR) << "Chunk server has version " << version_or.ValueOrDie()
+                 << " but the request tries to update version from "
+                 << from_version << " to " << request->new_chunk_version();
+      reply->set_status(
+          AdvanceFileChunkVersionReply::FAILED_VERSION_OUT_OF_SYNC);
+      return grpc::Status::OK;
+    }
+  } else {
+    LOG(ERROR) << "Unexpected error when advancing chunk version: " << status;
+    return ConvertProtobufStatusToGrpcStatus(status);
+  }
 }
 
 grpc::Status ChunkServerFileServiceImpl::ApplyMutations(
