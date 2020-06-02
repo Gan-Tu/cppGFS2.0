@@ -31,10 +31,11 @@ grpc::Status ChunkServerFileServiceImpl::InitFileChunk(
   LOG(INFO) << "Received InitFileChunkRequest:" << (*request).DebugString();
   *reply->mutable_request() = *request;
 
-  LOG(INFO) << "Preparing redo logs for InitFileChunk of file handle: "
+  LOG(INFO) << "Preparing redo/undo logs for InitFileChunk of file handle: "
             << request->chunk_handle();
   // TODO: may not be necessary depending on how crash-resistent we want to be
-  LOG(INFO) << "InitFileChunk redo logs prepared: " << request->chunk_handle();
+  LOG(INFO) << "InitFileChunk redo/undo logs prepared: "
+            << request->chunk_handle();
 
   LOG(INFO) << "Trying to create the file chunk with initial version of 1: "
             << request->chunk_handle();
@@ -61,10 +62,7 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
   LOG(INFO) << "Received ReadFileChunkRequest:" << (*request).DebugString();
   *reply->mutable_request() = *request;
 
-  LOG(INFO) << "Preparing redo logs for ReadFileChunk of file handle: "
-            << request->chunk_handle();
-  // TODO: may not be necessary depending on how crash-resistent we want to be
-  LOG(INFO) << "ReadFileChunk redo logs prepared: " << request->chunk_handle();
+  // No redo/undo logs needed for reads, since there are no state changes
 
   LOG(INFO) << "Trying to read the file chunk " << request->chunk_handle()
             << " of version " << request->chunk_version() << " from offset "
