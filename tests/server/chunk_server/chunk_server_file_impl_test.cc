@@ -32,8 +32,10 @@ using protos::grpc::ReadFileChunkReply;
 using protos::grpc::ReadFileChunkRequest;
 
 const std::string kTestConfigPath = "tests/server/chunk_server/test_config.yml";
-const std::string kTestServerName = "chunk_server_01";
-const std::string kTestServerAddress = "0.0.0.0:50052";
+// Initialize this test on port 50052, so it doesn't conflict with lease test
+// when running both using Bazel at the same time
+const std::string kTestServerName = "chunk_server_02";
+const std::string kTestServerAddress = "0.0.0.0:50053";
 
 // Since we share the same test chunk server in the background, we let differnet
 // unit tests issue requests to *differnet* file handles, so the mutations
