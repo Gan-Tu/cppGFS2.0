@@ -125,7 +125,8 @@ message ReadFileChunkReply {
     UNKNOWN = 0;
     OK = 1;
     FAILED_NOT_FOUND = 2;
-    FAILED_STALE_VERSION = 3;
+    FAILED_VERSION_OUT_OF_SYNC = 3;
+    FAILED_OUT_OF_RANGE = 4;
   }
   ReadFileChunkStatus status = 2;
   // The read data, if operation is successful

@@ -91,7 +91,7 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
     LOG(ERROR) << "Cannot read file chunk because the requested offset is out"
                << " of range for " << request->chunk_handle() << ": "
                << data_or.status().ToString();
-    reply->set_status(ReadFileChunkReply::UNKNOWN);
+    reply->set_status(ReadFileChunkReply::FAILED_OUT_OF_RANGE);
     return grpc::Status::OK;
   } else if (data_or.status().error_code() == StatusCode::NOT_FOUND) {
     StatusOr<uint32_t> version_or =
@@ -117,7 +117,7 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
       LOG(ERROR) << "Chunk server has version " << version_or.ValueOrDie()
                  << " but a different version is requested: "
                  << request->chunk_version();
-      reply->set_status(ReadFileChunkReply::FAILED_STALE_VERSION);
+      reply->set_status(ReadFileChunkReply::FAILED_VERSION_OUT_OF_SYNC);
       return grpc::Status::OK;
     }
   } else {

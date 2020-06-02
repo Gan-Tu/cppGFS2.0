@@ -34,8 +34,8 @@ using protos::grpc::ReadFileChunkRequest;
 const std::string kTestConfigPath = "tests/server/chunk_server/test_config.yml";
 // Initialize this test on port 50052, so it doesn't conflict with lease test
 // when running both using Bazel at the same time
-const std::string kTestServerName = "chunk_server_02";
-const std::string kTestServerAddress = "0.0.0.0:50053";
+const std::string kTestServerName = "chunk_server_03";
+const std::string kTestServerAddress = "0.0.0.0:50054";
 
 // Since we share the same test chunk server in the background, we let differnet
 // unit tests issue requests to *differnet* file handles, so the mutations
@@ -50,7 +50,7 @@ const std::string kTestData = "Hello, World! This is a dope test";
 namespace {
 void SeedTestData(ChunkServerImpl* chunk_server) {
   // TODO(tugan): chunk_server is not used for now, but will be added in future
-  // pull request for seeding lease service's test data; I leave it here for 
+  // pull request for seeding lease service's test data; I leave it here for
   // ease of integration later
 
   // initial chunks
@@ -246,14 +246,25 @@ TEST_F(ChunkServerFileImplTest, ReadFileChunkNoChunkVersion) {
       gfs_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
   EXPECT_EQ(reply_or.ValueOrDie().status(),
-            ReadFileChunkReply::FAILED_STALE_VERSION);
+            ReadFileChunkReply::FAILED_VERSION_OUT_OF_SYNC);
 
   req.set_chunk_version(kTestFileVersion - 1);
   grpc::ClientContext client_context2;
   reply_or = gfs_client_->SendRequest(req, client_context2);
   EXPECT_TRUE(reply_or.ok());
   EXPECT_EQ(reply_or.ValueOrDie().status(),
-            ReadFileChunkReply::FAILED_STALE_VERSION);
+            ReadFileChunkReply::FAILED_VERSION_OUT_OF_SYNC);
+}
+
+TEST_F(ChunkServerFileImplTest, ReadFileChunkOKOutOfRange) {
+  ReadFileChunkRequest req = MakeValidReadFileChunkRequest();
+  req.set_offset_start(kTestData.length() + 2);
+
+  grpc::ClientContext client_context;
+  auto reply_or = gfs_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(),
+            ReadFileChunkReply::FAILED_OUT_OF_RANGE);
 }
 
 //
