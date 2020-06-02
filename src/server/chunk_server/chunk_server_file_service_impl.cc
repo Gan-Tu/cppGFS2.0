@@ -41,16 +41,19 @@ grpc::Status ChunkServerFileServiceImpl::InitFileChunk(
             << request->chunk_handle();
   Status status = file_manager_->CreateChunk(request->chunk_handle(), 1);
   if (status.ok()) {
+    // SUCCESS
     LOG(INFO) << "Initial empty file chunk successfully created: "
               << request->chunk_handle();
     reply->set_status(InitFileChunkReply::CREATED);
     return grpc::Status::OK;
   } else if (status.error_code() == StatusCode::ALREADY_EXISTS) {
+    // ALREADY EXISTS
     LOG(ERROR) << "Cannot initialize file chunk because it already exits: "
                << request->chunk_handle();
     reply->set_status(InitFileChunkReply::ALREADY_EXISTS);
     return grpc::Status::OK;
   } else {
+    // INTERNAL ERROR
     LOG(ERROR) << "Unexpected error when initializing file chunk: " << status;
     return ConvertProtobufStatusToGrpcStatus(status);
   }
@@ -75,7 +78,7 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
       request->offset_start(), request->length());
 
   if (data_or.ok()) {
-    // If successful, set and return the data and bytes read
+    // SUCCESS
     reply->set_status(ReadFileChunkReply::OK);
     reply->set_data(data_or.ValueOrDie());
     reply->set_bytes_read(reply->data().length());
@@ -83,7 +86,7 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
               << request->chunk_handle();
     return grpc::Status::OK;
   } else if (data_or.status().error_code() == StatusCode::OUT_OF_RANGE) {
-    // Return out of range errors, if any
+    // OUT OF RANGE
     LOG(ERROR) << "Cannot read file chunk because the requested offset is out"
                << " of range for " << request->chunk_handle() << ": "
                << data_or.status().ToString();
@@ -99,7 +102,8 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
                    << request->chunk_handle();
         reply->set_status(ReadFileChunkReply::FAILED_NOT_FOUND);
         return grpc::Status::OK;
-      } else {  // internal errors
+      } else {
+        // INTERNAL ERROR
         LOG(ERROR) << "Unexpected error when reading the file chunk "
                    << request->chunk_handle()
                    << " of version: " << version_or.status();
@@ -115,7 +119,8 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
       reply->set_status(ReadFileChunkReply::FAILED_STALE_VERSION);
       return grpc::Status::OK;
     }
-  } else {  // internal errors
+  } else {
+    // INTERNAL ERROR
     LOG(ERROR) << "Unexpected error when initializing file chunk: "
                << data_or.status();
     return ConvertProtobufStatusToGrpcStatus(data_or.status());
@@ -144,6 +149,7 @@ grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
       request->chunk_handle(), from_version, request->new_chunk_version());
 
   if (status.ok()) {
+    // SUCCESS
     LOG(INFO) << "Successfully updated file chunk " << request->chunk_handle()
               << " to version " << request->new_chunk_version();
     reply->set_status(AdvanceFileChunkVersionReply::OK);
@@ -159,7 +165,8 @@ grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
             << request->chunk_handle();
         reply->set_status(AdvanceFileChunkVersionReply::FAILED_NOT_FOUND);
         return grpc::Status::OK;
-      } else {  // internal errors
+      } else {
+        // INTERNAL ERROR
         LOG(ERROR) << "Unexpected error when reading the file chunk "
                    << request->chunk_handle()
                    << " of version: " << version_or.status();
@@ -177,6 +184,7 @@ grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
       return grpc::Status::OK;
     }
   } else {
+    // INTERNAL ERROR
     LOG(ERROR) << "Unexpected error when advancing chunk version: " << status;
     return ConvertProtobufStatusToGrpcStatus(status);
   }
