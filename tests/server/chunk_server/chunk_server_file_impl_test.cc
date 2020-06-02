@@ -35,26 +35,28 @@ const std::string kTestConfigPath = "tests/server/chunk_server/test_config.yml";
 const std::string kTestServerName = "chunk_server_01";
 const std::string kTestServerAddress = "0.0.0.0:50052";
 
-// Since we share the same test chunk server in the background, we let grant
-// and revoke lease unit tests issue requests to *differnet* file handles, so
-// the mutations created by unit tests themselves don't interfere each other
+// Since we share the same test chunk server in the background, we let differnet
+// unit tests issue requests to *differnet* file handles, so the mutations
+// created by unit tests themselves don't interfere each other
 //
 // This is indeed not ideal, but does ther job for now
-// const std::string kTestGrantLeaseChunkHandle = "9d2a2342-97f9-11ea";
-// const std::string kTestRevokeLeaseChunkHandle_PERSIST = "bb37-0242ac130002";
-// const std::string kTestRevokeLeaseChunkHandle_REVOKABLE =
-// "0fd8e43c-a2e5-11ea"; const uint32_t kTestFileVersion = 2; const uint64_t
-// kTestExpirationUnixSeconds =
-//     absl::ToUnixSeconds(absl::Now() + absl::Hours(1));
+const std::string kTestFileHandle = "9d2a2342-97f9-11ea";
+const std::string kTestFileHandle_Advanceable = "bb37-0242ac130002";
+const uint32_t kTestFileVersion = 2;
+const std::string kTestData = "Hello, World! This is a dope test";
 
 namespace {
 void SeedTestData(ChunkServerImpl* chunk_server) {
-  // // initial chunks
-  // FileChunkManager::GetInstance()->CreateChunk(kTestGrantLeaseChunkHandle,
-  //                                              kTestFileVersion);
-  // // initial lease
-  // chunk_server->AddOrUpdateLease(kTestRevokeLeaseChunkHandle_PERSIST,
-  //                                kTestExpirationUnixSeconds);
+  // initial chunks
+  FileChunkManager* test_file_manager = FileChunkManager::GetInstance();
+  test_file_manager->CreateChunk(kTestFileHandle, kTestFileVersion);
+  test_file_manager->WriteToChunk(kTestFileHandle, kTestFileVersion,
+                                  /*start_offset=*/0, kTestData.length(),
+                                  kTestData);
+  test_file_manager->CreateChunk(kTestFileHandle_Advanceable, kTestFileVersion);
+  test_file_manager->WriteToChunk(kTestFileHandle_Advanceable, kTestFileVersion,
+                                  /*start_offset=*/0, kTestData.length(),
+                                  kTestData);
 }
 
 void StartTestServer() {
@@ -97,29 +99,212 @@ class ChunkServerFileImplTest : public ::testing::Test {
             kTestServerAddress, grpc::InsecureChannelCredentials()));
   }
 
+  ReadFileChunkRequest MakeValidReadFileChunkRequest() {
+    ReadFileChunkRequest req;
+    req.set_chunk_handle(kTestFileHandle);
+    req.set_chunk_version(kTestFileVersion);
+    req.set_offset_start(0);
+    req.set_length(kTestData.length());
+    return req;
+  }
+
+  AdvanceFileChunkVersionRequest MakeValidAdvanceFileChunkVersionRequest() {
+    AdvanceFileChunkVersionRequest req;
+    req.set_chunk_handle(kTestFileHandle);
+    req.set_new_chunk_version(kTestFileVersion + 1);
+    return req;
+  }
+
   std::shared_ptr<ChunkServerServiceMasterServerClient> master_server_client_;
   std::shared_ptr<ChunkServerServiceChunkServerClient> chunk_server_client_;
   std::shared_ptr<ChunkServerServiceGfsClient> gfs_client_;
 };
 
-TEST_F(ChunkServerFileImplTest, Basic) { EXPECT_TRUE(true); }
+//
+// TEST - Initialize File Chunks
+//
 
-TEST_F(ChunkServerFileImplTest, InitFileChunk) {
+TEST_F(ChunkServerFileImplTest, InitNewFileChunk) {
   InitFileChunkRequest req;
-  req.set_chunk_handle("init-chunk-test-handle");
+  req.set_chunk_handle("init-new-chunk-test-handle");
 
   // The chunk handle doesn't exist yet, so it should succeed
   grpc::ClientContext client_context;
   auto reply_or = master_server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
   EXPECT_EQ(reply_or.ValueOrDie().status(), InitFileChunkReply::CREATED);
+}
 
-  // We just initialized the chunk, so re-initialize it should error
-  grpc::ClientContext client_context_2;
-  auto reply_or2 = master_server_client_->SendRequest(req, client_context_2);
-  EXPECT_TRUE(reply_or2.ok());
-  EXPECT_EQ(reply_or2.ValueOrDie().status(),
-            InitFileChunkReply::ALREADY_EXISTS);
+TEST_F(ChunkServerFileImplTest, InitExistingFileChunk) {
+  InitFileChunkRequest req;
+  req.set_chunk_handle(kTestFileHandle);
+
+  // The chunk already exists, so re-initialize it should error
+  grpc::ClientContext client_context;
+  auto reply_or = master_server_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(), InitFileChunkReply::ALREADY_EXISTS);
+}
+
+TEST_F(ChunkServerFileImplTest, ReadFileChunkOK) {
+  ReadFileChunkRequest req = MakeValidReadFileChunkRequest();
+
+  grpc::ClientContext client_context;
+  auto reply_or = gfs_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(), ReadFileChunkReply::OK);
+  EXPECT_EQ(reply_or.ValueOrDie().data(), kTestData);
+  EXPECT_EQ(reply_or.ValueOrDie().bytes_read(), kTestData.length());
+}
+
+//
+// TEST - Read File Chunks
+//
+
+TEST_F(ChunkServerFileImplTest, ReadFileChunkFullRead) {
+  ReadFileChunkRequest req = MakeValidReadFileChunkRequest();
+  const uint32_t read_length = kTestData.length() - 3;
+  req.set_length(read_length);
+
+  grpc::ClientContext client_context;
+  auto reply_or = gfs_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(), ReadFileChunkReply::OK);
+  EXPECT_EQ(reply_or.ValueOrDie().data(), kTestData.substr(0, read_length));
+  EXPECT_EQ(reply_or.ValueOrDie().bytes_read(), read_length);
+}
+
+TEST_F(ChunkServerFileImplTest, ReadFileChunkPartialRead) {
+  ReadFileChunkRequest req = MakeValidReadFileChunkRequest();
+  req.set_length(kTestData.length() + 3);
+
+  grpc::ClientContext client_context;
+  auto reply_or = gfs_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(), ReadFileChunkReply::OK);
+
+  // We will reach end of file before we read the requested number of bytes, so
+  // this should be a partial read
+  EXPECT_EQ(reply_or.ValueOrDie().data(), kTestData);
+  EXPECT_EQ(reply_or.ValueOrDie().bytes_read(), kTestData.length());
+}
+
+TEST_F(ChunkServerFileImplTest, ReadFileChunkFullReadWithOffset) {
+  ReadFileChunkRequest req = MakeValidReadFileChunkRequest();
+  const uint32_t offset_start = 5;
+  const uint32_t read_length = kTestData.length() - offset_start;
+  req.set_offset_start(offset_start);
+  req.set_length(read_length);
+
+  grpc::ClientContext client_context;
+  auto reply_or = gfs_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(), ReadFileChunkReply::OK);
+  EXPECT_EQ(reply_or.ValueOrDie().data(),
+            kTestData.substr(offset_start, offset_start + read_length));
+  EXPECT_EQ(reply_or.ValueOrDie().bytes_read(), read_length);
+}
+
+TEST_F(ChunkServerFileImplTest, ReadFileChunkPartialReadWithOffset) {
+  ReadFileChunkRequest req = MakeValidReadFileChunkRequest();
+  const uint32_t offset_start = 5;
+  req.set_offset_start(offset_start);
+  req.set_length(kTestData.length());
+
+  grpc::ClientContext client_context;
+  auto reply_or = gfs_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(), ReadFileChunkReply::OK);
+  EXPECT_EQ(reply_or.ValueOrDie().data(), kTestData.substr(offset_start));
+  EXPECT_EQ(reply_or.ValueOrDie().bytes_read(),
+            kTestData.length() - offset_start);
+}
+
+TEST_F(ChunkServerFileImplTest, ReadFileChunkNoFileChunk) {
+  ReadFileChunkRequest req = MakeValidReadFileChunkRequest();
+  req.set_chunk_handle("no-such-handle");
+
+  grpc::ClientContext client_context;
+  auto reply_or = gfs_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(),
+            ReadFileChunkReply::FAILED_NOT_FOUND);
+}
+
+TEST_F(ChunkServerFileImplTest, ReadFileChunkNoChunkVersion) {
+  ReadFileChunkRequest req = MakeValidReadFileChunkRequest();
+
+  req.set_chunk_version(kTestFileVersion + 1);
+  grpc::ClientContext client_context;
+  StatusOr<ReadFileChunkReply> reply_or =
+      gfs_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(),
+            ReadFileChunkReply::FAILED_STALE_VERSION);
+
+  req.set_chunk_version(kTestFileVersion - 1);
+  grpc::ClientContext client_context2;
+  reply_or = gfs_client_->SendRequest(req, client_context2);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(),
+            ReadFileChunkReply::FAILED_STALE_VERSION);
+}
+
+//
+// TEST - Advance File Chunk Versions
+//
+
+TEST_F(ChunkServerFileImplTest, AdvanceFileChunkVersionOK) {
+  AdvanceFileChunkVersionRequest req =
+      MakeValidAdvanceFileChunkVersionRequest();
+  // this test should succeed, so we manipulate a different file handle to
+  // not interfere other advance tests
+  req.set_chunk_handle(kTestFileHandle_Advanceable);
+
+  grpc::ClientContext client_context;
+  auto reply_or = master_server_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(), AdvanceFileChunkVersionReply::OK);
+  EXPECT_EQ(reply_or.ValueOrDie().chunk_version(), req.new_chunk_version());
+}
+
+TEST_F(ChunkServerFileImplTest, AdvanceFileChunkVersionNoFileChunk) {
+  AdvanceFileChunkVersionRequest req =
+      MakeValidAdvanceFileChunkVersionRequest();
+  req.set_chunk_handle("no-such-handle");
+
+  grpc::ClientContext client_context;
+  auto reply_or = master_server_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(),
+            AdvanceFileChunkVersionReply::FAILED_NOT_FOUND);
+}
+
+TEST_F(ChunkServerFileImplTest, AdvanceFileChunkVersionOutOfSyncVersionError) {
+  AdvanceFileChunkVersionRequest req =
+      MakeValidAdvanceFileChunkVersionRequest();
+
+  req.set_new_chunk_version(kTestFileVersion + 2);
+  grpc::ClientContext client_context;
+  StatusOr<AdvanceFileChunkVersionReply> reply_or =
+      master_server_client_->SendRequest(req, client_context);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(),
+            AdvanceFileChunkVersionReply::FAILED_VERSION_OUT_OF_SYNC);
+
+  req.set_new_chunk_version(kTestFileVersion);
+  grpc::ClientContext client_context2;
+  reply_or = master_server_client_->SendRequest(req, client_context2);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(),
+            AdvanceFileChunkVersionReply::FAILED_VERSION_OUT_OF_SYNC);
+
+  req.set_new_chunk_version(kTestFileVersion - 1);
+  grpc::ClientContext client_context3;
+  reply_or = master_server_client_->SendRequest(req, client_context3);
+  EXPECT_TRUE(reply_or.ok());
+  EXPECT_EQ(reply_or.ValueOrDie().status(),
+            AdvanceFileChunkVersionReply::FAILED_VERSION_OUT_OF_SYNC);
 }
 
 int main(int argc, char** argv) {
