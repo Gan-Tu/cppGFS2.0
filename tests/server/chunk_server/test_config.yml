@@ -38,6 +38,11 @@ disk:
   block_size_mb: 64
   # The minimum disk space (MB) that a chunk server has to maintain
   min_free_disk_space_mb: 100
+  # on-disk leveldb database for chunk servers
+  leveldb:
+    chunk_server_01: data/gfs_db_chunk_server_01
+    chunk_server_02: data/gfs_db_chunk_server_02
+    chunk_server_03: data/gfs_db_chunk_server_03
 timeout:
   # The valid suffixes are "ns", "us" "ms", "s", "m", and "h".
   grpc: 10s

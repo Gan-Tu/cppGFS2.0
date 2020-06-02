@@ -169,7 +169,11 @@ def generate_config_and_config_file(config_filename, num_of_master_server,
     # Generate disk config
     config_data["disk"] = {"block_size_mb" : block_size_mb,
                            "min_free_disk_space_mb" : 
-                               min_free_disk_space_mb}
+                               min_free_disk_space_mb, "leveldb": {}}
+    for i in range(1, num_of_chunk_server+1):
+        server_name = chunk_server_name(i)
+        config_data["disk"]["leveldb"][server_name] = server_name + "-test-db"
+
     # Generate timeout config
     config_data["timeout"] = {"grpc" : str(grpc_timeout_s) + "s",
         "lease" : str(lease_timeout_s) + "s", 
@@ -226,6 +230,10 @@ def generate_config_and_config_file(config_filename, num_of_master_server,
                                + "\n"
     config_file_content += indent + "min_free_disk_space_mb: " \
                                + str(min_free_disk_space_mb) + "\n"
+    config_file_content += indent + "leveldb:\n"
+    for server_name in config_data["disk"]["leveldb"]:
+        config_file_content += indent + indent + server_name + ": " + \
+          config_data["disk"]["leveldb"][server_name] + "\n"
 
     config_file_content += "timeout:\n"
     config_file_content += indent + "grpc: " + str(grpc_timeout_s) + "s\n"

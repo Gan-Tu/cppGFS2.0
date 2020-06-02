@@ -6,6 +6,7 @@ cc_test(
     data = ["test_config.yml"],
     deps = [
         "//src/server/chunk_server:chunk_server_impl",
+        "//src/server/chunk_server:file_chunk_manager",
         "@com_google_absl//absl/time",
         "@com_google_protobuf//:protobuf_lite",
         "@com_google_test//:gtest_main",
@@ -21,19 +22,20 @@ cc_test(
         "//src/protos/grpc:cc_chunk_server_lease_service_grpc",
         "//src/server/chunk_server:chunk_server_impl",
         "//src/server/chunk_server:chunk_server_lease_service_impl",
+        "//src/server/chunk_server:file_chunk_manager",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_absl//absl/time",
         "@com_google_protobuf//:protobuf_lite",
         "@com_google_test//:gtest_main",
-    ],)
-
+    ],
+)
 
 cc_test(
     name = "file_chunk_manager_test",
     srcs = ["file_chunk_manager_test.cc"],
     deps = [
         "//src/server/chunk_server:file_chunk_manager",
-        "@com_google_test//:gtest_main",
         "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_test//:gtest_main",
     ],
 )
