@@ -167,9 +167,9 @@ google::protobuf::util::StatusOr<ReadFileChunkReply>
     read_file_chunk_request.set_chunk_handle(chunk_handle);
     read_file_chunk_request.set_chunk_version(chunk_version);
     // We start reading from the beginning of this chunk, where the offset
-    // equals to chunk_index * common::bytes_per_mb
+    // equals to chunk_index * common::bytesPerMb
     read_file_chunk_request.set_offset_start(chunk_index * 
-                                                 common::bytes_per_mb);
+                                                 common::bytesPerMb);
     read_file_chunk_request.set_length(nbytes);
     // Access the client-end-point for contacting the chunk server
     auto server_address(location.server_hostname()+":" + 
@@ -237,14 +237,14 @@ google::protobuf::util::StatusOr<std::pair<size_t, void*>>
   }
 
   size_t chunk_block_size(config_manager_->GetFileChunkBlockSize() * 
-                              common::bytes_per_mb);
+                              common::bytesPerMb);
 
   for (size_t chunk_index = offset / chunk_block_size; 
-       chunk_index * common::bytes_per_mb < offset + nbytes;
+       chunk_index * common::bytesPerMb < offset + nbytes;
        chunk_index++) {
     auto file_chunk_data_or(ReadFileChunk(filename, chunk_index, 
                                           std::min(remain_bytes, 
-                                                   common::bytes_per_mb)));
+                                                   common::bytesPerMb)));
     // If one of the chunk's read fails, free the buffer and return 
     if (!file_chunk_data_or.ok()) {
       free(buffer);

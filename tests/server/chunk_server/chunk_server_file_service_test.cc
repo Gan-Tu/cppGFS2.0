@@ -136,8 +136,11 @@ void SingleClientReadShortData() {
   auto read_data(read_result.ValueOrDie());
   EXPECT_EQ(read_data.bytes_read, short_data.size());
   EXPECT_EQ(memcmp(read_data.buffer, short_data.c_str(), short_data.size()), 0);
+  // Cleanup to prevent memory leak
+  free(read_data.buffer);
 }
 
+// TODO(Gan): refactor / rewrite this test for more cases 
 class ChunkServerFileServiceTest : public ::testing::Test {
 };
 
