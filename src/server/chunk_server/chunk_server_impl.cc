@@ -3,6 +3,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "src/common/system_logger.h"
+#include "src/server/chunk_server/file_chunk_manager.h"
 
 using gfs::common::ConfigManager;
 using gfs::common::thread_safe_flat_hash_map;
@@ -10,6 +11,7 @@ using gfs::service::ChunkServerServiceChunkServerClient;
 using gfs::service::MasterChunkServerManagerServiceClient;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
+using protos::grpc::ReportChunkServerRequest;
 
 namespace gfs {
 namespace server {
@@ -84,13 +86,18 @@ ChunkServerImpl::GetMasterProtocolClient(const std::string& server_address) {
   if (master_server_clients_.contains(server_address)) {
     return master_server_clients_[server_address];
   } else {
-    LOG(INFO) << "Estabalishing new connection to master:" << server_address;
-    master_server_clients_[server_address] =
-        std::make_shared<MasterChunkServerManagerServiceClient>(
-            grpc::CreateChannel(server_address,
-                                grpc::InsecureChannelCredentials()));
+    RegisterMasterProtocolClient(server_address);
     return master_server_clients_[server_address];
   }
+}
+
+void ChunkServerImpl::RegisterMasterProtocolClient(
+    const std::string& server_address) {
+  LOG(INFO) << "Establishing new connection to master:" << server_address;
+  master_server_clients_[server_address] =
+      std::make_shared<MasterChunkServerManagerServiceClient>(
+          grpc::CreateChannel(server_address,
+                              grpc::InsecureChannelCredentials()));
 }
 
 std::shared_ptr<ChunkServerServiceChunkServerClient>
@@ -107,6 +114,60 @@ ChunkServerImpl::GetChunkServerProtocolClient(
                                 grpc::InsecureChannelCredentials()));
     return chunk_server_clients_[server_address];
   }
+}
+
+bool ChunkServerImpl::ReportToMaster() {
+  // Prepare the report chunk server request
+  ReportChunkServerRequest request;
+
+  // Add the chunk server information to the request
+  auto chunk_server = request.mutable_chunk_server();
+  auto chunk_server_location = chunk_server->mutable_location();
+
+  chunk_server_location->set_server_hostname(
+      config_manager_->GetServerHostname(chunk_server_name_));
+  chunk_server_location->set_server_port(
+      config_manager_->GetServerPort(chunk_server_name_));
+
+  // TODO(bmokutub): Use std::filesystem to get the available disk space.
+  // Setting to 20GB for now, fix this.
+  chunk_server->set_available_disk_mb(/*available_disk_mb=*/20 * 1024);
+
+  // We also need to tell the master all the chunks we have, if any.
+  auto all_chunks_metadata =
+      FileChunkManager::GetInstance()->GetAllFileChunkMetadata();
+
+  LOG(INFO) << "Found " + std::to_string(all_chunks_metadata.size()) +
+                   " stored chunks to report to master.";
+
+  for (auto& chunk_metadata : all_chunks_metadata) {
+    // TODO(bmokutub): Also include chunk version in request so master can check
+    // if it is stale. Not needed for now.
+    chunk_server->add_stored_chunk_handles(chunk_metadata.chunk_handle());
+  }
+
+  // send the request to the master server(s), if more than one
+  uint32_t successful_report = 0;
+  for (auto& master_chunk_server_mgr_client : master_server_clients_) {
+    LOG(INFO) << "Reporting to master server: " +
+                     master_chunk_server_mgr_client.first;
+
+    auto reply = master_chunk_server_mgr_client.second->SendRequest(request);
+    if (reply.ok()) {
+      // TODO(bmokutub): Check the reply for stale chunks, if any, for deletion.
+      // Not needed for now.
+      ++successful_report;
+    } else {
+      // failed
+      LOG(ERROR) << "Report chunk server request to master server: " +
+                        master_chunk_server_mgr_client.first +
+                        " failed. Status: " + reply.status().ToString();
+    }
+  }
+
+  // For now return true if atleast one of the report request succeeded. Meaning
+  // atleast one master server knows about this chunk server.
+  return successful_report > 0;
 }
 
 }  // namespace server

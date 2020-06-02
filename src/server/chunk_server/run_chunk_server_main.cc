@@ -14,8 +14,8 @@
 
 using gfs::common::ConfigManager;
 using gfs::server::ChunkServerImpl;
-using gfs::service::ChunkServerControlServiceImpl;
 using gfs::server::FileChunkManager;
+using gfs::service::ChunkServerControlServiceImpl;
 using gfs::service::ChunkServerFileServiceImpl;
 using gfs::service::ChunkServerLeaseServiceImpl;
 using google::protobuf::util::StatusOr;
@@ -76,6 +76,29 @@ int main(int argc, char** argv) {
   }
   ChunkServerImpl* chunk_server_impl = chunk_server_impl_or.ValueOrDie();
   LOG(INFO) << "Chunk server initialized...";
+
+  // Initialize gRPC protocol clients for talking to the master server(s) that
+  // should be available upon GFS cluster's startup time, based on initial
+  // config file.
+  for (std::string& master_server_name : config->GetAllMasterServers()) {
+    const std::string master_server_address =
+        config->GetServerAddress(master_server_name, resolve_hostname);
+
+    LOG(INFO) << "Initializing gRPC protocol client for talking to "
+              << master_server_name << " at " << master_server_address;
+
+    chunk_server_impl->RegisterMasterProtocolClient(master_server_address);
+  }
+
+  // This chunkserver should report itself to the master server(s). This will
+  // enable the master be aware of this chunkserver, and to start selecting it
+  // for chunk allocation. This also allows chunk servers to be dynamically
+  // added since they just need to report themselves to master.
+  if (!chunk_server_impl->ReportToMaster()) {
+    LOG(ERROR) << "Failed to report to any master server. Probably no master "
+                  "server is running. Shutting down...";
+    return 1;
+  }
 
   // Register synchronous services for handling clients' metadata requests
   // Note that gRPC only support providing services through via a single port.
