@@ -88,12 +88,12 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
         chunk_server_service_client->SendRequest(init_chunk_request,
                                                  client_context));
 
-    // If an InitFileChunk request failed, we log it with a warning and 
+    // If an InitFileChunk request failed, we log it with a warning and
     // keep going
     if (!init_chunk_or.ok()) {
       LOG(WARNING) << "InitFileChunkRequest for " << chunk_handle
-                   << " sent to chunk server " << server_address 
-                   << " failed: " << init_chunk_or.status().error_message(); 
+                   << " sent to chunk server " << server_address
+                   << " failed: " << init_chunk_or.status().error_message();
       return common::utils::ConvertProtobufStatusToGrpcStatus(status);
     }
 
@@ -109,14 +109,14 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
         std::move(chunk_server_location));
   }
 
-  // If all InitFileChunkRequest failed and no locations are reported, 
+  // If all InitFileChunkRequest failed and no locations are reported,
   // we fail this RPC as client may not be able to write anything unless
   // retrying
   if (reply->metadata().locations().empty()) {
     LOG(ERROR) << "No file chunk requested for chunk handle " << chunk_handle;
-    // TODO(Xi): uncomment the following lines once the file chunk services 
+    // TODO(Xi): uncomment the following lines once the file chunk services
     // are implemented on the chunk server's side
-    //return grpc::Status(grpc::StatusCode::UNAVAILABLE, 
+    // return grpc::Status(grpc::StatusCode::UNAVAILABLE,
     //                    "no chunk server is available");
   }
 

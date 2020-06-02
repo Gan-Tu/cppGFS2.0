@@ -9,6 +9,7 @@
 #include "src/common/protocol_client/chunk_server_service_server_client.h"
 #include "src/common/protocol_client/master_chunk_server_manager_service_client.h"
 #include "src/common/utils.h"
+#include "src/server/chunk_server/file_chunk_manager.h"
 
 namespace gfs {
 namespace server {
@@ -30,17 +31,17 @@ class ChunkServerImpl {
   google::protobuf::util::StatusOr<absl::Time> GetLeaseExpirationTime(
       const std::string& file_handle);
 
-  // MOCK FUNCTIONS for chunk file manager
-  // Initialize, or update the chunk |version| for the given |file_handle|
-  // TODO(tugan,michael): use chunk file manager instead, when ready
-  void SetChunkVersion(const std::string& file_handle, const uint32_t version);
-  // Return NOT_FOUND, if no chunk exists on this chunk server
+  // Returns the stored version of the specified chunk handle.
+  // If the handle doesn't exist on the chunk server, return NOT_FOUND error.
+  // If there are data corruption on the chunk server that it is not able to
+  // determine the chunk version, return INTERNAL error.
   google::protobuf::util::StatusOr<uint32_t> GetChunkVersion(
       const std::string& file_handle);
 
   // Return the protocol client for talking to the master at |server_address|.
-  // If the connection is already established, reuse the connection. Otherwise,
-  // initialize and return a new protocol client connecting to |server_address|.
+  // If the connection is already established, reuse the connection.
+  // Otherwise, initialize and return a new protocol client connecting to
+  // |server_address|.
   std::shared_ptr<gfs::service::MasterChunkServerManagerServiceClient>
   GetMasterProtocolClient(const std::string& server_address);
 
@@ -72,6 +73,7 @@ class ChunkServerImpl {
         resolve_hostname_(resolve_hostname) {}
 
   gfs::common::ConfigManager* config_manager_ = nullptr;
+  FileChunkManager* file_manager_ = FileChunkManager::GetInstance();
   std::string chunk_server_name_ = nullptr;
   bool resolve_hostname_ = false;
 
@@ -79,10 +81,10 @@ class ChunkServerImpl {
 
   // Server address and its corresponding GFS protocol client
   // A protocol client will be added the first time the connection is added, and
-  // subsequent calls will simply reuse this protocol client and connection.
+  // subsequent calls will simply reuse this protocol client and connection. 
   // Currently we don't remove connections no longer in use, for simplicity.
   //
-  // Note that this design makes it possible to dynamically add new connections
+  // Note that this design makes it possible to dynamically add new connections 
   // to new servers that may not be present during startup configuration.
   gfs::common::thread_safe_flat_hash_map<
       std::string,

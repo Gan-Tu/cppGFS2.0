@@ -72,25 +72,9 @@ void ChunkServerImpl::RemoveLease(const std::string& file_handle) {
   lease_and_expiration_unix_sec_.erase(file_handle);
 }
 
-//
-// Mock Functions - File Chunks management
-//
-
-void ChunkServerImpl::SetChunkVersion(const std::string& file_handle,
-                                      const uint32_t version) {
-  // TODO(tugan,michael): use chunk file manager instead, when ready
-  chunk_versions_[file_handle] = version;
-}
-
 google::protobuf::util::StatusOr<uint32_t> ChunkServerImpl::GetChunkVersion(
     const std::string& file_handle) {
-  // TODO(tugan,michael): use chunk file manager instead, when ready
-  if (!chunk_versions_.contains(file_handle)) {
-    return Status(google::protobuf::util::error::NOT_FOUND,
-                  absl::StrCat("File chunk is not found: ", file_handle));
-  } else {
-    return chunk_versions_[file_handle];
-  }
+   return file_manager_->GetChunkVersion(file_handle);
 }
 
 //

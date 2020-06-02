@@ -3,12 +3,18 @@
 #include "absl/time/time.h"
 #include "google/protobuf/stubs/statusor.h"
 #include "gtest/gtest.h"
+#include "src/server/chunk_server/file_chunk_manager.h"
 
 using gfs::server::ChunkServerImpl;
+using gfs::server::FileChunkManager;
 using google::protobuf::util::StatusOr;
 
 class ChunkServerImplTest : public ::testing::Test {
  protected:
+  static void SetUpTestSuite() {
+    FileChunkManager::GetInstance()->Initialize("chunk_server_impl_test_db",
+                                                /*max_chunk_size_bytes=*/1024);
+  }
   void SetUp() override {
     StatusOr<ChunkServerImpl*> chunk_server_or =
         ChunkServerImpl::ConstructChunkServerImpl(
@@ -75,9 +81,9 @@ TEST_F(ChunkServerImplTest, ChunkVersionGetterSetter) {
 
   // Set chunk version
   uint32_t expected_chunk_version = 10;
-  chunk_server_->SetChunkVersion(file_handle, expected_chunk_version);
-
   // Now we should get the same chunk version back
+  FileChunkManager::GetInstance()->CreateChunk(file_handle,
+                                               expected_chunk_version);
   StatusOr<uint32_t> actual_chunk_version_or =
       chunk_server_->GetChunkVersion(file_handle);
   EXPECT_TRUE(actual_chunk_version_or.ok());

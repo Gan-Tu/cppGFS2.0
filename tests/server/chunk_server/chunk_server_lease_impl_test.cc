@@ -9,8 +9,10 @@
 #include "src/protos/grpc/chunk_server_lease_service.grpc.pb.h"
 #include "src/server/chunk_server/chunk_server_impl.h"
 #include "src/server/chunk_server/chunk_server_lease_service_impl.h"
+#include "src/server/chunk_server/file_chunk_manager.h"
 
 using gfs::server::ChunkServerImpl;
+using gfs::server::FileChunkManager;
 using gfs::service::ChunkServerLeaseServiceImpl;
 using gfs::service::ChunkServerServiceMasterServerClient;
 using google::protobuf::util::StatusOr;
@@ -40,11 +42,12 @@ const uint64_t kTestExpirationUnixSeconds =
 namespace {
 void SeedTestData(ChunkServerImpl* chunk_server) {
   // initial chunks
-  chunk_server->SetChunkVersion(kTestGrantLeaseChunkHandle, kTestFileVersion);
-  chunk_server->SetChunkVersion(kTestRevokeLeaseChunkHandle_PERSIST,
-                                kTestFileVersion);
-  chunk_server->SetChunkVersion(kTestRevokeLeaseChunkHandle_REVOKABLE,
-                                kTestFileVersion);
+  FileChunkManager::GetInstance()->CreateChunk(kTestGrantLeaseChunkHandle,
+                                               kTestFileVersion);
+  FileChunkManager::GetInstance()->CreateChunk(
+      kTestRevokeLeaseChunkHandle_PERSIST, kTestFileVersion);
+  FileChunkManager::GetInstance()->CreateChunk(
+      kTestRevokeLeaseChunkHandle_REVOKABLE, kTestFileVersion);
   // initial lease
   chunk_server->AddOrUpdateLease(kTestRevokeLeaseChunkHandle_PERSIST,
                                  kTestExpirationUnixSeconds);
@@ -53,6 +56,10 @@ void SeedTestData(ChunkServerImpl* chunk_server) {
 }
 
 void StartTestServer() {
+  // Initialize the test chunk server database
+  FileChunkManager::GetInstance()->Initialize("chunk_server_lease_impl_test_db",
+                                              /*max_chunk_size_bytes=*/1024);
+
   ServerBuilder builder;
   auto credentials = grpc::InsecureServerCredentials();
   builder.AddListeningPort(kTestServerAddress, credentials);
