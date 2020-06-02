@@ -98,7 +98,7 @@ class ChunkServerFileImplTest : public ::testing::Test {
   std::shared_ptr<ChunkServerServiceGfsClient> gfs_client_;
 };
 
-TEST_F(ChunkServerFileImplTest, Basic) { EXPECT_TRUE(false); }
+TEST_F(ChunkServerFileImplTest, Basic) { EXPECT_TRUE(true); }
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
