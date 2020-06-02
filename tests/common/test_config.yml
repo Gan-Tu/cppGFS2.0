@@ -22,6 +22,9 @@ network:
 disk:
   block_size_mb: 64
   min_free_disk_space_mb: 100
+  leveldb:
+    test_chunk_server_01: data/gfs_db_test_chunk_server_01
+    test_chunk_server_02: data/gfs_db_test_chunk_server_02
 timeout:
   grpc: 10s
   lease: 1m

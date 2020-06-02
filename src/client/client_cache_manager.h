@@ -99,7 +99,7 @@ class CacheManager {
   google::protobuf::util::Status 
       SetChunkVersion(const std::string& chunk_handle, uint32_t version);
 
-  // Retrieve the Chunk server loation entry for a given chunk handle.
+  // Retrieve the Chunk server location entry for a given chunk handle.
   // Return error if this entry has timed-out
   google::protobuf::util::StatusOr<ChunkServerLocationEntry>
       GetChunkServerLocation(const std::string& chunk_handle) const;
