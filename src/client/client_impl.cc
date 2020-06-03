@@ -10,6 +10,7 @@ using protos::grpc::OpenFileReply;
 using protos::grpc::OpenFileRequest;
 using protos::grpc::ReadFileChunkReply;
 using protos::grpc::ReadFileChunkRequest;
+using protos::grpc::WriteFileChunkReply;
 
 namespace gfs {
 namespace client {
@@ -82,13 +83,13 @@ google::protobuf::util::Status ClientImpl::CreateFile(
   return google::protobuf::util::Status::OK;
 }
 
-google::protobuf::util::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
-    const char* filename, size_t chunk_index, size_t offset, size_t nbytes) {
+google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
+    const char* filename, size_t chunk_index, 
+    OpenFileRequest::OpenMode file_open_mode, std::string& chunk_handle, 
+    uint32_t& chunk_version, 
+    CacheManager::ChunkServerLocationEntry& chunk_server_location_entry) {
   // First check if the cache manager has file chunk metadata for this chunk
   bool file_chunk_metadata_in_cache(true);
-  std::string chunk_handle;
-  uint32_t chunk_version;
-  CacheManager::ChunkServerLocationEntry chunk_server_location_entry;
 
   // Make sure that chunk_handle, version and location info are all there,
   // otherwise we'd have to call OpenFileRequest
@@ -121,12 +122,13 @@ google::protobuf::util::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
     OpenFileRequest open_file_request;
     open_file_request.set_filename(filename);
     open_file_request.set_chunk_index(chunk_index);
-    open_file_request.set_mode(OpenFileRequest::READ);
+    open_file_request.set_mode(file_open_mode);
     grpc::ClientContext client_context;
     common::SetClientContextDeadline(client_context, config_manager_);
 
-    LOG(INFO) << "Issuing OpenFilRequest to read file " << filename
-              << " at chunk index " << chunk_index;
+    LOG(INFO) << "Issuing OpenFilRequest to file " << filename
+              << " at chunk index " << chunk_index << " with open mode "
+              << file_open_mode;
 
     // Issue OpenFileReply rpc and check stastus
     StatusOr<OpenFileReply> open_file_or(
@@ -156,6 +158,25 @@ google::protobuf::util::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
     return google::protobuf::util::Status(
         google::protobuf::util::error::UNAVAILABLE,
         "No chunk server has been found");
+  }
+
+  return google::protobuf::util::Status::OK;
+}
+
+google::protobuf::util::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
+    const char* filename, size_t chunk_index, size_t offset, size_t nbytes) {
+  std::string chunk_handle;
+  uint32_t chunk_version;
+  CacheManager::ChunkServerLocationEntry chunk_server_location_entry;
+  
+  // Access the metadata first
+  auto get_metadata_status(
+      GetMetadataForChunk(filename, chunk_index, OpenFileRequest::READ,
+                          chunk_handle, chunk_version, 
+                          chunk_server_location_entry));
+
+  if (!get_metadata_status.ok()) {
+    return get_metadata_status;
   }
 
   // Loop over all server locations but return immediately as long as one
@@ -286,6 +307,57 @@ google::protobuf::util::StatusOr<std::pair<size_t, void*>> ClientImpl::ReadFile(
   }
 
   return std::make_pair(bytes_read, buffer);
+}
+
+google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
+    ClientImpl::WriteFileChunk(const char* filename, void* buffer, 
+                               size_t chunk_index, size_t offset, 
+                               size_t nbytes) {
+  return protos::grpc::WriteFileChunkReply();
+}
+
+google::protobuf::util::Status ClientImpl::WriteFile(const char* filename, 
+    void* buffer, size_t offset, size_t nbytes) {
+  const size_t chunk_block_size(config_manager_->GetFileChunkBlockSize() *
+                                common::bytesPerMb);
+  // Record the number of bytes that we need to write
+  size_t bytes_written(0);
+  // Record the number of bytes to write
+  size_t remain_bytes(nbytes);
+  // A flag to detect errors that encountered during issuing writes
+  size_t chunk_start_offset(offset % chunk_block_size);
+
+  for (size_t chunk_index = offset / chunk_block_size; remain_bytes > 0; 
+       chunk_index++) {
+    // Calculate the byte length that we need to issue write for chunk_index
+    // Within a chunk, the remaining space for a write, starting at offset
+    // is (chunk_block_size - chunk_start_offset), globally there are 
+    // remain_bytes to be written. Therefore, the byte length for this chunk is
+    // the min of these two values
+    size_t bytes_to_write(std::min(chunk_block_size - chunk_start_offset, 
+                                   remain_bytes));
+    // The buffer offset that we will start writing in this batch.
+    void* buffer_start((char*)buffer + bytes_written);
+    auto write_data_or(WriteFileChunk(filename, buffer_start, chunk_index,
+                                      chunk_start_offset, bytes_to_write));
+    // Return error if any write-to-chunk operation fails. This leaves the file
+    // in a partial state (and that is ok). 
+    if (!write_data_or.ok()) {
+      return write_data_or.status();
+    }
+
+    // Currently, we consier the case of bytes_written < bytes requested to be 
+    // an error, so chunk_bytes_written should be equal to bytes_to_write
+    size_t chunk_bytes_written(write_data_or.ValueOrDie().bytes_written());
+
+    // Update chunk_start_offset, bytes_written and remain_bytes counts. 
+    // Starting from the second chunk, chunk_start_offset is zero
+    chunk_start_offset = 0;
+    bytes_written += chunk_bytes_written;
+    remain_bytes -= chunk_bytes_written;
+  }
+
+  return google::protobuf::util::Status::OK;
 }
 
 void ClientImpl::RegisterChunkServerServiceClient(

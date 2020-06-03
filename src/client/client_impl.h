@@ -27,7 +27,12 @@ class ClientImpl {
   // to the actual data buffer
   google::protobuf::util::StatusOr<std::pair<size_t, void*>> ReadFile(
       const char* filename, size_t offset, size_t nbytes);
-  
+
+  // Internal impl call that writes buffer to a file, and the return is 
+  // the status which indicates if this write succeeds
+  google::protobuf::util::Status WriteFile(const char* filename, void* buffer,
+      size_t offset, size_t nbytes);
+
   // Construct and return a ClientImpl objects with proper configurations 
   // using the given config file. The ClientImpl object uses the config 
   // file to initialize the cache manager and two clients objects used to 
@@ -53,9 +58,27 @@ class ClientImpl {
       ReadFileChunk(const char* filename, size_t chunk_index, size_t offset, 
                     size_t nbytes); 
 
+  // Internal function to write a file chunk
+  google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
+      WriteFileChunk(const char* filename, void* buffer, size_t chunk_index,
+                     size_t offset, size_t nbytes);
+
   // Get the client end point for chunk server service client. 
   std::shared_ptr<service::ChunkServerServiceGfsClient> 
       GetChunkServerServiceClient(const std::string& server_address);
+
+  // Get the metadata for a chunk, including chunk_handle, version and 
+  // the corresponding ChunkServerLocationEntry. This function checks first 
+  // if all data above have been cached, if not then issue an OpenFileRequest
+  // to fetch the information. This function is used by both ReadFileChunk
+  // and WriteFileChunk. The returned status indicates if this operation is 
+  // successful. 
+  google::protobuf::util::Status 
+      GetMetadataForChunk(
+          const char* filename, size_t chunk_index,
+          protos::grpc::OpenFileRequest::OpenMode file_open_mode,
+          std::string& chunk_handle, uint32_t& version,
+          CacheManager::ChunkServerLocationEntry& entry);
 
   // Register a client end-point for chunk server service client
   void RegisterChunkServerServiceClient(const std::string& server_address);
