@@ -1,3 +1,5 @@
+#include <thread>
+#include <vector>
 #include "src/client/client_impl.h"
 
 #include "src/common/protocol_client/grpc_client_utils.h"
@@ -6,11 +8,15 @@
 
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
+using protos::grpc::FileChunkMutationStatus;
 using protos::grpc::OpenFileReply;
 using protos::grpc::OpenFileRequest;
 using protos::grpc::ReadFileChunkReply;
 using protos::grpc::ReadFileChunkRequest;
+using protos::grpc::SendChunkDataReply;
+using protos::grpc::SendChunkDataRequest;
 using protos::grpc::WriteFileChunkReply;
+using protos::grpc::WriteFileChunkRequest;
 
 namespace gfs {
 namespace client {
@@ -87,7 +93,8 @@ google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
     const char* filename, size_t chunk_index, 
     OpenFileRequest::OpenMode file_open_mode, std::string& chunk_handle, 
     uint32_t& chunk_version, 
-    CacheManager::ChunkServerLocationEntry& chunk_server_location_entry) {
+    CacheManager::ChunkServerLocationEntry& chunk_server_location_entry,
+    bool force_get) {
   // First check if the cache manager has file chunk metadata for this chunk
   bool file_chunk_metadata_in_cache(true);
 
@@ -116,13 +123,17 @@ google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
 
   // If file chunk metadata is not available, issue an OpenFileRequest to get
   // all information needed
-  if (!file_chunk_metadata_in_cache) {
+  if (!file_chunk_metadata_in_cache || force_get) {
     // TODO(Xi): refactor this block into a helper function
     // Prepare the open file request
     OpenFileRequest open_file_request;
     open_file_request.set_filename(filename);
     open_file_request.set_chunk_index(chunk_index);
     open_file_request.set_mode(file_open_mode);
+    // For WRITE request, we set create_if_not_exists to be true so we would
+    // create chunk for write if it does not exist
+    open_file_request.set_create_if_not_exists(
+        file_open_mode==OpenFileRequest::WRITE);                                       
     grpc::ClientContext client_context;
     common::SetClientContextDeadline(client_context, config_manager_);
 
@@ -313,7 +324,181 @@ google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
     ClientImpl::WriteFileChunk(const char* filename, void* buffer, 
                                size_t chunk_index, size_t offset, 
                                size_t nbytes) {
-  return protos::grpc::WriteFileChunkReply();
+  std::string chunk_handle;
+  uint32_t chunk_version;
+  CacheManager::ChunkServerLocationEntry chunk_server_location_entry;
+  
+  // Access the metadata first
+  auto get_metadata_status(
+      GetMetadataForChunk(filename, chunk_index, OpenFileRequest::WRITE,
+                          chunk_handle, chunk_version, 
+                          chunk_server_location_entry));
+
+  if (!get_metadata_status.ok()) {
+    return get_metadata_status;
+  }
+
+  // By default we retry three times
+  ushort retry(3);
+  // Prepare the data to be sent
+  const std::string data_to_send(std::string((const char*)buffer, nbytes));
+  // Compute the checksum
+  const std::string data_checksum(common::utils::calc_checksum(data_to_send));
+
+  while (retry > 0) {
+    // Push the data to all replica. For simplicity, we just push all data 
+    // from client to replica instead of the way described in the paper. 
+    // Furthermore, if any of the push request fails, we retry (and we retry
+    // with all replica). In terms of retry policy, we only retry if the 
+    // status says "FAILED", because "DATA_TOO_BIG" is not a retry-able error
+    // and "RATE_LIMITED" is not used for now.
+    std::atomic<bool> send_data_recoverable_error, 
+                          send_data_irrecoverable_error; 
+    std::vector<std::thread> send_data_threads;
+    for (auto& location : chunk_server_location_entry.locations) {
+      send_data_threads.push_back(std::thread([&, location]() {
+        // Prepare the SendChunkDataRequest
+        SendChunkDataRequest send_chunk_data_request;
+        send_chunk_data_request.set_data(data_to_send);
+        send_chunk_data_request.set_checksum(data_checksum);
+        auto server_address(location.server_hostname() + ":" + 
+                            std::to_string(location.server_port()));
+        // Prepare the client context
+        grpc::ClientContext client_context;
+        common::SetClientContextDeadline(client_context, config_manager_);
+        // Get the client end-point
+        auto chunk_server_service_client(
+            GetChunkServerServiceClient(server_address));
+        // Issue SendChunkData request and check status
+        StatusOr<SendChunkDataReply> send_chunk_reply_or(
+            chunk_server_service_client->SendRequest(send_chunk_data_request,
+                                                     client_context));
+        // Handle grpc error, log and set retry flag
+        if (!send_chunk_reply_or.ok()) {
+          // TODO(Xi): Not sure if we should consider an grpc error as 
+          // irrecoverable, but play safe here to retry
+          LOG(ERROR) << "Send file chunk data to " << server_address
+                     << "failed due to " << send_chunk_reply_or.status();
+          send_data_recoverable_error.store(true);
+        } else {
+          auto send_chunk_reply(send_chunk_reply_or.ValueOrDie());
+          switch (send_chunk_reply.status()) {
+            case SendChunkDataReply::OK: 
+              LOG(INFO) << "Send file chunk data to " << server_address 
+                        << "succeeds";
+              break; // Good
+            case SendChunkDataReply::FAILED:
+              // We consider this a retry-able condition
+              send_data_recoverable_error.store(true);
+              LOG(ERROR) << "Send file chunk data to " << server_address
+                         << "encountered recoverable failure" 
+                         << send_chunk_reply.status();
+              break;
+            default:
+              // All others are not retryable 
+              send_data_irrecoverable_error.store(true);
+              LOG(ERROR) << "Send file chunk data to " << server_address
+                         << "encountered irrecoverable failure" 
+                         << send_chunk_reply.status();
+          }
+        }
+      }));
+    }
+
+    // Join all threads above
+    for (auto& send_data_thread : send_data_threads) {
+      send_data_thread.join();
+    }
+
+    // If we countered irrecoverable failure, we have to abort here and return
+    // error. If we encountered recoverable failure, we retry. Otherwise, we 
+    // continue to the next phase of operation
+    if (send_data_irrecoverable_error.load()) {
+      // TODO(Xi): ideally return the actual status from send reply but as we
+      // are using multi-threading to send data this is a little tricky. Due
+      // to time constraint, simply use an internal error indicating that 
+      return google::protobuf::util::Status(
+          google::protobuf::util::error::INTERNAL,
+          "Send data encountered irrecoverable failure");
+    }
+
+    if (send_data_recoverable_error.load()) {
+      retry--;
+      continue;
+    }
+
+    // Prepare WriteFileChunkRequest, WriteFileChunkRequestHeader
+    WriteFileChunkRequest write_request;
+    write_request.mutable_header()->set_chunk_handle(chunk_handle);
+    write_request.mutable_header()->set_chunk_version(chunk_version);
+    write_request.mutable_header()->set_offset_start(offset);
+    write_request.mutable_header()->set_length(nbytes);
+    write_request.mutable_header()->set_data_checksum(data_checksum);
+    for (auto location : chunk_server_location_entry.locations) {
+      write_request.mutable_replica_locations()->Add(std::move(location));
+    }
+    // Prepare the client context    
+    grpc::ClientContext client_context;
+    common::SetClientContextDeadline(client_context, config_manager_);
+ 
+    // We send this WriteFileChunkRequest to the primary 
+    auto primary_location(chunk_server_location_entry.primary_location);
+    const std::string primary_server_address(
+        primary_location.server_hostname() + ":" + 
+            std::to_string(primary_location.server_port()));
+    
+    auto primary_server_service_client(GetChunkServerServiceClient(
+                                           primary_server_address));
+    // Issue WriteFileChunkRequest and check status
+    StatusOr<WriteFileChunkReply> write_reply_or(
+        primary_server_service_client->SendRequest(write_request, client_context));
+
+    // Handle grpc error, and retry if possible
+    if (!write_reply_or.ok()) {
+      LOG(ERROR) << "Send write chunk data request to " 
+                 << primary_server_address << "failed due to " 
+                 << write_reply_or.status();
+    } else {
+      auto write_reply(write_reply_or.ValueOrDie());
+      switch (write_reply.status()) {
+        case FileChunkMutationStatus::OK:
+          LOG(INFO) << "Write to file " << filename << " at chunk_index "
+                    << chunk_index << " and offset " << offset << " for "
+                    << nbytes << " bytes succeeds";
+          return write_reply_or;
+        case FileChunkMutationStatus::FAILED_NOT_LEASE_HOLDER:
+          // Client found out that the primary it though is no longer a lease
+          // holder, we need to force to get the chunk metadata and retry
+          LOG(INFO) << "Retrying as primary server "
+                    << primary_server_address << " is no longer lease holder "
+                    << "refetching chunk metadata";
+          get_metadata_status = 
+              GetMetadataForChunk(filename, chunk_index, 
+                                  OpenFileRequest::WRITE, chunk_handle, 
+                                  chunk_version,
+                                  chunk_server_location_entry, true);
+          if (!get_metadata_status.ok()) {
+            return get_metadata_status; 
+          }
+          break;
+        default:
+          // For other cases, we consider them to be irrecoverable and return
+          // error
+          LOG(ERROR) << "Write to file " << filename << " at chunk_index "
+                     << chunk_index << " and offset " << offset << " for "
+                     << nbytes << " byte failed due to " 
+                     << write_reply.status();
+          return write_reply_or;
+      }
+    }
+
+    retry--;
+  }
+
+  LOG(ERROR) << "Write file chunk failed after 3 retries";
+  return google::protobuf::util::Status(
+             google::protobuf::util::error::INTERNAL,
+                 "Write file chunk failed after 3 retries"); 
 }
 
 google::protobuf::util::Status ClientImpl::WriteFile(const char* filename, 
@@ -363,18 +548,27 @@ google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
 void ClientImpl::RegisterChunkServerServiceClient(
     const std::string& server_address) {
   LOG(INFO) << "Establishing new connection to chunk server:" << server_address;
-  chunk_server_service_client_[server_address] =
+  chunk_server_service_client_.TryInsert(server_address,
       std::make_shared<service::ChunkServerServiceGfsClient>(
           grpc::CreateChannel(server_address,
-                              grpc::InsecureChannelCredentials()));
+                              grpc::InsecureChannelCredentials())));
 }
 
 std::shared_ptr<service::ChunkServerServiceGfsClient>
 ClientImpl::GetChunkServerServiceClient(const std::string& server_address) {
-  if (!chunk_server_service_client_.contains(server_address)) {
-    RegisterChunkServerServiceClient(server_address);
+  auto try_get_client(
+      chunk_server_service_client_.TryGetValue(server_address));
+
+  if (try_get_client.second) {
+    // Client exist, return
+    return try_get_client.first;
   }
-  return chunk_server_service_client_[server_address];
+   
+  RegisterChunkServerServiceClient(server_address);
+ 
+  // We are not removing client ent-point, so this line must suceed
+  try_get_client = chunk_server_service_client_.TryGetValue(server_address);
+  return try_get_client.first;
 }
 
 ClientImpl::ClientImpl(common::ConfigManager* config_manager,

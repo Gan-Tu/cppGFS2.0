@@ -10,6 +10,7 @@
 #include "src/common/config_manager.h"
 #include "src/common/protocol_client/chunk_server_service_gfs_client.h"
 #include "src/common/protocol_client/master_metadata_service_client.h"
+#include "src/common/utils.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
 namespace gfs {
@@ -71,14 +72,16 @@ class ClientImpl {
   // the corresponding ChunkServerLocationEntry. This function checks first 
   // if all data above have been cached, if not then issue an OpenFileRequest
   // to fetch the information. This function is used by both ReadFileChunk
-  // and WriteFileChunk. The returned status indicates if this operation is 
-  // successful. 
+  // and WriteFileChunk. The last param forces an OpenFileRequest to get sent.
+  // This is used when client finds its no primary no longer holds the lease. 
+  // The returned status indicates if this operation is successful. 
   google::protobuf::util::Status 
       GetMetadataForChunk(
           const char* filename, size_t chunk_index,
           protos::grpc::OpenFileRequest::OpenMode file_open_mode,
           std::string& chunk_handle, uint32_t& version,
-          CacheManager::ChunkServerLocationEntry& entry);
+          CacheManager::ChunkServerLocationEntry& entry,
+          bool force_get = false);
 
   // Register a client end-point for chunk server service client
   void RegisterChunkServerServiceClient(const std::string& server_address);
@@ -96,9 +99,9 @@ class ClientImpl {
   // Reference to ChunkServerServiceGfs clients which can be accessed by the
   // chunk server addresses, the client will have to connect to different 
   // chunk servers. 
-  absl::flat_hash_map<std::string, 
-                      std::shared_ptr<service::ChunkServerServiceGfsClient>> 
-                          chunk_server_service_client_;
+  common::parallel_hash_map<
+      std::string, std::shared_ptr<service::ChunkServerServiceGfsClient>> 
+          chunk_server_service_client_;
 };
 
 } // namespace client
