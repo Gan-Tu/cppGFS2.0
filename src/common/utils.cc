@@ -1,3 +1,4 @@
+#include <openssl/md5.h>
 #include "src/common/utils.h"
 
 #include "google/protobuf/stubs/status.h"
@@ -248,6 +249,15 @@ google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node) {
     }
   }
   return google::protobuf::util::Status::OK;
+}
+
+const std::string calc_checksum(const std::string& data) {
+  std::string checksum_string(MD5_DIGEST_LENGTH, ' ');
+  // The casting below is necessary to fit with openssl's MD5 function 
+  // signature, which is a pretty ugly interface 
+  MD5((const unsigned char*)&data[0], data.size(), 
+      (unsigned char*)&checksum_string[0]);
+  return checksum_string;
 }
 
 }  // namespace utils

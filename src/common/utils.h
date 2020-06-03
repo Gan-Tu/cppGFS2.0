@@ -171,6 +171,10 @@ inline google::protobuf::util::StatusOr<T> ReturnStatusOrFromGrpcStatus(
 // Return Status::OK, if successful; otherwise, any validation error.
 google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node);
 
+// Helper function to compute the checksum of a given string. Internally we use
+// MD5 as a scheme to do this
+const std::string calc_checksum(const std::string& data);
+
 }  // namespace utils
 }  // namespace common
 }  // namespace gfs
