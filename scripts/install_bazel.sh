@@ -1,6 +1,7 @@
-# Download unzip, gcc, g++
+# Download unzip, gcc, g++, openssl library
 sudo apt-get update
 sudo apt install unzip gcc g++
+sudo apt install libssl-dev
 if [[ $? != 0 ]]; then
    echo "Failed to install or upgrade essential packages"
    exit 1
