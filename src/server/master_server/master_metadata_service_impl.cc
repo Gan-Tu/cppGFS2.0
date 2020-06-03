@@ -44,6 +44,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
   if (!status.ok()) {
     LOG(ERROR) << "File metadata creation failed: " << status.error_message();
     return common::utils::ConvertProtobufStatusToGrpcStatus(status);
+  } else {
+    LOG(INFO) << "File metadata created for " << filename;
   }
 
   // Step 2. Create the first file chunk for this file
@@ -54,6 +56,9 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
                << chunk_handle_or.status().error_message();
     return common::utils::ConvertProtobufStatusToGrpcStatus(
                chunk_handle_or.status());
+  } else {
+    LOG(INFO) << "Chunk handle created: " << chunk_handle_or.ValueOrDie()
+              << " for file " << filename;
   }
   const std::string& chunk_handle(chunk_handle_or.ValueOrDie());
 
@@ -95,6 +100,9 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
                    << " sent to chunk server " << server_address
                    << " failed: " << init_chunk_or.status().error_message();
       return common::utils::ConvertProtobufStatusToGrpcStatus(status);
+    } else {
+      LOG(INFO) << "InitFileChunkRequest for " << chunk_handle
+                << " sent to chunk server " << server_address << "succeeded";
     }
 
     // Pick a primary chunk server. Just select the first one
