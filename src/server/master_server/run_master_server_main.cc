@@ -54,7 +54,8 @@ int main(int argc, char** argv) {
   builder.RegisterService(&metadata_service);
 
   // Register a synchronous service for coordinating with chunkservers
-  MasterChunkServerManagerServiceImpl chunk_server_mgr_service;
+  MasterChunkServerManagerServiceImpl 
+      chunk_server_mgr_service(config, resolve_hostname);
   builder.RegisterService(&chunk_server_mgr_service);
 
   // Initialize gRPC protocol clients for talking to other servers that should

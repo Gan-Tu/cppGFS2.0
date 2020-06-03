@@ -547,7 +547,8 @@ google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
 
 void ClientImpl::RegisterChunkServerServiceClient(
     const std::string& server_address) {
-  LOG(INFO) << "Establishing new connection to chunk server:" << server_address;
+  LOG(INFO) << "Establishing new connection to chunk server: " 
+            << server_address;
   chunk_server_service_client_.TryInsert(server_address,
       std::make_shared<service::ChunkServerServiceGfsClient>(
           grpc::CreateChannel(server_address,

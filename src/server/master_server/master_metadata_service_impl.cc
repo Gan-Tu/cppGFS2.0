@@ -32,28 +32,17 @@ MasterMetadataServiceImpl ::chunk_server_manager() {
   return server::ChunkServerManager::GetInstance();
 }
 
-grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
-    const protos::grpc::OpenFileRequest* request,
-    protos::grpc::OpenFileReply* reply) {
-  // Step 1. Create file metadata
+grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
+  const protos::grpc::OpenFileRequest* request,
+  protos::grpc::OpenFileReply* reply) {
   const std::string& filename(request->filename());
-  LOG(INFO) << "MasterMetadataService handling file creation: " << filename;
+  const uint32_t chunk_index(request->chunk_index());
 
-  google::protobuf::util::Status status(
-      metadata_manager()->CreateFileMetadata(filename));
-  if (!status.ok()) {
-    LOG(ERROR) << "File metadata creation failed: " << status.error_message();
-    return common::utils::ConvertProtobufStatusToGrpcStatus(status);
-  } else {
-    LOG(INFO) << "File metadata created for " << filename;
-  }
-
-  // Step 2. Create the first file chunk for this file
+  // Step 1. Create the file chunk
   google::protobuf::util::StatusOr<std::string> chunk_handle_or(
-      metadata_manager()->CreateChunkHandle(filename, 0));
+      metadata_manager()->CreateChunkHandle(filename, chunk_index));
   if (!chunk_handle_or.ok()) {
-    LOG(ERROR) << "Chunk handle creation failed: " 
-               << chunk_handle_or.status().error_message();
+    LOG(ERROR) << "Chunk handle creation failed: " << chunk_handle_or.status();
     return common::utils::ConvertProtobufStatusToGrpcStatus(
                chunk_handle_or.status());
   } else {
@@ -62,7 +51,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
   }
   const std::string& chunk_handle(chunk_handle_or.ValueOrDie());
 
-  // Step 3. Allocate chunk servers
+  // Step 2. Allocate chunk servers for this file chunk
   const ushort num_of_chunk_replica(3);
   // TODO(someone): make this number configurable via config.yml. Probably not
   // a priority right now
@@ -74,7 +63,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
   reply->mutable_metadata()->set_chunk_handle(chunk_handle);
   reply->mutable_metadata()->set_version(0);
 
-  // Step 4. Coordinate with chunk servers to initialize the file chunk
+  // Step 3. Coordinate with chunk servers to initialize the file chunk
   for (auto chunk_server_location : chunk_server_locations) {
     const std::string server_address(
         chunk_server_location.server_hostname() + ":" +
@@ -99,10 +88,11 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
       LOG(WARNING) << "InitFileChunkRequest for " << chunk_handle
                    << " sent to chunk server " << server_address
                    << " failed: " << init_chunk_or.status().error_message();
-      return common::utils::ConvertProtobufStatusToGrpcStatus(status);
+      return common::utils::ConvertProtobufStatusToGrpcStatus(
+                 init_chunk_or.status());
     } else {
       LOG(INFO) << "InitFileChunkRequest for " << chunk_handle
-                << " sent to chunk server " << server_address << "succeeded";
+                << " sent to chunk server " << server_address << " succeeded";
     }
 
     // Pick a primary chunk server. Just select the first one
@@ -129,6 +119,27 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
   }
 
   return grpc::Status::OK;
+}
+
+grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
+    const protos::grpc::OpenFileRequest* request,
+    protos::grpc::OpenFileReply* reply) {
+  // Step 1. Create file metadata
+  const std::string& filename(request->filename());
+  LOG(INFO) << "MasterMetadataService handling file creation: " << filename;
+
+  google::protobuf::util::Status status(
+      metadata_manager()->CreateFileMetadata(filename));
+  if (!status.ok()) {
+    LOG(ERROR) << "File metadata creation failed: " << status.error_message();
+    return common::utils::ConvertProtobufStatusToGrpcStatus(status);
+  } else {
+    LOG(INFO) << "File metadata created for " << filename;
+  }
+
+  // Step 2. Create the first file chunk for this file and allocate chunk 
+  // servers
+  return HandleFileChunkCreation(request, reply);
 }
 
 grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
@@ -167,6 +178,19 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
 grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
     const protos::grpc::OpenFileRequest* request,
     protos::grpc::OpenFileReply* reply) {
+  // Step 1. Access the chunk handle, if the chunk handle does not exist
+  // then create one for this write request. Note that we currently only
+  // support this mode, i.e. create_if_not_exists is assumed to be true
+  // for write request
+  const std::string& filename(request->filename());
+  const uint32_t chunk_index(request->chunk_index());
+
+  google::protobuf::util::StatusOr<std::string> chunk_handle_or(
+      metadata_manager()->GetChunkHandle(filename, chunk_index));
+
+  if (!chunk_handle_or.ok()) {
+  }
+ 
   return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
 }
 

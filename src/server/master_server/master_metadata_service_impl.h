@@ -49,6 +49,12 @@ class MasterMetadataServiceImpl final
       const protos::grpc::OpenFileRequest* request,
       protos::grpc::OpenFileReply* reply);
 
+  // Handle chunk creation, this is an internal helper function that gets
+  // called when a file is created and when a write request is processed 
+  grpc::Status HandleFileChunkCreation(
+      const protos::grpc::OpenFileRequest* request,
+      protos::grpc::OpenFileReply* reply);
+
   // Handle an OpenFileRequest request sent by the client.
   grpc::Status OpenFile(grpc::ServerContext* context,
                         const protos::grpc::OpenFileRequest* request,

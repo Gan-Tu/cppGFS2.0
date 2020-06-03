@@ -2,6 +2,7 @@
 #define GFS_SERVER_MASTER_SERVER_MASTER_CHUNK_SERVER_MANAGER_SERVICE_IMPL_H_
 
 #include "grpcpp/grpcpp.h"
+#include "src/common/config_manager.h"
 #include "src/protos/grpc/master_chunk_server_manager_service.grpc.pb.h"
 
 namespace gfs {
@@ -28,6 +29,19 @@ class MasterChunkServerManagerServiceImpl final
       grpc::ServerContext* context,
       const protos::grpc::ReportChunkServerRequest* request,
       protos::grpc::ReportChunkServerReply* reply) override;
+ public:
+  // Default constructor, only used in test
+  MasterChunkServerManagerServiceImpl() : config_manager_(nullptr), 
+                                          resolve_hostname_(false) {}
+
+  MasterChunkServerManagerServiceImpl(
+      common::ConfigManager* config_manager, bool resolve_hostname) : 
+          config_manager_(config_manager), resolve_hostname_(resolve_hostname) 
+              {}
+
+ private:
+  common::ConfigManager* config_manager_;
+  bool resolve_hostname_;
 };
 
 // The asynchronous implementation for handling MasterChunkServerManagerService
