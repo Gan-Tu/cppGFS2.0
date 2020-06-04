@@ -119,11 +119,14 @@ class ChunkServerAvailableDiskGreaterCompare {
 //     return 3 servers.
 //
 // ChunkServerManager services that keeps it updated:
-//   ChunkServerHeartBeatMonitoringTask (UnregisterChunkServer)
+//   ChunkServerHeartBeatMonitorTask (UnregisterChunkServer)
 //
 //   MasterChunkServerManagerService (RegisterChunkServer, UpdateChunkServer)
 //
 class ChunkServerManager {
+  // To access chunk servers map
+  friend class ChunkServerHeartBeatMonitorTask;
+
  public:
   // The singleton instance
   static ChunkServerManager& GetInstance() {

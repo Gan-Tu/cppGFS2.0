@@ -6,10 +6,12 @@
 #include "grpcpp/grpcpp.h"
 #include "src/common/config_manager.h"
 #include "src/common/system_logger.h"
+#include "src/server/master_server/chunk_server_heartbeat_monitor_task.h"
 #include "src/server/master_server/master_chunk_server_manager_service_impl.h"
 #include "src/server/master_server/master_metadata_service_impl.h"
 
 using gfs::common::ConfigManager;
+using gfs::server::ChunkServerHeartBeatMonitorTask;
 using gfs::service::MasterChunkServerManagerServiceImpl;
 using gfs::service::MasterMetadataServiceImpl;
 using grpc::Server;
@@ -72,9 +74,18 @@ int main(int argc, char** argv) {
 
   LOG(INFO) << "Server listening on " << server_address;
 
+  // Start the chunk server heartbeat monitor task after services have been
+  // started.
+  auto chunk_servers_heartbeat_task =
+      ChunkServerHeartBeatMonitorTask::GetInstance();
+  chunk_servers_heartbeat_task->Start(config_path);
+
   // Wait for the server to shutdown. Note that some other thread must be
   // responsible for shutting down the server for this call to ever return.
   server->Wait();
+
+  // Shutdown the task
+  chunk_servers_heartbeat_task->Terminate();
 
   return 0;
 }

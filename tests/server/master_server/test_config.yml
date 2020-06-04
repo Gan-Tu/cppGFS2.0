@@ -1,0 +1,32 @@
+version: 1.0
+servers:
+  master_servers:
+    - test_master
+  chunk_servers:
+    - test_chunk_server_01
+    - test_chunk_server_02
+network:
+  test_master:
+    hostname: test_master_hostname
+    port: 10002
+  test_chunk_server_01:
+    hostname: test_chunk_server_01_hostname
+    port: 8080
+  test_chunk_server_02:
+    hostname: test_chunk_server_02_hostname
+    port: 50051
+  dns_lookup_table:
+    test_master_hostname: 0.0.0.0
+    test_chunk_server_01_hostname: 0.0.0.0
+    test_chunk_server_02_hostname: 0.0.0.0
+disk:
+  block_size_mb: 64
+  min_free_disk_space_mb: 100
+  leveldb:
+    test_chunk_server_01: data/gfs_db_test_chunk_server_01
+    test_chunk_server_02: data/gfs_db_test_chunk_server_02
+timeout:
+  grpc: 10s
+  lease: 1m
+  heartbeat: 2s
+  client_cache: 1h

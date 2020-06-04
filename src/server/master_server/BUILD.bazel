@@ -61,6 +61,21 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "chunk_server_heartbeat_monitor_task",
+    srcs = ["chunk_server_heartbeat_monitor_task.cc"],
+    hdrs = ["chunk_server_heartbeat_monitor_task.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":chunk_server_manager",
+        "//src/common:system_logger",
+        "//src/common/protocol_client:chunk_server_control_service_client",
+        "//src/common:config_manager",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
 cc_binary(
     name = "run_master_server_main",
     srcs = ["run_master_server_main.cc"],
@@ -69,6 +84,7 @@ cc_binary(
     deps = [
         ":master_chunk_server_manager_service_impl",
         ":master_metadata_service_impl",
+        ":chunk_server_heartbeat_monitor_task",
         "//src/common:config_manager",
         "//src/common:system_logger",
         "@com_google_absl//absl/flags:flag",

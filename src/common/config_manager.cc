@@ -108,7 +108,7 @@ absl::Duration ConfigManager::GetWriteLeaseTimeout() {
   return deadline;
 }
 
-absl::Duration ConfigManager::GetHeartBeatDeadline() {
+absl::Duration ConfigManager::GetHeartBeatTaskSleepDuration() {
   absl::Duration deadline;
   absl::ParseDuration(config_["timeout"]["heartbeat"].as<std::string>(),
                       &deadline);

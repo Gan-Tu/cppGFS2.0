@@ -79,6 +79,6 @@ TEST_F(ConfigManagerTest, GetDiskMetadataTest) {
 TEST_F(ConfigManagerTest, GetTimeoutTest) {
   EXPECT_EQ(config_->GetGrpcDeadline(), absl::Seconds(10));
   EXPECT_EQ(config_->GetWriteLeaseTimeout(), absl::Minutes(1));
-  EXPECT_EQ(config_->GetHeartBeatDeadline(), absl::Seconds(30));
+  EXPECT_EQ(config_->GetHeartBeatTaskSleepDuration(), absl::Seconds(30));
   EXPECT_EQ(config_->GetClientCacheTimeout(), absl::Hours(1));
 }
