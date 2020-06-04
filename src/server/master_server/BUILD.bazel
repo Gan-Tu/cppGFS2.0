@@ -55,6 +55,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//src/common:utils",
+        "//src/common:system_logger",
         "//src/protos:cc_chunk_server_proto",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/synchronization",

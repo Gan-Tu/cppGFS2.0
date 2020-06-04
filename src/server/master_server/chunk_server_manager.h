@@ -227,6 +227,10 @@ class ChunkServerManager {
       const std::string& chunk_handle);
 
  private:
+  // Create a string representation of the location (i.e tostring)
+  std::string CreateChunkServerLocationString(
+      const protos::ChunkServerLocation& location);
+
   // This is a thread safe map that stores the mapping from chunkserverlocation
   // to the chunkserver. The location uniquely identifies the chunkserver. This
   // is used to store the registered chunk servers and are removed when the
