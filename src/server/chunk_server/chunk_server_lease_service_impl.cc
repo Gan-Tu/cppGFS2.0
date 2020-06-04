@@ -24,10 +24,17 @@ grpc::Status ChunkServerLeaseServiceImpl::GrantLease(
   LOG(INFO) << "Received GrantLeaseRequest:" << (*request).DebugString();
   *reply->mutable_request() = *request;
 
-  LOG(INFO) << "Preparing redo logs for GrantLease of file handle: "
-            << request->chunk_handle();
-  // TODO: may not be necessary depending on how crash-resistent we want to be
-  LOG(INFO) << "GrantLease redo logs prepared: " << request->chunk_handle();
+  // No redo/undo logs needed. If the chunk server crashes at any point of
+  // handling a GrantLease request, it will fail to reply to the master and the
+  // master is safe to assume it has not accepted lease successfully. Since we
+  // do not store lease information on disk, upon restart of the chunk server,
+  // it will start off holding no leases neither, consistent with master's
+  // assumption. If a chunk sever crashes *after* accepting a lease and
+  // replying to the master, it's also safe for master to wait until the lease
+  // expires before reassign someone else the lease. If the chunk server
+  // recovers before the lease expires, then the chunk server's startup
+  // ReportToMaster RPC call will also effectively let master know it crashed
+  // and restarted, and the master can then determine how to re-issue the lease.
 
   LOG(INFO) << "Validating GrantLeaseRequest for: " << request->chunk_handle();
   StatusOr<uint32_t> owned_version_or =
@@ -75,10 +82,13 @@ grpc::Status ChunkServerLeaseServiceImpl::RevokeLease(
   LOG(INFO) << "Received RevokeLeaseRequest:" << (*request).DebugString();
   *reply->mutable_request() = *request;
 
-  LOG(INFO) << "Preparing redo logs for RevokeLease of file handle: "
-            << request->chunk_handle();
-  // TODO: may not be necessary depending on how crash-resistent we want to be
-  LOG(INFO) << "RevokeLease redo logs prepared: " << request->chunk_handle();
+  // No redo/undo logs needed. If the chunk server crashes at any point of
+  // handling a RevokeLease request, it will fail to reply to the master and the
+  // master is safe to assume it has not revoked the lease and either retry or
+  // wait until the lease expires.  If a chunk sever crashes *after* revoking
+  // a lease and replying to the master, since we do not store lease information
+  // on disk, upon restart of the chunk server, it will start off holding no
+  // leases neither, consistent with the outcome of "revoking" a lease.
 
   LOG(INFO) << "Validating RevokeLeaseRequest for: " << request->chunk_handle();
   StatusOr<absl::Time> current_lease_expiration_time_or =

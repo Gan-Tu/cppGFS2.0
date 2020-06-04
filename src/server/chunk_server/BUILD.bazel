@@ -21,6 +21,8 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":chunk_server_impl",
+        ":file_chunk_manager",
+        "//src/common:system_logger",
         "//src/protos/grpc:cc_chunk_server_file_service_grpc",
         "@com_github_grpc_grpc//:grpc++",
     ],
