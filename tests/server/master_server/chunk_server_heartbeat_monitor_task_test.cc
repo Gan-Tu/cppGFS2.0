@@ -33,7 +33,7 @@ using protos::grpc::ReportChunkServerRequest;
 const std::string kTestConfigPath =
     "tests/server/master_server/test_config.yml";
 const std::string kTestMasterServerName = "test_master";
-const std::string kTestMasterServerAddress = "0.0.0.0:10002";
+const std::string kTestMasterServerAddress = "0.0.0.0:10022";
 
 namespace {
 void StartChunkServerControlService(const std::string& server_address,
@@ -87,7 +87,8 @@ class ChunkServerHeartBeatMonitorTaskTest : public ::testing::Test {
         // up after the test finishes
         /*chunk_database_name=*/"chunk_server_heartbeat_test_db",
         /*max_chunk_size_bytes=*/100);
-    ChunkServerHeartBeatMonitorTask::GetInstance()->Start(kTestConfigPath);
+    ChunkServerHeartBeatMonitorTask::GetInstance()->Start(
+        kTestConfigPath, /*resolve_hostname=*/true);
   }
 
   static void TearDownTestSuite() {

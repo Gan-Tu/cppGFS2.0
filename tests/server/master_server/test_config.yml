@@ -8,13 +8,13 @@ servers:
 network:
   test_master:
     hostname: test_master_hostname
-    port: 10002
+    port: 10022
   test_chunk_server_01:
     hostname: test_chunk_server_01_hostname
-    port: 8080
+    port: 10023
   test_chunk_server_02:
     hostname: test_chunk_server_02_hostname
-    port: 50051
+    port: 10024
   dns_lookup_table:
     test_master_hostname: 0.0.0.0
     test_chunk_server_01_hostname: 0.0.0.0

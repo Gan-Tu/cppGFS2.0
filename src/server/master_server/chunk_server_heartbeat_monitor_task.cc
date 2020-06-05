@@ -23,7 +23,8 @@ ChunkServerHeartBeatMonitorTask::ChunkServerHeartBeatMonitorTask()
     : thread_(nullptr),
       terminate_promise_(nullptr),
       terminate_future_(nullptr),
-      config_mgr_(nullptr) {}
+      config_mgr_(nullptr),
+      resolve_hostname_(false) {}
 
 ChunkServerHeartBeatMonitorTask::~ChunkServerHeartBeatMonitorTask() {
   Terminate();
@@ -36,7 +37,8 @@ ChunkServerHeartBeatMonitorTask::GetInstance() {
   return &instance;
 }
 
-void ChunkServerHeartBeatMonitorTask::Start(const std::string& config_file) {
+void ChunkServerHeartBeatMonitorTask::Start(const std::string& config_file,
+                                            const bool resolve_hostname) {
   if (!this->terminate_promise_) {
     LOG(INFO) << "Chunk server heartbeat monitor task is starting...";
 
@@ -46,6 +48,8 @@ void ChunkServerHeartBeatMonitorTask::Start(const std::string& config_file) {
 
     this->config_mgr_ =
         std::unique_ptr<ConfigManager>(config_manager_or.ValueOrDie());
+
+    this->resolve_hostname_ = resolve_hostname;
 
     // Create the promise used to signal the background thread to terminate.
     this->terminate_promise_ =
@@ -80,10 +84,13 @@ void ChunkServerHeartBeatMonitorTask::MonitorHeartBeat() {
 
       CheckHeartBeatRequest request;
 
+      std::string hostname = chunk_server.first.server_hostname();
+      if (this->resolve_hostname_) {
+        hostname = this->config_mgr_->ResolveHostname(hostname);
+      }
+
       auto server_address =
-          absl::StrCat(this->config_mgr_->ResolveHostname(
-                           chunk_server.first.server_hostname()),
-                       ":", chunk_server.first.server_port());
+          absl::StrCat(hostname, ":", chunk_server.first.server_port());
 
       auto client = GetOrCreateChunkServerControlClient(server_address);
 
