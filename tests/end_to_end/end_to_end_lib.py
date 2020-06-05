@@ -2,6 +2,7 @@ import os
 import signal
 import socket
 import subprocess
+import time
 
 # This is a shared python module that many end-to-end tests will use. It 
 # provides utility function that a distributed end-to-end test can take 
@@ -299,4 +300,6 @@ def start_master_and_chunk_servers(config_filename, log_directory = None,
         
         master_and_chunk_server_procs.append(chunk_server_proc)
     
+    # Sleep for 3.0 seconds to let the server processes be up
+    time.sleep(3.0)
     return master_and_chunk_server_procs 

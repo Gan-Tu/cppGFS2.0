@@ -91,7 +91,6 @@ google::protobuf::util::StatusOr<Data> read(const char* filename, size_t offset,
   auto check_filename_status(common::utils::CheckFilenameValidity(filename));
   if (!check_filename_status.ok()) {
     return check_filename_status;
-
   }
 
   auto read_data_or(client_impl_->ReadFile(filename, offset, nbytes));
@@ -104,9 +103,24 @@ google::protobuf::util::StatusOr<Data> read(const char* filename, size_t offset,
               read_data_or.ValueOrDie().second);
 }
 
-google::protobuf::util::Status write(const char* path, void* buffer,
+google::protobuf::util::Status write(const char* filename, void* buffer,
                                      size_t offset, size_t nbytes) {
-  return google::protobuf::util::Status::OK;
+  // Make sure that init_client is called as a pre-condition
+  if (!client_impl_) {
+    return google::protobuf::util::Status(
+               google::protobuf::util::error::FAILED_PRECONDITION,
+               "init_client must be called before calling client APIs");
+  }
+
+  // Check and validate the filename
+  auto check_filename_status(common::utils::CheckFilenameValidity(filename));
+  if (!check_filename_status.ok()) {
+    return check_filename_status;
+  }
+
+  auto write_data_status(client_impl_->WriteFile(filename, buffer, offset, 
+                                                 nbytes));
+  return write_data_status;
 }
 
 google::protobuf::util::Status remove(const char* filename) {
