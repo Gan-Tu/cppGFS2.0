@@ -42,7 +42,8 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "min disk: " << config->GetRequiredDiskSpaceToMaintain() << "MB";
   LOG(INFO) << "grpc timeout: " << config->GetGrpcDeadline();
   LOG(INFO) << "lease timeout: " << config->GetWriteLeaseTimeout();
-  LOG(INFO) << "heartbeat timeout: " << config->GetHeartBeatDeadline();
+  LOG(INFO) << "heartbeat task periodic sleep duration: "
+            << config->GetHeartBeatTaskSleepDuration();
   LOG(INFO) << "client cache timeout: " << config->GetClientCacheTimeout();
 
   return 0;

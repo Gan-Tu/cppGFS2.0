@@ -58,9 +58,9 @@ class ConfigManager {
   // Return the default timeout for each write lease granted
   absl::Duration GetWriteLeaseTimeout();
 
-  // Return the max deadline allowed between heart beat messages, after when
-  // the server will be considered dead
-  absl::Duration GetHeartBeatDeadline();
+  // Return the duration of time for the heartbeat task to sleep after checking
+  // heartbeat for all chunkservers and before doing another check.
+  absl::Duration GetHeartBeatTaskSleepDuration();
 
   // Return the timeout, after when the client side file metadata cache expires
   absl::Duration GetClientCacheTimeout();

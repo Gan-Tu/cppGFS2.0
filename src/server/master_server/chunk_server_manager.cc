@@ -1,5 +1,8 @@
 #include "src/server/master_server/chunk_server_manager.h"
 
+#include "absl/strings/str_cat.h"
+#include "src/common/system_logger.h"
+
 namespace protos {
 bool operator==(const protos::ChunkServerLocation& lhs,
                 const protos::ChunkServerLocation& rhs) {
@@ -23,6 +26,8 @@ ChunkServerLocationThreadSafeFlatSet ChunkServerManager::AllocateChunkServer(
   if (this->chunk_locations_map_.contains(chunk_handle)) {
     // Chunk handle has been allocated previously.
     // Return the previously allocated locations.
+    LOG(INFO) << "Chunk servers have been previously allocated for chunk: "
+              << chunk_handle;
     return this->chunk_locations_map_[chunk_handle];
   }
 
@@ -37,6 +42,8 @@ ChunkServerLocationThreadSafeFlatSet ChunkServerManager::AllocateChunkServer(
   // situation.
   absl::MutexLock chunk_servers_priority_list_lock_guard(
       &chunk_servers_priority_list_lock_);
+
+  LOG(INFO) << "Allocating chunk servers for chunk: " << chunk_handle;
 
   ushort allocated_servers_count = 0;
   // Since the list is sorted and servers with max available disk are in front,
@@ -72,6 +79,11 @@ ChunkServerLocationThreadSafeFlatSet ChunkServerManager::AllocateChunkServer(
     chunk_server->set_available_disk_mb(new_available_disk);
     // add this chunk handle to the list of stored chunks
     chunk_server->add_stored_chunk_handles(chunk_handle);
+
+    LOG(INFO) << "Allocated chunk server "
+              << CreateChunkServerLocationString(chunk_server->location())
+              << " (new available disk= " << new_available_disk << "mb)"
+              << " for storing chunk " << chunk_handle;
   }
 
   if (allocated_servers_count > 0) {
@@ -102,6 +114,9 @@ bool ChunkServerManager::RegisterChunkServer(
 
   // Was successfully inserted, means not previously registered
   if (result.second) {
+    LOG(INFO) << "Registering chunk server "
+              << CreateChunkServerLocationString(chunk_server->location());
+
     // Lock guard scope
     {
       // create a lock for this chunkserver
@@ -122,6 +137,10 @@ bool ChunkServerManager::RegisterChunkServer(
       for (int i = 0; i < chunk_server->stored_chunk_handles_size(); ++i) {
         this->chunk_locations_map_[chunk_server->stored_chunk_handles(i)]
             .insert(chunk_server->location());
+        LOG(INFO) << "Chunk server "
+                  << CreateChunkServerLocationString(chunk_server->location())
+                  << " reported chunk "
+                  << chunk_server->stored_chunk_handles(i);
       }
     }
 
@@ -227,6 +246,10 @@ void ChunkServerManager::UpdateChunkServer(
   // be removed and add the new ones.
   auto chunk_server = result->second;
 
+  LOG(INFO) << "Updating chunk server "
+            << CreateChunkServerLocationString(chunk_server->location())
+            << " with newly reported info";
+
   // Get priority list lock before chunkserver lock. This is to avoid deadlock
   // when we are running update while allocation is also going on. Since
   // allocation also gets priority list lock before chunkserver lock.
@@ -284,6 +307,11 @@ ChunkServerLocationThreadSafeFlatSet ChunkServerManager::GetChunkLocations(
   // Returns the set of locations if chunk_handle exist or inserts an empty
   // set and return it.
   return this->chunk_locations_map_[chunk_handle];
+}
+
+std::string ChunkServerManager::CreateChunkServerLocationString(
+    const protos::ChunkServerLocation& location) {
+  return absl::StrCat(location.server_hostname(), ":", location.server_port());
 }
 
 }  // namespace server
