@@ -27,3 +27,10 @@ TEST_F(UtilsUnitTest, ValidPathnameTest) {
   auto validPathnameRes(CheckFilenameValidity("/foo/bar/baz"));
   EXPECT_TRUE(validPathnameRes.ok());
 }
+
+// A trivial test to ensure that we can compute the checksum reliably
+TEST_F(UtilsUnitTest, SimpleChecksumTest) {
+  std::string sample_data("Test is a sample data for testing checksum");
+  auto check_sum(calc_checksum(sample_data));
+  EXPECT_EQ(check_sum, calc_checksum(sample_data));
+}

@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
 
   // Register a synchronous service for handling clients' metadata requests
-  MasterMetadataServiceImpl metadata_service(config);
+  MasterMetadataServiceImpl metadata_service(config, resolve_hostname);
   builder.RegisterService(&metadata_service);
 
   // Register a synchronous service for coordinating with chunkservers

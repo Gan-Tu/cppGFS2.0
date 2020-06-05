@@ -2,6 +2,7 @@
 #define GFS_SERVER_MASTER_SERVER_MASTER_CHUNK_SERVER_MANAGER_SERVICE_IMPL_H_
 
 #include "grpcpp/grpcpp.h"
+#include "src/common/config_manager.h"
 #include "src/protos/grpc/master_chunk_server_manager_service.grpc.pb.h"
 
 namespace gfs {
