@@ -108,6 +108,12 @@ class parallel_hash_map : public phmap::parallel_flat_hash_map<Key, Value> {
     (*this)[key] = value;
   }
 
+  // Erase the value for a key
+  void Erase(const Key& key) {
+    absl::Mutex* lock(FetchLock(key));
+    absl::WriterMutexLock lock_guard(lock);
+    this->erase(key);
+  }
  private:
   std::vector<std::shared_ptr<absl::Mutex>> locks_;
   absl::Mutex* FetchLock(const Key& key) {
