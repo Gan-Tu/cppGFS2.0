@@ -87,22 +87,21 @@ class ChunkServerHeartBeatMonitorTaskTest : public ::testing::Test {
         // up after the test finishes
         /*chunk_database_name=*/"chunk_server_heartbeat_test_db",
         /*max_chunk_size_bytes=*/100);
-    ChunkServerHeartBeatMonitorTask::GetInstance()->Start(
-        kTestConfigPath, /*resolve_hostname=*/true);
-  }
-
-  static void TearDownTestSuite() {
-    ChunkServerHeartBeatMonitorTask::GetInstance()->Terminate();
   }
 
   void SetUp() override {
     // Create the config manager for the test to read test config.
     config_mgr_ = std::shared_ptr<ConfigManager>(
         ConfigManager::GetConfig(kTestConfigPath).ValueOrDie());
+
+    ChunkServerHeartBeatMonitorTask::GetInstance()->Start(
+        config_mgr_.get(), /*resolve_hostname=*/true);
   }
 
   // Executed after each test method in the suite.
   void TearDown() override {
+    ChunkServerHeartBeatMonitorTask::GetInstance()->Terminate();
+
     // Unregister all the ChunkServers registered by the test.
     ChunkServerManager::GetInstance().UnRegisterAllChunkServers();
   }

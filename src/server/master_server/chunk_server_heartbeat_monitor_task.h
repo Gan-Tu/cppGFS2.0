@@ -44,7 +44,8 @@ class ChunkServerHeartBeatMonitorTask {
   // not already running and returns without blocking the current thread. Uses
   // the config file to create config manager to read required configurations.
   // Does nothing if task is already started.
-  void Start(const std::string& config_file, const bool resolve_hostname);
+  void Start(gfs::common::ConfigManager* config_mgr,
+             const bool resolve_hostname);
 
   // This sends a signal to the thread running in background to terminate and
   // waits till termination is complete. We would only terminate when this is
@@ -100,7 +101,7 @@ class ChunkServerHeartBeatMonitorTask {
       std::shared_ptr<gfs::service::ChunkServerControlServiceClient>>
       chunk_server_control_clients_;
 
-  std::unique_ptr<gfs::common::ConfigManager> config_mgr_;
+  gfs::common::ConfigManager* config_mgr_;
 
   bool resolve_hostname_;
 };

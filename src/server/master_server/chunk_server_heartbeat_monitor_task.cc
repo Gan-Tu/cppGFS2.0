@@ -37,17 +37,13 @@ ChunkServerHeartBeatMonitorTask::GetInstance() {
   return &instance;
 }
 
-void ChunkServerHeartBeatMonitorTask::Start(const std::string& config_file,
+void ChunkServerHeartBeatMonitorTask::Start(ConfigManager* config_mgr,
                                             const bool resolve_hostname) {
   if (!this->terminate_promise_) {
     LOG(INFO) << "Chunk server heartbeat monitor task is starting...";
 
-    // Instantiate a ConfigManager with the given filename
-    StatusOr<ConfigManager*> config_manager_or(
-        ConfigManager::GetConfig(config_file));
-
-    this->config_mgr_ =
-        std::unique_ptr<ConfigManager>(config_manager_or.ValueOrDie());
+    LOG_ASSERT(config_mgr);
+    this->config_mgr_ = config_mgr;
 
     this->resolve_hostname_ = resolve_hostname;
 

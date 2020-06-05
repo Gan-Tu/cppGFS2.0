@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
   // started.
   auto chunk_servers_heartbeat_task =
       ChunkServerHeartBeatMonitorTask::GetInstance();
-  chunk_servers_heartbeat_task->Start(config_path, resolve_hostname);
+  chunk_servers_heartbeat_task->Start(config, resolve_hostname);
 
   // Wait for the server to shutdown. Note that some other thread must be
   // responsible for shutting down the server for this call to ever return.
