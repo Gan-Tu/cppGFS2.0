@@ -81,7 +81,7 @@ class ClientImpl {
           protos::grpc::OpenFileRequest::OpenMode file_open_mode,
           std::string& chunk_handle, uint32_t& version,
           CacheManager::ChunkServerLocationEntry& entry,
-          bool force_get = false);
+          bool refresh_cache = false);
 
   // Register a client end-point for chunk server service client
   void RegisterChunkServerServiceClient(const std::string& server_address);

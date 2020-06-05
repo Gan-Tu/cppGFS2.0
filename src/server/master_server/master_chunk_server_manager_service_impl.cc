@@ -45,12 +45,6 @@ grpc::Status MasterChunkServerManagerServiceImpl::ReportChunkServer(
     std::shared_ptr<protos::ChunkServer> new_chunk_server(
         new protos::ChunkServer(new_server_info));
 
-    // Resolve name if this is necessary
-    if (resolve_hostname_) {
-      new_chunk_server->mutable_location()->set_server_hostname(
-          config_manager_->ResolveHostname(
-              new_chunk_server->location().server_hostname()));
-    }
     gfs::server::ChunkServerManager::GetInstance().RegisterChunkServer(
         new_chunk_server);
 

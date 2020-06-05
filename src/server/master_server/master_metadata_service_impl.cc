@@ -63,15 +63,18 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
   auto chunk_server_locations(chunk_server_manager().AllocateChunkServer(
       chunk_handle, num_of_chunk_replica));
 
-  // Prepare the InitChunkFileReply
+  // Prepare the OpenFileReply
   *reply->mutable_metadata() = FileChunkMetadata();
   reply->mutable_metadata()->set_chunk_handle(chunk_handle);
   reply->mutable_metadata()->set_version(0);
 
   // Step 3. Coordinate with chunk servers to initialize the file chunk
   for (auto chunk_server_location : chunk_server_locations) {
-    const std::string server_address(
-        chunk_server_location.server_hostname() + ":" +
+    std::string server_name(chunk_server_location.server_hostname());
+    if (resolve_hostname_) {
+      server_name = config_manager_->ResolveHostname(server_name);
+    }
+    const std::string server_address(server_name+ ":" +
         std::to_string(chunk_server_location.server_port()));
     // Create and return this chunk server Rpc client if not exist
     auto chunk_server_service_client =
@@ -271,6 +274,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
     LOG(ERROR) << "Grant lease request for chunk " << chunk_handle 
                << " at " << primary_server_address << " failed due to "
                << grant_lease_reply_or.status();
+    // TODO(Xi): technically, we can retry on another server if the random 
+    // server cannot be a primary
     return common::utils::ConvertProtobufStatusToGrpcStatus(
                grant_lease_reply_or.status());
   } else {

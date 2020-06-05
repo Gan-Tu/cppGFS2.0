@@ -94,36 +94,38 @@ google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
     OpenFileRequest::OpenMode file_open_mode, std::string& chunk_handle, 
     uint32_t& chunk_version, 
     CacheManager::ChunkServerLocationEntry& chunk_server_location_entry,
-    bool force_get) {
+    bool refresh_cache) {
   // First check if the cache manager has file chunk metadata for this chunk
   bool file_chunk_metadata_in_cache(true);
 
   // Make sure that chunk_handle, version and location info are all there,
   // otherwise we'd have to call OpenFileRequest
-  auto chunk_handle_or(cache_manager_->GetChunkHandle(filename, chunk_index));
-  if (chunk_handle_or.ok()) {
-    chunk_handle = chunk_handle_or.ValueOrDie();
-    auto chunk_version_or(cache_manager_->GetChunkVersion(chunk_handle));
-    if (chunk_version_or.ok()) {
-      chunk_version = chunk_version_or.ValueOrDie();
-      auto chunk_server_location_entry_or(
-          cache_manager_->GetChunkServerLocation(chunk_handle));
-      if (chunk_server_location_entry_or.ok()) {
-        chunk_server_location_entry =
-            chunk_server_location_entry_or.ValueOrDie();
+  if (!refresh_cache) {
+    auto chunk_handle_or(cache_manager_->GetChunkHandle(filename, chunk_index));
+    if (chunk_handle_or.ok()) {
+      chunk_handle = chunk_handle_or.ValueOrDie();
+      auto chunk_version_or(cache_manager_->GetChunkVersion(chunk_handle));
+      if (chunk_version_or.ok()) {
+        chunk_version = chunk_version_or.ValueOrDie();
+        auto chunk_server_location_entry_or(
+            cache_manager_->GetChunkServerLocation(chunk_handle));
+        if (chunk_server_location_entry_or.ok()) {
+          chunk_server_location_entry =
+              chunk_server_location_entry_or.ValueOrDie();
+        } else {
+          file_chunk_metadata_in_cache = false;
+        }
       } else {
         file_chunk_metadata_in_cache = false;
       }
     } else {
       file_chunk_metadata_in_cache = false;
     }
-  } else {
-    file_chunk_metadata_in_cache = false;
   }
 
   // If file chunk metadata is not available, issue an OpenFileRequest to get
   // all information needed
-  if (!file_chunk_metadata_in_cache || force_get) {
+  if (!file_chunk_metadata_in_cache || refresh_cache) {
     // TODO(Xi): refactor this block into a helper function
     // Prepare the open file request
     OpenFileRequest open_file_request;
@@ -478,6 +480,8 @@ google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
                                   chunk_version,
                                   chunk_server_location_entry, true);
           if (!get_metadata_status.ok()) {
+            LOG(ERROR) << "Refreshing metadata cache failed due to "
+                       << get_metadata_status;
             return get_metadata_status; 
           }
           break;

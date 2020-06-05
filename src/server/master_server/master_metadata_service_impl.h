@@ -17,8 +17,9 @@ namespace service {
 class MasterMetadataServiceImpl final
     : public protos::grpc::MasterMetadataService::Service {
  public:
-  MasterMetadataServiceImpl(common::ConfigManager* config_manager) : 
-      config_manager_(config_manager) {}
+  MasterMetadataServiceImpl(common::ConfigManager* config_manager, 
+                            bool resolve_hostname = false) : 
+      config_manager_(config_manager), resolve_hostname_(resolve_hostname) {}
 
   // Return the protocol client for talking to the chunk server at
   // |server_address|.  If the connection is already established, reuse the
@@ -74,6 +75,8 @@ class MasterMetadataServiceImpl final
   // Reference to the config manager in order to access some configurable 
   // params such as grpc timeout
   common::ConfigManager* config_manager_;
+  // Whether to resolve hostname
+  bool resolve_hostname_;
 };
 
 // The asynchronous implementation for handling MasterMetadataService requests
