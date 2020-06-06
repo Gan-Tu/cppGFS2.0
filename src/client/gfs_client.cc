@@ -1,4 +1,5 @@
 #include "src/client/gfs_client.h"
+
 #include "src/client/client_impl.h"
 #include "src/common/utils.h"
 
@@ -14,21 +15,22 @@ static thread_local ClientImpl* client_impl_ = nullptr;
 // read, write, create and create | write
 bool ValidateOpenFlag(unsigned int flags) {
   return flags == OpenFlag::Read || flags == OpenFlag::Write ||
-         flags == OpenFlag::Create || 
+         flags == OpenFlag::Create ||
          flags == (OpenFlag::Write | OpenFlag::Create);
 }
 
 google::protobuf::util::Status init_client(const std::string& config_filename,
-  const std::string& master_name, const bool resolve_hostname) {
+                                           const std::string& master_name,
+                                           const bool resolve_hostname) {
   if (client_impl_) {
-    return  google::protobuf::util::Status(
-                google::protobuf::util::error::ALREADY_EXISTS,
-                "ClientImpl has already been initialized successfully");
+    return google::protobuf::util::Status(
+        google::protobuf::util::error::ALREADY_EXISTS,
+        "ClientImpl has already been initialized successfully");
   }
 
   // Instantiate the client impl object
-  auto client_impl_or(ClientImpl::ConstructClientImpl(config_filename, 
-                          master_name, resolve_hostname));
+  auto client_impl_or(ClientImpl::ConstructClientImpl(
+      config_filename, master_name, resolve_hostname));
   if (!client_impl_or.ok()) {
     return client_impl_or.status();
   }
@@ -37,20 +39,25 @@ google::protobuf::util::Status init_client(const std::string& config_filename,
   return google::protobuf::util::Status::OK;
 }
 
+void reset_client() {
+  delete client_impl_;
+  client_impl_ = nullptr;
+}
+
 google::protobuf::util::Status open(const char* filename, unsigned int flags) {
   // Make sure that init_client is called as a pre-condition
   if (!client_impl_) {
     return google::protobuf::util::Status(
-               google::protobuf::util::error::FAILED_PRECONDITION,
-               "init_client must be called before calling client APIs");
+        google::protobuf::util::error::FAILED_PRECONDITION,
+        "init_client must be called before calling client APIs");
   }
-   
-  // Check and validate the flags, e.g. it doesn't make sense to 
+
+  // Check and validate the flags, e.g. it doesn't make sense to
   // open with both read and write flags
   if (!ValidateOpenFlag(flags)) {
     return google::protobuf::util::Status(
-               google::protobuf::util::error::INVALID_ARGUMENT,
-               "Invalid open flag : " + std::to_string(flags)); 
+        google::protobuf::util::error::INVALID_ARGUMENT,
+        "Invalid open flag : " + std::to_string(flags));
   }
 
   // Check and validate the filename
@@ -59,9 +66,10 @@ google::protobuf::util::Status open(const char* filename, unsigned int flags) {
     return check_filename_status;
   }
 
-  // Creation mode, this is true when flags = OpenFlag::Create or 
+  // Creation mode, this is true when flags = OpenFlag::Create or
   // Open::Create | Open::Write
-  if (flags | OpenFlag::Create) {
+  if (flags == OpenFlag::Create ||
+      flags == (OpenFlag::Create | OpenFlag::Write)) {
     auto create_status(client_impl_->CreateFile(filename));
     if (!create_status.ok()) {
       return create_status;
@@ -83,8 +91,8 @@ google::protobuf::util::StatusOr<Data> read(const char* filename, size_t offset,
   // Make sure that init_client is called as a pre-condition
   if (!client_impl_) {
     return google::protobuf::util::Status(
-               google::protobuf::util::error::FAILED_PRECONDITION,
-               "init_client must be called before calling client APIs");
+        google::protobuf::util::error::FAILED_PRECONDITION,
+        "init_client must be called before calling client APIs");
   }
 
   // Check and validate the filename
@@ -99,7 +107,7 @@ google::protobuf::util::StatusOr<Data> read(const char* filename, size_t offset,
     return read_data_or.status();
   }
 
-  return Data(read_data_or.ValueOrDie().first, 
+  return Data(read_data_or.ValueOrDie().first,
               read_data_or.ValueOrDie().second);
 }
 
@@ -108,8 +116,8 @@ google::protobuf::util::Status write(const char* filename, void* buffer,
   // Make sure that init_client is called as a pre-condition
   if (!client_impl_) {
     return google::protobuf::util::Status(
-               google::protobuf::util::error::FAILED_PRECONDITION,
-               "init_client must be called before calling client APIs");
+        google::protobuf::util::error::FAILED_PRECONDITION,
+        "init_client must be called before calling client APIs");
   }
 
   // Check and validate the filename
@@ -118,8 +126,8 @@ google::protobuf::util::Status write(const char* filename, void* buffer,
     return check_filename_status;
   }
 
-  auto write_data_status(client_impl_->WriteFile(filename, buffer, offset, 
-                                                 nbytes));
+  auto write_data_status(
+      client_impl_->WriteFile(filename, buffer, offset, nbytes));
   return write_data_status;
 }
 
