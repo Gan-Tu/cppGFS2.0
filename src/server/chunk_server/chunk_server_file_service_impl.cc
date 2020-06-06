@@ -32,6 +32,7 @@ using protos::grpc::SendChunkDataReply;
 using protos::grpc::SendChunkDataRequest;
 using protos::grpc::WriteFileChunkReply;
 using protos::grpc::WriteFileChunkRequest;
+using namespace gfs::common::utils;
 
 namespace gfs {
 namespace service {
@@ -439,8 +440,6 @@ grpc::Status ChunkServerFileServiceImpl::SendChunkData(
     const protos::grpc::SendChunkDataRequest* request,
     protos::grpc::SendChunkDataReply* reply) {
   *reply->mutable_request() = *request;
-  // Calculate checksum and compare with what was sent to make sure data is
-  // still intact, else return add bad data to enum??
 
   // use config mgr for chunksize
   // Is the data size greater than the allowed chunk size
@@ -452,6 +451,18 @@ grpc::Status ChunkServerFileServiceImpl::SendChunkData(
                << 64 /*fix*/ << "MB";
 
     reply->set_status(SendChunkDataReply::DATA_TOO_BIG);
+    return grpc::Status::OK;
+  }
+
+  // Calculate checksum and compare with what was sent to make sure data is
+  // still intact
+  auto checksum = calc_checksum(request->data());
+
+  if (checksum != request->checksum()) {
+    LOG(ERROR) << "Received bad chunk data. Received checksum: "
+               << request->checksum() << ", calculated checksum: " << checksum;
+
+    reply->set_status(SendChunkDataReply::BAD_DATA);
     return grpc::Status::OK;
   }
 

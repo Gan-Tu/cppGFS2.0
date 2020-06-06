@@ -178,7 +178,8 @@ message SendChunkDataReply {
     OK = 1;
     RATE_LIMITED = 2; // not used, but as an example of what we can have
     DATA_TOO_BIG = 3; // data is bigger than allowed GFS file chunk block size
-    FAILED = 4;
+    BAD_DATA = 4; // checksum for data sent doesn't match the calculated checksum
+    FAILED = 5;
   }
   SendChunkDataRequestStatus status = 2;
 }
