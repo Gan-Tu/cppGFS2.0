@@ -105,11 +105,24 @@ void StartTestServer(const std::string& server_address,
 
   ChunkServerLeaseServiceImpl lease_service(chunk_server);
   builder.RegisterService(&lease_service);
-  ChunkServerFileServiceImpl file_service(chunk_server);
+  ChunkServerFileServiceImpl file_service(
+      chunk_server, /*clear_cached_data_after_write=*/false);
   builder.RegisterService(&file_service);
   // Start the server, and let it run until thread is cancelled
   std::unique_ptr<Server> server(builder.BuildAndStart());
   server->Wait();
+}
+
+StatusOr<SendChunkDataReply> SendDataToChunkServer(
+    const std::string& server_address, const std::string& data,
+    const std::string& checksum) {
+  ChunkServerServiceGfsClient client(
+      grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
+
+  SendChunkDataRequest request;
+  request.set_data(data);
+  request.set_checksum(checksum);
+  return client.SendRequest(request);
 }
 }  // namespace
 
@@ -397,14 +410,9 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
 
   // Send data to all servers, trivial no need to parallelize
   for (auto& server_name : all_chunk_server_names) {
-    ChunkServerServiceGfsClient client(grpc::CreateChannel(
+    auto reply = SendDataToChunkServer(
         config_mgr_->GetServerAddress(server_name, /*resolve_hostname=*/true),
-        grpc::InsecureChannelCredentials()));
-
-    SendChunkDataRequest request;
-    request.set_data(write_data);
-    request.set_checksum(write_data_checksum);
-    auto reply = client.SendRequest(request);
+        write_data, write_data_checksum);
 
     EXPECT_TRUE(reply.ok());
     EXPECT_EQ(reply.ValueOrDie().status(), SendChunkDataReply::OK);
@@ -466,6 +474,17 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
   // Case 2:
   // Now try to write wrong version. This should fail.
 
+  // Again send data to chunk servers, since cache is cleared after Write.
+  // Send data to all servers, trivial no need to parallelize
+  for (auto& server_name : all_chunk_server_names) {
+    auto reply = SendDataToChunkServer(
+        config_mgr_->GetServerAddress(server_name, /*resolve_hostname=*/true),
+        write_data, write_data_checksum);
+
+    EXPECT_TRUE(reply.ok());
+    EXPECT_EQ(reply.ValueOrDie().status(), SendChunkDataReply::OK);
+  }
+
   write_request.mutable_header()->set_chunk_version(kTestFileVersion + 1);
 
   write_reply_or = primary_client.SendRequest(write_request);
@@ -482,6 +501,17 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
 
   // Case 3:
   // Now try to write wrong offset. This should fail.
+
+  // Again send data to chunk servers, since cache is cleared after Write.
+  // Send data to all servers, trivial no need to parallelize
+  for (auto& server_name : all_chunk_server_names) {
+    auto reply = SendDataToChunkServer(
+        config_mgr_->GetServerAddress(server_name, /*resolve_hostname=*/true),
+        write_data, write_data_checksum);
+
+    EXPECT_TRUE(reply.ok());
+    EXPECT_EQ(reply.ValueOrDie().status(), SendChunkDataReply::OK);
+  }
 
   // Set correct version
   write_request.mutable_header()->set_chunk_version(kTestFileVersion);

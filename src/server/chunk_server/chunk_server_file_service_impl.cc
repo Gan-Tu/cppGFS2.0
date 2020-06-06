@@ -432,6 +432,11 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
     }
   }
 
+  // Remove the data from cache
+  if (clear_cached_data_after_write_) {
+    cache_mgr->RemoveValue(request_header.data_checksum());
+  }
+
   return return_status;
 }
 
@@ -441,9 +446,10 @@ grpc::Status ChunkServerFileServiceImpl::SendChunkData(
     protos::grpc::SendChunkDataReply* reply) {
   *reply->mutable_request() = *request;
 
-  // use config mgr for chunksize
   // Is the data size greater than the allowed chunk size
-  if (request->data().size() > 64 * gfs::common::bytesPerMb) {
+  if (request->data().size() >
+      chunk_server_impl_->GetConfigManager()->GetFileChunkBlockSize() *
+          gfs::common::bytesPerMb) {
     LOG(ERROR) << "Received chunk data with checksum " << request->checksum()
                << " and size "
                << request->data().size() / gfs::common::bytesPerMb
