@@ -81,8 +81,6 @@ class ChunkServerServiceMasterServerClient {
   std::unique_ptr<protos::grpc::ChunkServerFileService::Stub> file_stub_;
 };
 
-
-
 // Communication manager for fellow chunk servers to send gRPC amongst
 // themselves doing file related, and replication related operations.
 //
@@ -105,7 +103,8 @@ class ChunkServerServiceChunkServerClient {
   // Send an ApplyMutations gRPC |request| to the chunk server, and return chunk
   // server's corresponding reply if successful; otherwise a Status with error
   // message. This method is synchronous and will block until it hears from the
-  // chunk server. This gRPC is only sent by master to the chunk server.
+  // chunk server. This gRPC is only sent by primary chunk server to the other
+  // replica chunk servers during write request.
   google::protobuf::util::StatusOr<protos::grpc::ApplyMutationsReply>
   SendRequest(const protos::grpc::ApplyMutationsRequest& request);
   google::protobuf::util::StatusOr<protos::grpc::ApplyMutationsReply>
