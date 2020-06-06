@@ -4,13 +4,13 @@
 
 const char kConfigFileName[] = "data/config.yml";
 const char kMasterName[] = "master_server_01";
-const bool resolve_hostname = true;
+const bool kResolveHostname = true;
 
-static void BM_INIT_CILENT(benchmark::State& state) {
+static void BM_INIT_CLIENT(benchmark::State& state) {
   // Benchmark the init_client function
   for (auto _ : state) {
     auto init_status(gfs::client::init_client(kConfigFileName, kMasterName,
-                                              resolve_hostname));
+                                              kResolveHostname));
     // delete the cached client impl, so we can run it again
     state.PauseTiming();
     gfs::client::reset_client();
@@ -20,7 +20,7 @@ static void BM_INIT_CILENT(benchmark::State& state) {
 
 static void BM_OPEN_WITH_READ_MODE(benchmark::State& state) {
   auto init_status(
-      gfs::client::init_client(kConfigFileName, kMasterName, resolve_hostname));
+      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   // Benchmark the init_client function
   state.counters["ok"] = 0;
   state.counters["failed"] = 0;
@@ -38,7 +38,7 @@ static void BM_OPEN_WITH_READ_MODE(benchmark::State& state) {
 
 static void BM_OPEN_WITH_WRITE_MODE(benchmark::State& state) {
   auto init_status(
-      gfs::client::init_client(kConfigFileName, kMasterName, resolve_hostname));
+      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   // Benchmark the init_client function
   state.counters["ok"] = 0;
   state.counters["failed"] = 0;
@@ -57,7 +57,7 @@ static void BM_OPEN_WITH_WRITE_MODE(benchmark::State& state) {
 
 static void BM_OPEN_WITH_CREATE_MODE(benchmark::State& state) {
   auto init_status(
-      gfs::client::init_client(kConfigFileName, kMasterName, resolve_hostname));
+      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   // Benchmark the init_client function
   state.counters["ok"] = 0;
   state.counters["failed"] = 0;
@@ -75,7 +75,7 @@ static void BM_OPEN_WITH_CREATE_MODE(benchmark::State& state) {
 }
 
 // Register the function as a benchmark
-BENCHMARK(BM_INIT_CILENT);
+BENCHMARK(BM_INIT_CLIENT);
 BENCHMARK(BM_OPEN_WITH_READ_MODE);
 BENCHMARK(BM_OPEN_WITH_WRITE_MODE);
 BENCHMARK(BM_OPEN_WITH_CREATE_MODE);
