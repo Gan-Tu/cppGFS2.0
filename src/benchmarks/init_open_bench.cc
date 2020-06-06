@@ -1,3 +1,4 @@
+#include "absl/strings/str_cat.h"
 #include "benchmark/benchmark.h"
 #include "glog/logging.h"
 #include "src/client/gfs_client.h"
@@ -22,63 +23,72 @@ static void BM_OPEN_WITH_READ_MODE(benchmark::State& state) {
   auto init_status(
       gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   // Benchmark the init_client function
-  state.counters["ok"] = 0;
-  state.counters["failed"] = 0;
+  uint64_t ok = 0;
+  uint64_t failed = 0;
   for (auto _ : state) {
     auto status_or = gfs::client::open("/open_with_read", gfs::OpenFlag::Read);
     state.PauseTiming();
     if (status_or.ok()) {
-      state.counters["ok"]++;
+      ok++;
     } else {
-      state.counters["failed"]++;
+      failed++;
     }
     state.ResumeTiming();
   }
+  state.counters["ok"] = ok;
+  state.counters["failed"] = failed;
 }
 
 static void BM_OPEN_WITH_WRITE_MODE(benchmark::State& state) {
   auto init_status(
       gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   // Benchmark the init_client function
-  state.counters["ok"] = 0;
-  state.counters["failed"] = 0;
+  uint64_t ok = 0;
+  uint64_t failed = 0;
   for (auto _ : state) {
     auto status_or =
         gfs::client::open("/open_with_write", gfs::OpenFlag::Write);
     state.PauseTiming();
     if (status_or.ok()) {
-      state.counters["ok"]++;
+      ok++;
     } else {
-      state.counters["failed"]++;
+      failed++;
     }
     state.ResumeTiming();
   }
+  state.counters["ok"] = ok;
+  state.counters["failed"] = failed;
 }
 
 static void BM_OPEN_WITH_CREATE_MODE(benchmark::State& state) {
   auto init_status(
       gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   // Benchmark the init_client function
-  state.counters["ok"] = 0;
-  state.counters["failed"] = 0;
+  uint64_t ok = 0;
+  uint64_t failed = 0;
+  int iter_count = 0;
   for (auto _ : state) {
-    auto status_or =
-        gfs::client::open("/open_with_create", gfs::OpenFlag::Create);
+    auto status_or = gfs::client::open(
+        absl::StrCat("/open_with_create_iter_", iter_count).c_str(),
+        gfs::OpenFlag::Create);
     state.PauseTiming();
     if (status_or.ok()) {
-      state.counters["ok"]++;
+      ok++;
     } else {
-      state.counters["failed"]++;
+      failed++;
     }
+    iter_count++;
     state.ResumeTiming();
   }
+  state.counters["ok"] = ok;
+  state.counters["failed"] = failed;
 }
 
-// Register the function as a benchmark
+// Register the function as a benchmark, and run single threaded
 BENCHMARK(BM_INIT_CLIENT);
 BENCHMARK(BM_OPEN_WITH_READ_MODE);
-BENCHMARK(BM_OPEN_WITH_WRITE_MODE);
-BENCHMARK(BM_OPEN_WITH_CREATE_MODE);
+// BENCHMARK(BM_OPEN_WITH_WRITE_MODE);
+// BENCHMARK(BM_OPEN_WITH_CREATE_MODE);
 
 // Instead of using BENCHMARK_MAIN, we manually write the main to allows
 // use initialize the google logging, to surpress the INFO log being logged
