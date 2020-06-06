@@ -1,19 +1,29 @@
 #include "src/server/chunk_server/chunk_server_file_service_impl.h"
 
+#include <future>
+#include <utility>
+#include <vector>
+
 #include "grpcpp/grpcpp.h"
+#include "src/common/protocol_client/chunk_server_service_server_client.h"
 #include "src/common/system_logger.h"
+#include "src/common/utils.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
+#include "src/server/chunk_server/chunk_data_cache_manager.h"
 #include "src/server/chunk_server/file_chunk_manager.h"
 
 using gfs::common::utils::ConvertProtobufStatusToGrpcStatus;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
 using StatusCode = google::protobuf::util::error::Code;
+using gfs::server::ChunkDataCacheManager;
+using gfs::service::ChunkServerServiceChunkServerClient;
 using grpc::ServerContext;
 using protos::grpc::AdvanceFileChunkVersionReply;
 using protos::grpc::AdvanceFileChunkVersionRequest;
 using protos::grpc::ApplyMutationsReply;
 using protos::grpc::ApplyMutationsRequest;
+using protos::grpc::FileChunkMutationStatus;
 using protos::grpc::InitFileChunkReply;
 using protos::grpc::InitFileChunkRequest;
 using protos::grpc::ReadFileChunkReply;
@@ -131,8 +141,120 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
 grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
     ServerContext* context, const WriteFileChunkRequest* request,
     WriteFileChunkReply* reply) {
-  // TODO(someone): implement the GFS chunk server logic here
-  return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+  LOG(INFO) << "Received WriteFileChunkRequest: " << (*request).DebugString();
+
+  *reply->mutable_request() = *request;
+
+  grpc::Status grpc_status = grpc::Status::OK;
+
+  auto& request_header = request->header();
+
+  LOG(INFO) << "Checking if we have lease on chunk handle: "
+            << request_header.chunk_handle();
+
+  if (!chunk_server_impl_->HasWriteLease(request_header.chunk_handle())) {
+    // Doesn't have write lease
+    LOG(ERROR) << "Don't have write lease for chunk handle: "
+               << request_header.chunk_handle();
+    reply->set_status(FileChunkMutationStatus::FAILED_NOT_LEASE_HOLDER);
+    return grpc_status;
+  }
+
+  LOG(INFO) << "There is a valid lease on chunk handle: "
+            << request_header.chunk_handle();
+
+  // We currently do one write at a time and send apply mutation for just this
+  // write. The WriteFileChunkReply status is set as FileChunkMutationStatus::OK
+  // if this internal write succeeds. Because it can fail at other replicas, we
+  // add the status of each replica apply mutation to the replica_status.
+
+  // Get data from cache and try to make the local write
+  grpc_status = WriteFileChunkInternal(request_header, reply);
+
+  if (reply->status() != FileChunkMutationStatus::OK) {
+    // Write failed
+    return grpc_status;
+  }
+
+  // Write successful
+  // Send to other replicas to apply this write
+  LOG(INFO) << "Now sending apply mutation requests to "
+            << request->replica_locations_size()
+            << " replica(s) in parallel for file chunk: "
+            << request_header.chunk_handle();
+
+  // Send the requests in parallel
+  std::vector<
+      std::future<std::pair<std::string, StatusOr<ApplyMutationsReply>>>>
+      apply_mutation_results;
+
+  for (int replica = 0; replica < request->replica_locations_size();
+       ++replica) {
+    apply_mutation_results.push_back(
+        std::async(std::launch::async, [&, replica]() {
+          auto& replica_location = request->replica_locations(replica);
+
+          std::string hostname = replica_location.server_hostname();
+          if (chunk_server_impl_->ResolveHostname()) {
+            hostname = chunk_server_impl_->GetConfigManager()->ResolveHostname(
+                hostname);
+          }
+
+          auto server_address =
+              absl::StrCat(hostname, ":", replica_location.server_port());
+
+          auto client =
+              chunk_server_impl_->GetChunkServerProtocolClient(server_address);
+
+          ApplyMutationsRequest apply_mutation_request;
+          *apply_mutation_request.add_headers() = request_header;
+
+          LOG(INFO)
+              << "Sending apply mutation request to replica chunk server: "
+              << server_address
+              << " for file chunk: " << request_header.chunk_handle();
+
+          auto apply_mutation_reply =
+              client->SendRequest(apply_mutation_request);
+
+          return std::pair<std::string, StatusOr<ApplyMutationsReply>>(
+              server_address, apply_mutation_reply);
+        }));
+  }
+
+  // Wait for the apply muatation replies
+  for (int replica = 0; replica < request->replica_locations_size();
+       ++replica) {
+    LOG(INFO) << "Waiting for apply mutation reply for replica " << replica
+              << " for file chunk: " << request_header.chunk_handle();
+
+    auto apply_mutation_result = apply_mutation_results[replica].get();
+    auto server_address = apply_mutation_result.first;
+    auto apply_mutation_reply = apply_mutation_result.second;
+
+    FileChunkMutationStatus apply_mutation_status;
+    if (apply_mutation_reply.ok()) {
+      apply_mutation_status = apply_mutation_reply.ValueOrDie().status();
+
+      LOG(INFO) << "Received apply mutation status: " << apply_mutation_status
+                << " for file chunk: " << request_header.chunk_handle()
+                << " from chunk server: " << server_address;
+    } else {
+      LOG(ERROR) << "Apply mutation request to chunk server: " << server_address
+                 << " for file chunk: " << request_header.chunk_handle()
+                 << " failed. Status: " << apply_mutation_reply.status();
+
+      apply_mutation_status = FileChunkMutationStatus::UNKNOWN;
+    }
+
+    // Add the result of this replica mutation to reply
+    auto replica_status = reply->add_replica_status();
+    *replica_status->mutable_chunk_server_location() =
+        request->replica_locations(replica);
+    replica_status->set_status(apply_mutation_status);
+  }
+
+  return grpc_status;
 }
 
 grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
@@ -196,16 +318,154 @@ grpc::Status ChunkServerFileServiceImpl::ApplyMutations(
     grpc::ServerContext* context,
     const protos::grpc::ApplyMutationsRequest* request,
     protos::grpc::ApplyMutationsReply* reply) {
-  // TODO(someone): implement the GFS chunk server logic here
-  return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+  LOG(INFO) << "Received ApplyMutationsRequest: " << (*request).DebugString();
+
+  *reply->mutable_request() = *request;
+
+  // Ideally we'll use the serialized order of mutations.
+  // But we are currently just sending one apply mutation request.
+  auto& request_header = request->headers(0);
+
+  // Get data from cache and try to make the local write
+  WriteFileChunkReply write_reply;
+  auto status = WriteFileChunkInternal(request_header, &write_reply);
+
+  reply->set_status(write_reply.status());
+  return status;
+}
+
+grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
+    const protos::grpc::WriteFileChunkRequestHeader& request_header,
+    protos::grpc::WriteFileChunkReply* const reply) {
+  LOG(INFO) << "Checking data in cache for checksum: "
+            << request_header.data_checksum()
+            << ", Chunk handle: " << request_header.chunk_handle();
+
+  auto cache_mgr = ChunkDataCacheManager::GetInstance();
+  auto data_or = cache_mgr->GetValue(request_header.data_checksum());
+  if (!data_or.ok()) {
+    // Data not found, probably hasn't been sent
+    LOG(ERROR) << "Data not found in cache for checksum: "
+               << request_header.data_checksum()
+               << ". Chunk handle: " << request_header.chunk_handle();
+    reply->set_status(FileChunkMutationStatus::FAILED_DATA_NOT_FOUND);
+    return grpc::Status::OK;
+  }
+
+  LOG(INFO) << "Data found in cache for checksum: "
+            << request_header.data_checksum()
+            << ". Chunk handle: " << request_header.chunk_handle()
+            << ". Now writing data to file chunk.";
+
+  // Do the actual disk write
+  auto write_result = file_manager_->WriteToChunk(
+      request_header.chunk_handle(), request_header.chunk_version(),
+      request_header.offset_start(), request_header.length(),
+      data_or.ValueOrDie());
+
+  grpc::Status return_status = grpc::Status::OK;
+
+  if (write_result.ok()) {
+    // Write successful
+    auto num_bytes_written = write_result.ValueOrDie();
+    LOG(INFO) << "Write successful for file chunk: "
+              << request_header.chunk_handle()
+              << " Bytes written: " << num_bytes_written;
+
+    reply->set_bytes_written(num_bytes_written);
+    reply->set_status(FileChunkMutationStatus::OK);
+  } else {
+    // Write failed, lets see why it failed
+    auto error_code = write_result.status().error_code();
+
+    LOG(ERROR) << "Write failed for file chunk: "
+               << request_header.chunk_handle()
+               << ", Error code: " << error_code;
+
+    if (error_code == StatusCode::NOT_FOUND) {
+      // See why it wasn't found
+      // Get the current chunk version
+      StatusOr<uint32_t> version_result =
+          file_manager_->GetChunkVersion(request_header.chunk_handle());
+
+      if (version_result.ok()) {
+        // NOT FOUND: stale version
+        LOG(ERROR) << "Cannot write file chunk "
+                   << request_header.chunk_handle()
+                   << " because the requested version: "
+                   << request_header.chunk_version()
+                   << " is stale. Current version: "
+                   << version_result.ValueOrDie();
+        reply->set_status(FileChunkMutationStatus::FAILED_STALE_VERSION);
+      } else {
+        // Get version failed, maybe chunk doesn't exist.
+        // NOT FOUND: file handle
+        if (version_result.status().error_code() == StatusCode::NOT_FOUND) {
+          LOG(ERROR) << "Cannot write to file chunk because it is not found: "
+                     << request_header.chunk_handle();
+          reply->set_status(FileChunkMutationStatus::FAILED_DATA_NOT_FOUND);
+        } else {
+          // INTERNAL ERROR
+          LOG(ERROR)
+              << "Unexpected error when checking the current write version for "
+                 "file chunk: "
+              << request_header.chunk_handle()
+              << ". Status: " << version_result.status();
+          return_status =
+              ConvertProtobufStatusToGrpcStatus(version_result.status());
+        }
+      }
+    } else if (error_code == StatusCode::OUT_OF_RANGE) {
+      LOG(ERROR) << "Failed to write file chunk because the write offset "
+                 << request_header.offset_start()
+                 << " is out of the allowed range. Status: "
+                 << write_result.status();
+      reply->set_status(FileChunkMutationStatus::FAILED_OUT_OF_RANGE);
+    } else {
+      // INTERNAL ERROR
+      LOG(ERROR) << "Unexpected error while writing file chunk: "
+                 << request_header.chunk_handle()
+                 << ". Status: " << write_result.status();
+      reply->set_status(FileChunkMutationStatus::UNKNOWN);
+      return_status = ConvertProtobufStatusToGrpcStatus(write_result.status());
+    }
+  }
+
+  return return_status;
 }
 
 grpc::Status ChunkServerFileServiceImpl::SendChunkData(
     grpc::ServerContext* context,
     const protos::grpc::SendChunkDataRequest* request,
     protos::grpc::SendChunkDataReply* reply) {
-  // TODO(someone): implement the GFS chunk server logic here
-  return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+  *reply->mutable_request() = *request;
+  // Calculate checksum and compare with what was sent to make sure data is
+  // still intact, else return add bad data to enum??
+
+  // use config mgr for chunksize
+  // Is the data size greater than the allowed chunk size
+  if (request->data().size() > 64 * gfs::common::bytesPerMb) {
+    LOG(ERROR) << "Received chunk data with checksum " << request->checksum()
+               << " and size "
+               << request->data().size() / gfs::common::bytesPerMb
+               << "MB is bigger than the max allowed size "
+               << 64 /*fix*/ << "MB";
+
+    reply->set_status(SendChunkDataReply::DATA_TOO_BIG);
+    return grpc::Status::OK;
+  }
+
+  // Store the data temporarily in the cache
+  ChunkDataCacheManager::GetInstance()->SetValue(request->checksum(),
+                                                 request->data());
+
+  LOG(INFO) << "Received chunk data with checksum " << request->checksum()
+            << " and size " << request->data().size() / gfs::common::bytesPerMb
+            << "MB has been temporarily stored in the cache";
+
+  reply->set_status(SendChunkDataReply::OK);
+
+  return grpc::Status::OK;
 }
 
 }  // namespace service

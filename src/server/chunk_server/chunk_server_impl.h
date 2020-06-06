@@ -45,8 +45,8 @@ class ChunkServerImpl {
   std::shared_ptr<gfs::service::MasterChunkServerManagerServiceClient>
   GetMasterProtocolClient(const std::string& server_address);
 
-  // Register (create) a protocol client for talking to the master at |server_address|.
-  // Overwrite any existing connection.
+  // Register (create) a protocol client for talking to the master at
+  // |server_address|. Overwrite any existing connection.
   void RegisterMasterProtocolClient(const std::string& server_address);
 
   // Similar to GetMasterProtocolClient, but for talking to chunk servers.
@@ -61,6 +61,12 @@ class ChunkServerImpl {
   // and the master will become aware of them and start issuing chunk
   // allocations to them. Returns true if successful and false otherwise.
   bool ReportToMaster();
+
+  // Get the configuration manager used by the chunkserver
+  gfs::common::ConfigManager* GetConfigManager() const;
+
+  // Check if resolving hostname is enabled
+  bool ResolveHostname() const;
 
  private:
   ChunkServerImpl() = default;
@@ -81,10 +87,10 @@ class ChunkServerImpl {
 
   // Server address and its corresponding GFS protocol client
   // A protocol client will be added the first time the connection is added, and
-  // subsequent calls will simply reuse this protocol client and connection. 
+  // subsequent calls will simply reuse this protocol client and connection.
   // Currently we don't remove connections no longer in use, for simplicity.
   //
-  // Note that this design makes it possible to dynamically add new connections 
+  // Note that this design makes it possible to dynamically add new connections
   // to new servers that may not be present during startup configuration.
   gfs::common::thread_safe_flat_hash_map<
       std::string,

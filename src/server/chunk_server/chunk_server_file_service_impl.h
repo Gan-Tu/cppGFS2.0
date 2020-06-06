@@ -53,6 +53,16 @@ class ChunkServerFileServiceImpl final
   gfs::server::ChunkServerImpl* chunk_server_impl_;
   gfs::server::FileChunkManager* file_manager_ =
       gfs::server::FileChunkManager::GetInstance();
+
+ private:
+  // Internal helper method to write file chunk to the local file chunk manager
+  // and set reply status to the appropriate FileChunkMutationStatus. This is
+  // used by both WriteFileChunk and ApplyMutations, to apply writes locally. It
+  // gets the write data from cache if exist, and uses the file manager to write
+  // data to the file chunk on disk.
+  grpc::Status WriteFileChunkInternal(
+      const protos::grpc::WriteFileChunkRequestHeader& request_header,
+      protos::grpc::WriteFileChunkReply* const reply);
 };
 
 // The asynchronous implementation for handling ChunkServerFileService requests
