@@ -68,10 +68,15 @@ google::protobuf::util::Status open(const char* filename, unsigned int flags) {
 
   // Creation mode, this is true when flags = OpenFlag::Create or
   // Open::Create | Open::Write
-  if (flags == OpenFlag::Create ||
-      flags == (OpenFlag::Create | OpenFlag::Write)) {
+  if (flags == OpenFlag::Create) {
     auto create_status(client_impl_->CreateFile(filename));
     if (!create_status.ok()) {
+      return create_status;
+    }
+  } else if (flags == (OpenFlag::Create | OpenFlag::Write)) {
+    auto create_status(client_impl_->CreateFile(filename));
+    if (!create_status.ok() &&
+        create_status.code() != google::protobuf::util::error::ALREADY_EXISTS) {
       return create_status;
     }
   }
