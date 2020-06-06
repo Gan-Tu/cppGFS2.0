@@ -33,6 +33,9 @@ struct Data {
 google::protobuf::util::Status init_client(const std::string& config_filename,
     const std::string& master_name, const bool resolve_hostname = false);
 
+// Reset client as if it was never initialized
+void reset_client();
+
 // We support the following mode: Read Mode | Write Mode | Create Mode
 // when opening a file. The only possible combination is Write | Create. 
 // The flags is an unsigned integer (similar to the open system call) which
