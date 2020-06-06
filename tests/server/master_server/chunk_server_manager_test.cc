@@ -451,7 +451,7 @@ TEST_F(ChunkServerManagerTest, ConcurrentRegisterAndAllocateChunkServers) {
 
   // concurrently register 5 more chunservers and allocate 8 chunkservers
   // Using 8 here since allocation is usually faster than registration.
-  ushort server_allocation_thread_count = chunk_servers_count - 2;
+  ushort server_allocation_thread_count = preregistered_servers_count;
   std::vector<std::future<ChunkServerLocationThreadSafeFlatSet>>
       server_allocation_thread_futures;
 
