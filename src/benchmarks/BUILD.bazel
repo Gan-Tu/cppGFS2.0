@@ -1,0 +1,13 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+cc_binary(
+    name = "init_open_bench",
+    srcs = ["init_open_bench.cc"],
+    data = ["//data:config.yml"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/client:gfs_client",
+        "@com_google_benchmark//:benchmark",
+        "@com_google_glog//:glog",
+    ],
+)
