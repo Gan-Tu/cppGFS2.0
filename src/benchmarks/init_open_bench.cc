@@ -112,7 +112,7 @@ static void BM_OPEN_WITH_CREATE_MODE_MULTI_THREADED(benchmark::State& state) {
   state.counters["failed"] = failed;
 }
 
-// Register the function as a benchmark, and run single threaded
+// Register the function as a benchmark
 BENCHMARK(BM_INIT_CLIENT);
 BENCHMARK(BM_OPEN_WITH_READ_MODE);
 BENCHMARK(BM_OPEN_WITH_WRITE_MODE);
