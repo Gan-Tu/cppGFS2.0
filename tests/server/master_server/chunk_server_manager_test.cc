@@ -424,7 +424,6 @@ TEST_F(ChunkServerManagerTest, ConcurrentAllocateChunkServers) {
 TEST_F(ChunkServerManagerTest, ConcurrentRegisterAndAllocateChunkServers) {
   const ushort chunk_servers_count = 10;
   const ushort preregistered_servers_count = chunk_servers_count / 2;
-  const ushort concurrently_registered_servers_count = chunk_servers_count / 2;
   ChunkServerLocationThreadSafeFlatSet created_locations;
 
   // Pre-register 5 chunkservers
@@ -449,8 +448,8 @@ TEST_F(ChunkServerManagerTest, ConcurrentRegisterAndAllocateChunkServers) {
                                  *server_location));
   }
 
-  // concurrently register 5 more chunservers and allocate 8 chunkservers
-  // Using 8 here since allocation is usually faster than registration.
+  // concurrently register 5 more chunservers and allocate 5 chunkservers
+  // Using 5 here since allocation is usually faster than registration.
   ushort server_allocation_thread_count = preregistered_servers_count;
   std::vector<std::future<ChunkServerLocationThreadSafeFlatSet>>
       server_allocation_thread_futures;
@@ -466,32 +465,31 @@ TEST_F(ChunkServerManagerTest, ConcurrentRegisterAndAllocateChunkServers) {
               /*server_count=*/1);
         }));
 
-    // we only want to create 5 more chunkservers
-    if (i < concurrently_registered_servers_count) {
-      const ushort server_id = preregistered_servers_count + i;
+    const ushort server_id = preregistered_servers_count + i;
+    server_registration_thread_futures.push_back(
+        std::async(std::launch::async, [&, server_id]() {
+          protos::ChunkServerLocation* server_location =
+              new protos::ChunkServerLocation(
+                  std::move(CreateChunkServerLocation(
+                      std::string("192.168.1.") + std::to_string(server_id),
+                      server_id)));
 
-      server_registration_thread_futures.push_back(
-          std::async(std::launch::async, [&, server_id]() {
-            protos::ChunkServerLocation* server_location =
-                new protos::ChunkServerLocation(
-                    std::move(CreateChunkServerLocation(
-                        std::string("192.168.1.") + std::to_string(server_id),
-                        server_id)));
+          std::shared_ptr<protos::ChunkServer> chunk_server(
+              new protos::ChunkServer());
+          chunk_server->set_allocated_location(server_location);
+          // Giving them 100 to 109mb, can only store 1 chunk
+          chunk_server->set_available_disk_mb(100 + server_id);
 
-            std::shared_ptr<protos::ChunkServer> chunk_server(
-                new protos::ChunkServer());
-            chunk_server->set_allocated_location(server_location);
-            // Giving them 100 to 109mb, can only store 1 chunk
-            chunk_server->set_available_disk_mb(100 + server_id);
+          // store all the created locations.
+          // Doing this here instead of after registration, because this
+          // registered chunk server, might have been allocated for a chunk,
+          // and before we insert into created_locations, the allocation
+          // thread may be done, and checks if the location is in
+          // created_locations and fails because not yet inserted.
+          created_locations.insert(*server_location);
 
-            ChunkServerManager::GetInstance().RegisterChunkServer(chunk_server);
-
-            // store all the created locations.
-            // Doing this here, since the set synchronizes threads and don't
-            // want that before we register.
-            created_locations.insert(*server_location);
-          }));
-    }
+          ChunkServerManager::GetInstance().RegisterChunkServer(chunk_server);
+        }));
   }
 
   // Wait for each server allocation thread future and get result.
