@@ -39,8 +39,7 @@ Make sure you have [Docker](https://docs.docker.com/engine/install/) and [Docker
 To start all servers and expose respective server ports outside of Docker for connection, run:
 
 ```
-docker-compose build
-docker-compose up
+docker-compose up --build
 ```
 
 After all servers have started, try it out by running an example client script:
