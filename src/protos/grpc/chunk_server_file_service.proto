@@ -167,7 +167,7 @@ message SendChunkDataRequest {
   bytes data = 1;
   // The checksum for uniquely identifying this data across requests, so
   // future requests don't need to resend the data, unless the data expired.
-  string checksum = 2;
+  bytes checksum = 2;
 }
 
 message SendChunkDataReply {
@@ -178,7 +178,8 @@ message SendChunkDataReply {
     OK = 1;
     RATE_LIMITED = 2; // not used, but as an example of what we can have
     DATA_TOO_BIG = 3; // data is bigger than allowed GFS file chunk block size
-    FAILED = 4;
+    BAD_DATA = 4; // checksum for data sent doesn't match the calculated checksum
+    FAILED = 5;
   }
   SendChunkDataRequestStatus status = 2;
 }
@@ -194,7 +195,7 @@ message WriteFileChunkRequestHeader {
   uint32 length = 4;
   // The checksum for uniquely identifying the data previously sent to all 
   // replicas already via SendChunkData gRPC.
-  string data_checksum = 5;
+  bytes data_checksum = 5;
 }
 
 message ApplyMutationsRequest {
@@ -215,6 +216,8 @@ enum FileChunkMutationStatus {
   // This only applies if a client tries to send a WriteRequest to a secondary
   // replica; it'll not error when ApplyMutationRequests are sent by the primary
   FAILED_NOT_LEASE_HOLDER = 5;
+  // Failed because the write start offset is outside the allowed range
+  FAILED_OUT_OF_RANGE = 6;
 }
 
 

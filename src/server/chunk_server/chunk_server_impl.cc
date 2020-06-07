@@ -74,7 +74,7 @@ void ChunkServerImpl::RemoveLease(const std::string& file_handle) {
 
 google::protobuf::util::StatusOr<uint32_t> ChunkServerImpl::GetChunkVersion(
     const std::string& file_handle) {
-   return file_manager_->GetChunkVersion(file_handle);
+  return file_manager_->GetChunkVersion(file_handle);
 }
 
 //
@@ -169,6 +169,12 @@ bool ChunkServerImpl::ReportToMaster() {
   // atleast one master server knows about this chunk server.
   return successful_report > 0;
 }
+
+gfs::common::ConfigManager* ChunkServerImpl::GetConfigManager() const {
+  return config_manager_;
+}
+
+bool ChunkServerImpl::ResolveHostname() const { return resolve_hostname_; }
 
 }  // namespace server
 }  // namespace gfs

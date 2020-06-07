@@ -89,5 +89,11 @@ ChunkServerServiceMasterServerClient::SendRequest(
   return SendRequest(request, default_context);
 }
 
+StatusOr<ApplyMutationsReply> ChunkServerServiceChunkServerClient::SendRequest(
+    const ApplyMutationsRequest& request) {
+  ClientContext default_context;
+  return SendRequest(request, default_context);
+}
+
 }  // namespace service
 }  // namespace gfs

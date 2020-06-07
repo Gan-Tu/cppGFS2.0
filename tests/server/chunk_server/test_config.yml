@@ -9,6 +9,8 @@ servers:
     - chunk_server_01
     - chunk_server_02
     - chunk_server_03
+    - write_chunk_server_01
+    - write_chunk_server_02
 # Network Information for each server
 # Feel free to change hostname to match Docker config, when applicable
 network:
@@ -24,6 +26,12 @@ network:
   chunk_server_03:
     hostname: chunk_server_03
     port: 50054
+  write_chunk_server_01:
+    hostname: write_chunk_server_01
+    port: 50055
+  write_chunk_server_02:
+    hostname: write_chunk_server_02
+    port: 50056
   dns_lookup_table: # Hostname -> IP address mapping
     # These values should only be used, if no DNS server is available
     # for translating hostname to IP address. If using Docker, docker
@@ -33,6 +41,8 @@ network:
     chunk_server_01: 0.0.0.0
     chunk_server_02: 0.0.0.0
     chunk_server_03: 0.0.0.0
+    write_chunk_server_01: 0.0.0.0
+    write_chunk_server_02: 0.0.0.0
 disk:
   # The block size (MB) for each GFS file chunk
   block_size_mb: 64
@@ -43,6 +53,8 @@ disk:
     chunk_server_01: data/gfs_db_chunk_server_01
     chunk_server_02: data/gfs_db_chunk_server_02
     chunk_server_03: data/gfs_db_chunk_server_03
+    write_chunk_server_01: data/gfs_db_write_chunk_server_01
+    write_chunk_server_02: data/gfs_db_write_chunk_server_02
 timeout:
   # The valid suffixes are "ns", "us" "ms", "s", "m", and "h".
   grpc: 10s
