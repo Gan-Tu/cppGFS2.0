@@ -86,10 +86,10 @@ class ClientImpl {
   // Register a client end-point for chunk server service client
   void RegisterChunkServerServiceClient(const std::string& server_address);
 
-  bool resolve_hostname_;
-
   // Reference to the configuration manager
   common::ConfigManager* config_manager_;
+
+  bool resolve_hostname_;
 
   // Reference to the cache manager
   CacheManager* cache_manager_;
