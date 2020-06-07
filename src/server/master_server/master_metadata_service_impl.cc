@@ -42,6 +42,11 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
     protos::grpc::OpenFileReply* reply) {
   const std::string& filename(request->filename());
   const uint32_t chunk_index(request->chunk_index());
+  if (!metadata_manager()->ExistFileMetadata(filename)) {
+    LOG(ERROR) << "Cannot create file chunk index " << chunk_index << " for "
+               << filename << " because the file doesn't exist";
+    return grpc::Status(grpc::NOT_FOUND, "File doesn't exist");
+  }
 
   // Step 1. Create the file chunk
   // TODO(Xi): undo the file handle creation if any step of the remaining fails,
