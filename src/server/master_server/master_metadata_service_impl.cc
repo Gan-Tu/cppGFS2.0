@@ -265,10 +265,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
   }
 
   FileChunkMetadata metadata = file_chunk_metadata_or.ValueOrDie();
-  *reply->mutable_metadata() = metadata;
-
   const std::string& chunk_handle(metadata.chunk_handle());
-  uint32_t chunk_version(metadata.version());
+  uint32_t chunk_version = metadata.version();
   uint32_t new_chunk_version = chunk_version + 1;
 
   LOG(INFO) << "Advancing chunk version for chunk handle " << chunk_handle
@@ -276,7 +274,9 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
 
   // Now that all chunk server locations are stored in reply, the master first
   // advances the chunk version of this chunk and then send a GrantLeaseRequest
-  for (auto chunk_server_location : metadata.locations()) {
+  std::vector<protos::ChunkServerLocation> advanced_locations = {};
+  for (auto chunk_server_location :
+       chunk_server_manager().GetChunkLocations(chunk_handle)) {
     std::string chunk_server_hostname = chunk_server_location.server_hostname();
     if (resolve_hostname_) {
       chunk_server_hostname =
@@ -306,17 +306,29 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
       LOG(ERROR) << "Failed to advance chunk version for chunk " << chunk_handle
                  << " on chunk server " << server_address << "due to "
                  << advance_version_reply_or.status();
-      LOG(INFO) << "Removing chunk server "
+      LOG(INFO) << "Skipping chunk server "
                 << chunk_server_location.server_hostname()
-                << " from write locations for " << chunk_handle;
+                << " for write operation " << chunk_handle;
       // TODO(Xi): handle if all version advancement fails
       // TODO(tugan): the client shouldn't write to this chunk server anymore
     } else {
       LOG(INFO) << "Advanced chunk version for chunk " << chunk_handle
                 << " on chunk server " << server_address;
+      advanced_locations.push_back(chunk_server_location);
     }
   }
 
+  if (advanced_locations.empty()) {
+    LOG(ERROR) << "No chunk servers were able to advance version for "
+               << chunk_handle << " from " << chunk_version << " to "
+               << new_chunk_version;
+    return grpc::Status(grpc::UNAVAILABLE,
+                        "Cannot advance versions on all chunk servers, so no "
+                        "write operations can be done. Abort.");
+  }
+
+  // This should happen after at least one chunk server is advanced so master
+  // doesn't become out of sync with all others
   auto version_advance_status(
       metadata_manager()->AdvanceChunkVersion(chunk_handle));
   if (!version_advance_status.ok()) {
@@ -330,56 +342,64 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
   }
 
   // After advancing the chunk version, obtain a lease
-  std::string primary_server_hostname =
-      reply->metadata().primary_location().server_hostname();
-  if (resolve_hostname_) {
-    primary_server_hostname =
-        config_manager_->ResolveHostname(primary_server_hostname);
+  // We do so by trying to grant lease to one server at a time, and stop
+  // at the first one that accepted the lease
+  bool lease_granted = false;
+  protos::ChunkServerLocation primary_location;
+  for (auto& location : advanced_locations) {
+    std::string primary_server_hostname = location.server_hostname();
+    if (resolve_hostname_) {
+      primary_server_hostname =
+          config_manager_->ResolveHostname(primary_server_hostname);
+    }
+    const std::string& primary_server_address(
+        primary_server_hostname + ":" + std::to_string(location.server_port()));
+    auto lease_service_client(
+        GetOrCreateChunkServerProtocolClient(primary_server_address));
+
+    LOG(INFO) << "MasterMetadataService trying to grant write lease to server "
+              << primary_server_address;
+    // Prepare GrantLeaseRequest to send to chunk server
+    GrantLeaseRequest grant_lease_request;
+    grant_lease_request.set_chunk_handle(chunk_handle);
+    grant_lease_request.set_chunk_version(chunk_version + 1);
+    grant_lease_request.mutable_lease_expiration_time()->set_seconds(
+        absl::ToUnixSeconds(absl::Now() +
+                            config_manager_->GetWriteLeaseTimeout()));
+    grpc::ClientContext client_context;
+    common::SetClientContextDeadline(client_context, config_manager_);
+
+    // Issue GrantLeaseRequest request and check status
+    google::protobuf::util::StatusOr<GrantLeaseReply> grant_lease_reply_or(
+        lease_service_client->SendRequest(grant_lease_request, client_context));
+
+    // Handle error, and logging
+    if (!grant_lease_reply_or.ok()) {
+      LOG(ERROR) << "Grant lease request for chunk " << chunk_handle << " at "
+                 << primary_server_address << " failed due to "
+                 << grant_lease_reply_or.status();
+      continue;
+    } else {
+      LOG(INFO) << "Grant lease request for chunk " << chunk_handle << " at "
+                << primary_server_address << " succeeded";
+      lease_granted = true;
+      primary_location = location;
+      break;
+    }
   }
-  const std::string& primary_server_address(
-      primary_server_hostname + ":" +
-      std::to_string(reply->metadata().primary_location().server_port()));
-  auto lease_service_client(
-      GetOrCreateChunkServerProtocolClient(primary_server_address));
 
-  LOG(INFO) << "MasterMetadataService granting write lease to primary server "
-            << primary_server_address;
-  // Prepare GrantLeaseRequest to send to chunk server
-  GrantLeaseRequest grant_lease_request;
-  grant_lease_request.set_chunk_handle(chunk_handle);
-  grant_lease_request.set_chunk_version(chunk_version + 1);
-  grant_lease_request.mutable_lease_expiration_time()->set_seconds(
-      absl::ToUnixSeconds(absl::Now() +
-                          config_manager_->GetWriteLeaseTimeout()));
-  grpc::ClientContext client_context;
-  common::SetClientContextDeadline(client_context, config_manager_);
-
-  // Issue GrantLeaseRequest request and check status
-  google::protobuf::util::StatusOr<GrantLeaseReply> grant_lease_reply_or(
-      lease_service_client->SendRequest(grant_lease_request, client_context));
-
-  // Handle error, and logging
-  if (!grant_lease_reply_or.ok()) {
-    LOG(ERROR) << "Grant lease request for chunk " << chunk_handle << " at "
-               << primary_server_address << " failed due to "
-               << grant_lease_reply_or.status();
-    // TODO(Xi): technically, we can retry on another server if the random
-    // server cannot be a primary
-    return common::utils::ConvertProtobufStatusToGrpcStatus(
-        grant_lease_reply_or.status());
-  } else {
-    LOG(INFO) << "Grant lease request for chunk " << chunk_handle << " at "
-              << primary_server_address << " succeeded";
+  if (!lease_granted) {
+    return grpc::Status(grpc::UNAVAILABLE,
+                        "No chunk server is available to accept the write "
+                        "lease and act as the primary. Abort");
   }
 
-  // Get the Metadata back to reply
-  auto updated_metadata_or(
-      metadata_manager()->GetFileChunkMetadata(chunk_handle));
-  if (!updated_metadata_or.ok()) {
-    return common::utils::ConvertProtobufStatusToGrpcStatus(
-        updated_metadata_or.status());
+  reply->mutable_metadata()->set_chunk_handle(chunk_handle);
+  reply->mutable_metadata()->set_version(new_chunk_version);
+  *reply->mutable_metadata()->mutable_primary_location() = primary_location;
+  for (auto& location : advanced_locations) {
+    *reply->mutable_metadata()->add_locations() = location;
   }
-  *reply->mutable_metadata() = updated_metadata_or.ValueOrDie();
 
   return grpc::Status::OK;
 }
