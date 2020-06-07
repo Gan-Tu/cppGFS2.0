@@ -20,8 +20,11 @@ def test_main():
     # Launch the cluster 
     config_filename = test_case_name + "/" + "config.yaml"
     log_directory = test_case_name + "/" + "logs"
+    # We configure grpc timeout to be 30s as there are grpc calls that send
+    # 64MB data in one shot
     server_procs = end_to_end_lib.start_master_and_chunk_servers(
-                       config_filename, log_directory)
+                       config_filename, log_directory,
+                       grpc_timeout_s = 30)
 
     # Launch client process as writer
     client = subprocess.Popen(
