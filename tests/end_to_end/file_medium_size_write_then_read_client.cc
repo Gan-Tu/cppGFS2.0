@@ -72,7 +72,7 @@ void singleFileRead(const std::string& filename_base, ushort id) {
 
   auto read_data(read_data_or.ValueOrDie());
   if (memcmp(read_data.buffer, kGlobalFileData.c_str(), 
-             kGlobalFileData.size() != 0)) {
+             kGlobalFileData.size()) != 0) {
     LOG(ERROR) << "Read request in the " + std::to_string(id) 
                << " receives incorrect data";
     exit(1);
