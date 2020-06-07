@@ -116,7 +116,7 @@ ChunkServerImpl::GetChunkServerProtocolClient(
   }
 }
 
-bool ChunkServerImpl::ReportToMaster() {
+bool ChunkServerImpl::ReportToMaster(const uint64_t initial_disk_space_mb) {
   // Prepare the report chunk server request
   ReportChunkServerRequest request;
 
@@ -131,7 +131,7 @@ bool ChunkServerImpl::ReportToMaster() {
 
   // TODO(bmokutub): Use std::filesystem to get the available disk space.
   // Setting to 20GB for now, fix this.
-  chunk_server->set_available_disk_mb(/*available_disk_mb=*/20 * 1024);
+  chunk_server->set_available_disk_mb(initial_disk_space_mb);
 
   // We also need to tell the master all the chunks we have, if any.
   auto all_chunks_metadata =

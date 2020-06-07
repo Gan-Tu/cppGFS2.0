@@ -94,7 +94,10 @@ int main(int argc, char** argv) {
   // enable the master be aware of this chunkserver, and to start selecting it
   // for chunk allocation. This also allows chunk servers to be dynamically
   // added since they just need to report themselves to master.
-  if (!chunk_server_impl->ReportToMaster()) {
+  //
+  // TODO(tugan): initial setting as 2TB for now, useful for benchmarking
+  const uint64_t initial_disk_space_mb = 1024 * 1024 * 2;
+  if (!chunk_server_impl->ReportToMaster(initial_disk_space_mb)) {
     LOG(ERROR) << "Failed to report to any master server. Probably no master "
                   "server is running. Shutting down...";
     return 1;

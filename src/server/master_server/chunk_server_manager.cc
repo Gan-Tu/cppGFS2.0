@@ -70,6 +70,8 @@ ChunkServerLocationThreadSafeFlatSet ChunkServerManager::AllocateChunkServer(
     if (new_available_disk <= 0) {
       // stop iterating, won't find any chunk server with larger disk since list
       // is sorted by available disk in descending order
+      LOG(ERROR) << "Stopped allocating because no remaining chunk servers have "
+                   "free space anymore: " << chunk_handle;
       break;
     }
 
