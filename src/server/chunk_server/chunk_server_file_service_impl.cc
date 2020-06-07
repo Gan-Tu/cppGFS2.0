@@ -223,7 +223,7 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
         }));
   }
 
-  // Wait for the apply muatation replies
+  // Wait for the apply mutation replies
   for (int replica = 0; replica < request->replica_locations_size();
        ++replica) {
     LOG(INFO) << "Waiting for apply mutation reply for replica " << replica
@@ -339,7 +339,7 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
     const protos::grpc::WriteFileChunkRequestHeader& request_header,
     protos::grpc::WriteFileChunkReply* const reply) {
   LOG(INFO) << "Checking data in cache for checksum: "
-            << request_header.data_checksum()
+            << request_header.data_checksum().c_str()
             << ", Chunk handle: " << request_header.chunk_handle();
 
   auto cache_mgr = ChunkDataCacheManager::GetInstance();
@@ -347,14 +347,14 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
   if (!data_or.ok()) {
     // Data not found, probably hasn't been sent
     LOG(ERROR) << "Data not found in cache for checksum: "
-               << request_header.data_checksum()
+               << request_header.data_checksum().c_str()
                << ". Chunk handle: " << request_header.chunk_handle();
     reply->set_status(FileChunkMutationStatus::FAILED_DATA_NOT_FOUND);
     return grpc::Status::OK;
   }
 
   LOG(INFO) << "Data found in cache for checksum: "
-            << request_header.data_checksum()
+            << request_header.data_checksum().c_str()
             << ". Chunk handle: " << request_header.chunk_handle()
             << ". Now writing data to file chunk.";
 
@@ -450,8 +450,8 @@ grpc::Status ChunkServerFileServiceImpl::SendChunkData(
   if (request->data().size() >
       chunk_server_impl_->GetConfigManager()->GetFileChunkBlockSize() *
           gfs::common::bytesPerMb) {
-    LOG(ERROR) << "Received chunk data with checksum " << request->checksum()
-               << " and size "
+    LOG(ERROR) << "Received chunk data with checksum "
+               << request->checksum().c_str() << " and size "
                << request->data().size() / gfs::common::bytesPerMb
                << "MB is bigger than the max allowed size "
                << 64 /*fix*/ << "MB";
@@ -466,7 +466,8 @@ grpc::Status ChunkServerFileServiceImpl::SendChunkData(
 
   if (checksum != request->checksum()) {
     LOG(ERROR) << "Received bad chunk data. Received checksum: "
-               << request->checksum() << ", calculated checksum: " << checksum;
+               << request->checksum().c_str()
+               << ", calculated checksum: " << checksum.c_str();
 
     reply->set_status(SendChunkDataReply::BAD_DATA);
     return grpc::Status::OK;
