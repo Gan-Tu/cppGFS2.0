@@ -77,7 +77,7 @@ void SeedTestMetadata() {
   auto file_chunk_metadata(metadata_manager->GetFileChunkMetadata(
                                kSmallDataFileChunkHandle).ValueOrDie());
   file_chunk_metadata.mutable_locations()->Add(
-      tests::ChunkServerLocationBuilder(kTestChunkServerHostName,
+      tests::ChunkServerLocationBuilder(kTestChunkServerName,
                                         kTestChunkServerPort));
   metadata_manager->SetFileChunkMetadata(file_chunk_metadata);
 }
@@ -121,7 +121,7 @@ void StartTestMasterServer() {
 // Initialize the client impl and make it ready to call client function
 void StartClient() {
   Status init_status(gfs::client::init_client(kTestConfigPath, 
-                                              "master_server_01",true));
+                                              "master_server_01", true));
   EXPECT_TRUE(init_status.ok());
 }
 

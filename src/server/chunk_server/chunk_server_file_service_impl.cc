@@ -223,7 +223,7 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
         }));
   }
 
-  // Wait for the apply muatation replies
+  // Wait for the apply mutation replies
   for (int replica = 0; replica < request->replica_locations_size();
        ++replica) {
     LOG(INFO) << "Waiting for apply mutation reply for replica " << replica

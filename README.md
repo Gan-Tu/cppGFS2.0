@@ -58,6 +58,15 @@ After you are done with it, turn everything off by either typing Ctrl + C, or us
 docker-compose down
 ```
 
+## Known Issues
+
+1. If the initialization of the first file chunk fails at any of the chunk server during file creation, the metadata will be created but chunks won't be initialized, so future file creation on the same filename fails
+
+2. If advance file version command fails on any of the chunk server replica, that chunk server address is still returned in the response to the client, when it should remove the server from return
+
+3. If anything goes wrong with the primary location, we should update the primary server for the chunk handle in both future returns, and in terms of who to send the lease
+
+
 ## C++ Style Guide
 
 Please, if possible, follow [Google C++ style guide](https://google.github.io/styleguide/cppguide.html). If you use an IDE or any common text editors, they have extensions that help you auto format and lint your code for style errors.
