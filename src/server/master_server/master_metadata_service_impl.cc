@@ -110,6 +110,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
     if (metadata.primary_location().server_hostname().empty()) {
       auto primary_location(chunk_server_location);
       *(metadata.mutable_primary_location()) = primary_location;
+      LOG(INFO) << "Assign " << primary_location.DebugString()
+                << " as the primary chunk location for " << chunk_handle;
     }
 
     // Prepare the InitFileChunk reply with the chunk metadata
@@ -247,6 +249,10 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
 
   const std::string& chunk_handle(metadata.chunk_handle());
   uint32_t chunk_version(metadata.version());
+  uint32_t new_chunk_version = chunk_version + 1;
+
+  LOG(INFO) << "Advancing chunk version for chunk handle " << chunk_handle
+            << " from " << chunk_version << " to " << new_chunk_version;
 
   // Now that all chunk server locations are stored in reply, the master first
   // advances the chunk version of this chunk and then send a GrantLeaseRequest
@@ -259,6 +265,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
     const std::string server_address(
         chunk_server_hostname + ":" +
         std::to_string(chunk_server_location.server_port()));
+    LOG(INFO) << "Issuing AdvanceFileChunkVersion request to " << server_address
+              << " for chunk handle " << chunk_handle;
     // Create and return this chunk server Rpc client if not exist
     auto chunk_server_service_client =
         GetOrCreateChunkServerProtocolClient(server_address);
@@ -266,7 +274,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
     AdvanceFileChunkVersionRequest advance_version_request;
     advance_version_request.set_chunk_handle(chunk_handle);
     // Advance the chunk version by 1
-    advance_version_request.set_new_chunk_version(chunk_version + 1);
+    advance_version_request.set_new_chunk_version(new_chunk_version);
     grpc::ClientContext client_context;
     common::SetClientContextDeadline(client_context, config_manager_);
 
@@ -278,11 +286,27 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
       LOG(ERROR) << "Failed to advance chunk version for chunk " << chunk_handle
                  << " on chunk server " << server_address << "due to "
                  << advance_version_reply_or.status();
+      LOG(INFO) << "Removing chunk server "
+                << chunk_server_location.server_hostname()
+                << " from write locations for " << chunk_handle;
       // TODO(Xi): handle if all version advancement fails
+      // TODO(tugan): the client shouldn't write to this chunk server anymore
     } else {
       LOG(INFO) << "Advanced chunk version for chunk " << chunk_handle
                 << " on chunk server " << server_address;
     }
+  }
+
+  auto version_advance_status(
+      metadata_manager()->AdvanceChunkVersion(chunk_handle));
+  if (!version_advance_status.ok()) {
+    LOG(ERROR) << "Failed to advance chunk version for chunk " << chunk_handle
+               << " on the master due to " << version_advance_status;
+    return common::utils::ConvertProtobufStatusToGrpcStatus(
+        version_advance_status);
+  } else {
+    LOG(INFO) << "Advanced chunk version for chunk " << chunk_handle
+              << " on the master server ";
   }
 
   // After advancing the chunk version, obtain a lease
@@ -324,6 +348,16 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
     LOG(INFO) << "Grant lease request for chunk " << chunk_handle << " at "
               << primary_server_address << " succeeded";
   }
+
+  // Get the Metadata back to reply
+  auto updated_metadata_or(
+      metadata_manager()->GetFileChunkMetadata(chunk_handle));
+  if (!updated_metadata_or.ok()) {
+    return common::utils::ConvertProtobufStatusToGrpcStatus(
+        updated_metadata_or.status());
+  }
+  *reply->mutable_metadata() = updated_metadata_or.ValueOrDie();
+
   return grpc::Status::OK;
 }
 

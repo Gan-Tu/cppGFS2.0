@@ -144,7 +144,7 @@ google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
               << " at chunk index " << chunk_index << " with open mode "
               << file_open_mode;
 
-    // Issue OpenFileReply rpc and check stastus
+    // Issue OpenFileReply rpc and check status
     StatusOr<OpenFileReply> open_file_or(
         master_metadata_service_client_->SendRequest(open_file_request,
                                                      client_context));
@@ -502,7 +502,12 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
                      << chunk_index << " and offset " << offset << " for "
                      << nbytes << " byte failed due to "
                      << write_reply.status();
-          return write_reply_or;
+          return google::protobuf::util::Status(
+              google::protobuf::util::error::INTERNAL,
+              "Write to file " + std::string(filename) + " at chunk_index " +
+                  std::to_string(chunk_index) + " and offset " +
+                  std::to_string(offset) + "for " + std::to_string(nbytes) +
+                  " failed due to internal error");
       }
     }
 
