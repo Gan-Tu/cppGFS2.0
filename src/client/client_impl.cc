@@ -202,7 +202,12 @@ google::protobuf::util::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
     read_file_chunk_request.set_offset_start(offset);
     read_file_chunk_request.set_length(nbytes);
     // Access the client-end-point for contacting the chunk server
-    auto server_address(location.server_hostname() + ":" +
+    std::string chunk_server_hostname = location.server_hostname();
+    if (resolve_hostname_) {
+      chunk_server_hostname =
+          config_manager_->ResolveHostname(chunk_server_hostname);
+    }
+    auto server_address(chunk_server_hostname + ":" +
                         std::to_string(location.server_port()));
     // Prepare the client context
     grpc::ClientContext client_context;
@@ -356,13 +361,17 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
         send_data_irrecoverable_error{false};
     std::vector<std::thread> send_data_threads;
     for (auto& location : chunk_server_location_entry.locations) {
-      send_data_threads.push_back(std::thread([&, location]() {
+      std::string server_hostname = location.server_hostname();
+      if (resolve_hostname_) {
+        server_hostname = config_manager_->ResolveHostname(server_hostname);
+      }
+      auto server_address(server_hostname + ":" +
+                          std::to_string(location.server_port()));
+      send_data_threads.push_back(std::thread([&, server_address]() {
         // Prepare the SendChunkDataRequest
         SendChunkDataRequest send_chunk_data_request;
         send_chunk_data_request.set_data(data_to_send);
         send_chunk_data_request.set_checksum(data_checksum);
-        auto server_address(location.server_hostname() + ":" +
-                            std::to_string(location.server_port()));
         // Prepare the client context
         grpc::ClientContext client_context;
         common::SetClientContextDeadline(client_context, config_manager_);
@@ -443,8 +452,12 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
 
     // We send this WriteFileChunkRequest to the primary
     auto primary_location(chunk_server_location_entry.primary_location);
+    std::string primary_hostname = primary_location.server_hostname();
+    if (resolve_hostname_) {
+      primary_hostname = config_manager_->ResolveHostname(primary_hostname);
+    }
     const std::string primary_server_address(
-        primary_location.server_hostname() + ":" +
+        primary_hostname + ":" +
         std::to_string(primary_location.server_port()));
 
     auto primary_server_service_client(
@@ -582,6 +595,8 @@ ClientImpl::ClientImpl(common::ConfigManager* config_manager,
   // Instantiate the CacheManager with the configured timeout
   cache_manager_ = CacheManager::ConstructCacheManager(
       config_manager_->GetClientCacheTimeout());
+
+  resolve_hostname_ = resolve_hostname;
 
   // Instantiate the master service client
   auto master_address(

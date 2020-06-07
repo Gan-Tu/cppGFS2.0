@@ -162,6 +162,11 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
   const std::string& filename(request->filename());
   const uint32_t chunk_index(request->chunk_index());
 
+  if (!metadata_manager()->ExistFileMetadata(filename)) {
+    LOG(ERROR) << "Cannot read file because it doesn't exist" << filename;
+    return grpc::Status(grpc::NOT_FOUND, "File doesn't exists in server");
+  }
+
   google::protobuf::util::StatusOr<std::string> chunk_handle_or(
       metadata_manager()->GetChunkHandle(filename, chunk_index));
 
@@ -197,6 +202,12 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
   // for write request
   const std::string& filename(request->filename());
   const uint32_t chunk_index(request->chunk_index());
+
+  if (!metadata_manager()->ExistFileMetadata(filename) &&
+      !request->create_if_not_exists()) {
+    LOG(ERROR) << "Cannot read file because it doesn't exist" << filename;
+    return grpc::Status(grpc::NOT_FOUND, "File doesn't exists in server");
+  }
 
   google::protobuf::util::StatusOr<std::string> chunk_handle_or(
       metadata_manager()->GetChunkHandle(filename, chunk_index));
@@ -314,7 +325,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
               << primary_server_address << " succeeded";
   }
   return grpc::Status::OK;
-} 
+}
 
 std::shared_ptr<ChunkServerServiceMasterServerClient>
 MasterMetadataServiceImpl::GetOrCreateChunkServerProtocolClient(
