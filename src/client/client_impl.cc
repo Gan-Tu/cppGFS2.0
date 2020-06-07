@@ -1,6 +1,7 @@
+#include "src/client/client_impl.h"
+
 #include <thread>
 #include <vector>
-#include "src/client/client_impl.h"
 
 #include "src/common/protocol_client/grpc_client_utils.h"
 #include "src/common/system_logger.h"
@@ -90,9 +91,9 @@ google::protobuf::util::Status ClientImpl::CreateFile(
 }
 
 google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
-    const char* filename, size_t chunk_index, 
-    OpenFileRequest::OpenMode file_open_mode, std::string& chunk_handle, 
-    uint32_t& chunk_version, 
+    const char* filename, size_t chunk_index,
+    OpenFileRequest::OpenMode file_open_mode, std::string& chunk_handle,
+    uint32_t& chunk_version,
     CacheManager::ChunkServerLocationEntry& chunk_server_location_entry,
     bool refresh_cache) {
   // First check if the cache manager has file chunk metadata for this chunk
@@ -134,8 +135,8 @@ google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
     open_file_request.set_mode(file_open_mode);
     // For WRITE request, we set create_if_not_exists to be true so we would
     // create chunk for write if it does not exist
-    open_file_request.set_create_if_not_exists(
-        file_open_mode==OpenFileRequest::WRITE);                                       
+    open_file_request.set_create_if_not_exists(file_open_mode ==
+                                               OpenFileRequest::WRITE);
     grpc::ClientContext client_context;
     common::SetClientContextDeadline(client_context, config_manager_);
 
@@ -181,12 +182,11 @@ google::protobuf::util::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
   std::string chunk_handle;
   uint32_t chunk_version;
   CacheManager::ChunkServerLocationEntry chunk_server_location_entry;
-  
+
   // Access the metadata first
-  auto get_metadata_status(
-      GetMetadataForChunk(filename, chunk_index, OpenFileRequest::READ,
-                          chunk_handle, chunk_version, 
-                          chunk_server_location_entry));
+  auto get_metadata_status(GetMetadataForChunk(
+      filename, chunk_index, OpenFileRequest::READ, chunk_handle, chunk_version,
+      chunk_server_location_entry));
 
   if (!get_metadata_status.ok()) {
     return get_metadata_status;
@@ -323,18 +323,16 @@ google::protobuf::util::StatusOr<std::pair<size_t, void*>> ClientImpl::ReadFile(
 }
 
 google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
-    ClientImpl::WriteFileChunk(const char* filename, void* buffer, 
-                               size_t chunk_index, size_t offset, 
-                               size_t nbytes) {
+ClientImpl::WriteFileChunk(const char* filename, void* buffer,
+                           size_t chunk_index, size_t offset, size_t nbytes) {
   std::string chunk_handle;
   uint32_t chunk_version;
   CacheManager::ChunkServerLocationEntry chunk_server_location_entry;
-  
+
   // Access the metadata first
-  auto get_metadata_status(
-      GetMetadataForChunk(filename, chunk_index, OpenFileRequest::WRITE,
-                          chunk_handle, chunk_version, 
-                          chunk_server_location_entry));
+  auto get_metadata_status(GetMetadataForChunk(
+      filename, chunk_index, OpenFileRequest::WRITE, chunk_handle,
+      chunk_version, chunk_server_location_entry));
 
   if (!get_metadata_status.ok()) {
     return get_metadata_status;
@@ -348,14 +346,14 @@ google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
   const std::string data_checksum(common::utils::calc_checksum(data_to_send));
 
   while (retry > 0) {
-    // Push the data to all replica. For simplicity, we just push all data 
-    // from client to replica instead of the way described in the paper. 
+    // Push the data to all replica. For simplicity, we just push all data
+    // from client to replica instead of the way described in the paper.
     // Furthermore, if any of the push request fails, we retry (and we retry
-    // with all replica). In terms of retry policy, we only retry if the 
+    // with all replica). In terms of retry policy, we only retry if the
     // status says "FAILED", because "DATA_TOO_BIG" is not a retry-able error
     // and "RATE_LIMITED" is not used for now.
-    std::atomic<bool> send_data_recoverable_error, 
-                          send_data_irrecoverable_error; 
+    std::atomic<bool> send_data_recoverable_error{false},
+        send_data_irrecoverable_error{false};
     std::vector<std::thread> send_data_threads;
     for (auto& location : chunk_server_location_entry.locations) {
       send_data_threads.push_back(std::thread([&, location]() {
@@ -363,7 +361,7 @@ google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
         SendChunkDataRequest send_chunk_data_request;
         send_chunk_data_request.set_data(data_to_send);
         send_chunk_data_request.set_checksum(data_checksum);
-        auto server_address(location.server_hostname() + ":" + 
+        auto server_address(location.server_hostname() + ":" +
                             std::to_string(location.server_port()));
         // Prepare the client context
         grpc::ClientContext client_context;
@@ -377,7 +375,7 @@ google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
                                                      client_context));
         // Handle grpc error, log and set retry flag
         if (!send_chunk_reply_or.ok()) {
-          // TODO(Xi): Not sure if we should consider an grpc error as 
+          // TODO(Xi): Not sure if we should consider an grpc error as
           // irrecoverable, but play safe here to retry
           LOG(ERROR) << "Send file chunk data to " << server_address
                      << "failed due to " << send_chunk_reply_or.status();
@@ -385,22 +383,22 @@ google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
         } else {
           auto send_chunk_reply(send_chunk_reply_or.ValueOrDie());
           switch (send_chunk_reply.status()) {
-            case SendChunkDataReply::OK: 
-              LOG(INFO) << "Send file chunk data to " << server_address 
+            case SendChunkDataReply::OK:
+              LOG(INFO) << "Send file chunk data to " << server_address
                         << "succeeds";
-              break; // Good
+              break;  // Good
             case SendChunkDataReply::FAILED:
               // We consider this a retry-able condition
               send_data_recoverable_error.store(true);
               LOG(ERROR) << "Send file chunk data to " << server_address
-                         << "encountered recoverable failure" 
+                         << "encountered recoverable failure"
                          << send_chunk_reply.status();
               break;
             default:
-              // All others are not retryable 
+              // All others are not retryable
               send_data_irrecoverable_error.store(true);
               LOG(ERROR) << "Send file chunk data to " << server_address
-                         << "encountered irrecoverable failure" 
+                         << "encountered irrecoverable failure"
                          << send_chunk_reply.status();
           }
         }
@@ -413,12 +411,12 @@ google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
     }
 
     // If we countered irrecoverable failure, we have to abort here and return
-    // error. If we encountered recoverable failure, we retry. Otherwise, we 
+    // error. If we encountered recoverable failure, we retry. Otherwise, we
     // continue to the next phase of operation
     if (send_data_irrecoverable_error.load()) {
       // TODO(Xi): ideally return the actual status from send reply but as we
       // are using multi-threading to send data this is a little tricky. Due
-      // to time constraint, simply use an internal error indicating that 
+      // to time constraint, simply use an internal error indicating that
       return google::protobuf::util::Status(
           google::protobuf::util::error::INTERNAL,
           "Send data encountered irrecoverable failure");
@@ -439,26 +437,27 @@ google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
     for (auto location : chunk_server_location_entry.locations) {
       write_request.mutable_replica_locations()->Add(std::move(location));
     }
-    // Prepare the client context    
+    // Prepare the client context
     grpc::ClientContext client_context;
     common::SetClientContextDeadline(client_context, config_manager_);
- 
-    // We send this WriteFileChunkRequest to the primary 
+
+    // We send this WriteFileChunkRequest to the primary
     auto primary_location(chunk_server_location_entry.primary_location);
     const std::string primary_server_address(
-        primary_location.server_hostname() + ":" + 
-            std::to_string(primary_location.server_port()));
-    
-    auto primary_server_service_client(GetChunkServerServiceClient(
-                                           primary_server_address));
+        primary_location.server_hostname() + ":" +
+        std::to_string(primary_location.server_port()));
+
+    auto primary_server_service_client(
+        GetChunkServerServiceClient(primary_server_address));
     // Issue WriteFileChunkRequest and check status
     StatusOr<WriteFileChunkReply> write_reply_or(
-        primary_server_service_client->SendRequest(write_request, client_context));
+        primary_server_service_client->SendRequest(write_request,
+                                                   client_context));
 
     // Handle grpc error, and retry if possible
     if (!write_reply_or.ok()) {
-      LOG(ERROR) << "Send write chunk data request to " 
-                 << primary_server_address << "failed due to " 
+      LOG(ERROR) << "Send write chunk data request to "
+                 << primary_server_address << "failed due to "
                  << write_reply_or.status();
     } else {
       auto write_reply(write_reply_or.ValueOrDie());
@@ -471,18 +470,16 @@ google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
         case FileChunkMutationStatus::FAILED_NOT_LEASE_HOLDER:
           // Client found out that the primary it though is no longer a lease
           // holder, we need to force to get the chunk metadata and retry
-          LOG(INFO) << "Retrying as primary server "
-                    << primary_server_address << " is no longer lease holder "
+          LOG(INFO) << "Retrying as primary server " << primary_server_address
+                    << " is no longer lease holder "
                     << "refetching chunk metadata";
-          get_metadata_status = 
-              GetMetadataForChunk(filename, chunk_index, 
-                                  OpenFileRequest::WRITE, chunk_handle, 
-                                  chunk_version,
-                                  chunk_server_location_entry, true);
+          get_metadata_status = GetMetadataForChunk(
+              filename, chunk_index, OpenFileRequest::WRITE, chunk_handle,
+              chunk_version, chunk_server_location_entry, true);
           if (!get_metadata_status.ok()) {
             LOG(ERROR) << "Refreshing metadata cache failed due to "
                        << get_metadata_status;
-            return get_metadata_status; 
+            return get_metadata_status;
           }
           break;
         default:
@@ -490,7 +487,7 @@ google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
           // error
           LOG(ERROR) << "Write to file " << filename << " at chunk_index "
                      << chunk_index << " and offset " << offset << " for "
-                     << nbytes << " byte failed due to " 
+                     << nbytes << " byte failed due to "
                      << write_reply.status();
           return write_reply_or;
       }
@@ -501,12 +498,14 @@ google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
 
   LOG(ERROR) << "Write file chunk failed after 3 retries";
   return google::protobuf::util::Status(
-             google::protobuf::util::error::INTERNAL,
-                 "Write file chunk failed after 3 retries"); 
+      google::protobuf::util::error::INTERNAL,
+      "Write file chunk failed after 3 retries");
 }
 
-google::protobuf::util::Status ClientImpl::WriteFile(const char* filename, 
-    void* buffer, size_t offset, size_t nbytes) {
+google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
+                                                     void* buffer,
+                                                     size_t offset,
+                                                     size_t nbytes) {
   const size_t chunk_block_size(config_manager_->GetFileChunkBlockSize() *
                                 common::bytesPerMb);
   // Record the number of bytes that we need to write
@@ -516,30 +515,30 @@ google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
   // A flag to detect errors that encountered during issuing writes
   size_t chunk_start_offset(offset % chunk_block_size);
 
-  for (size_t chunk_index = offset / chunk_block_size; remain_bytes > 0; 
+  for (size_t chunk_index = offset / chunk_block_size; remain_bytes > 0;
        chunk_index++) {
     // Calculate the byte length that we need to issue write for chunk_index
     // Within a chunk, the remaining space for a write, starting at offset
-    // is (chunk_block_size - chunk_start_offset), globally there are 
+    // is (chunk_block_size - chunk_start_offset), globally there are
     // remain_bytes to be written. Therefore, the byte length for this chunk is
     // the min of these two values
-    size_t bytes_to_write(std::min(chunk_block_size - chunk_start_offset, 
-                                   remain_bytes));
+    size_t bytes_to_write(
+        std::min(chunk_block_size - chunk_start_offset, remain_bytes));
     // The buffer offset that we will start writing in this batch.
     void* buffer_start((char*)buffer + bytes_written);
     auto write_data_or(WriteFileChunk(filename, buffer_start, chunk_index,
                                       chunk_start_offset, bytes_to_write));
     // Return error if any write-to-chunk operation fails. This leaves the file
-    // in a partial state (and that is ok). 
+    // in a partial state (and that is ok).
     if (!write_data_or.ok()) {
       return write_data_or.status();
     }
 
-    // Currently, we consier the case of bytes_written < bytes requested to be 
+    // Currently, we consier the case of bytes_written < bytes requested to be
     // an error, so chunk_bytes_written should be equal to bytes_to_write
     size_t chunk_bytes_written(write_data_or.ValueOrDie().bytes_written());
 
-    // Update chunk_start_offset, bytes_written and remain_bytes counts. 
+    // Update chunk_start_offset, bytes_written and remain_bytes counts.
     // Starting from the second chunk, chunk_start_offset is zero
     chunk_start_offset = 0;
     bytes_written += chunk_bytes_written;
@@ -551,9 +550,10 @@ google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
 
 void ClientImpl::RegisterChunkServerServiceClient(
     const std::string& server_address) {
-  LOG(INFO) << "Establishing new connection to chunk server: " 
+  LOG(INFO) << "Establishing new connection to chunk server: "
             << server_address;
-  chunk_server_service_client_.TryInsert(server_address,
+  chunk_server_service_client_.TryInsert(
+      server_address,
       std::make_shared<service::ChunkServerServiceGfsClient>(
           grpc::CreateChannel(server_address,
                               grpc::InsecureChannelCredentials())));
@@ -561,16 +561,15 @@ void ClientImpl::RegisterChunkServerServiceClient(
 
 std::shared_ptr<service::ChunkServerServiceGfsClient>
 ClientImpl::GetChunkServerServiceClient(const std::string& server_address) {
-  auto try_get_client(
-      chunk_server_service_client_.TryGetValue(server_address));
+  auto try_get_client(chunk_server_service_client_.TryGetValue(server_address));
 
   if (try_get_client.second) {
     // Client exist, return
     return try_get_client.first;
   }
-   
+
   RegisterChunkServerServiceClient(server_address);
- 
+
   // We are not removing client ent-point, so this line must suceed
   try_get_client = chunk_server_service_client_.TryGetValue(server_address);
   return try_get_client.first;
@@ -591,14 +590,6 @@ ClientImpl::ClientImpl(common::ConfigManager* config_manager,
   auto master_channel(grpc::CreateChannel(master_address, credentials));
   master_metadata_service_client_ =
       std::make_shared<service::MasterMetadataServiceClient>(master_channel);
-
-  // Instantiate the list of chunk service clients
-  auto chunk_server_names(config_manager_->GetAllChunkServers());
-  for (auto const& chunk_server_name : chunk_server_names) {
-    auto chunk_server_address(
-        config_manager_->GetServerAddress(chunk_server_name, resolve_hostname));
-    RegisterChunkServerServiceClient(chunk_server_address);
-  }
 }
 
 google::protobuf::util::StatusOr<ClientImpl*> ClientImpl::ConstructClientImpl(
