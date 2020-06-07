@@ -75,6 +75,9 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
   metadata.set_chunk_handle(chunk_handle);
   metadata.set_version(1);  // 1 is the initialized version
 
+  reply->mutable_metadata()->set_chunk_handle(chunk_handle);
+  reply->mutable_metadata()->set_version(1);
+
   // Step 3. Coordinate with chunk servers to initialize the file chunk
   for (auto chunk_server_location : chunk_server_locations) {
     std::string server_name(chunk_server_location.server_hostname());
@@ -121,11 +124,12 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
                                                       primary_location);
     }
 
-    // Prepare the InitFileChunk reply with the chunk metadata
-    *metadata.add_locations() = chunk_server_location;
+    // Prepare the InitFileChunk reply with the chunk metadata. Note that we
+    // do not cache the locations as chunk server manager handles this
+    *reply->mutable_metadata()->add_locations() = chunk_server_location;
   }
 
-  if (metadata.locations().empty()) {
+  if (reply->metadata().locations().empty()) {
     LOG(ERROR) << "No chunk servers are available for allocation.";
     LOG(ERROR) << "No file chunk can be initialized for: " << chunk_handle;
     return grpc::Status(grpc::StatusCode::UNAVAILABLE,
@@ -201,6 +205,14 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
 
   // Set the file chunk metadata in reply
   *reply->mutable_metadata() = file_chunk_metadata_or.ValueOrDie();
+  // Set the location information, as we always inquiry the chunk server 
+  // manager instead of caching on the master
+  auto chunk_server_locations(
+      chunk_server_manager().GetChunkLocations(chunk_handle));
+  for(auto chunk_server_location : chunk_server_locations) {
+    *reply->mutable_metadata()->add_locations() = chunk_server_location;
+  }
+
   return grpc::Status::OK;
 }
 
@@ -246,8 +258,9 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
     }
   }
 
+  const std::string& chunk_handle(chunk_handle_or.ValueOrDie());
   google::protobuf::util::StatusOr<FileChunkMetadata> file_chunk_metadata_or(
-      metadata_manager()->GetFileChunkMetadata(chunk_handle_or.ValueOrDie()));
+      metadata_manager()->GetFileChunkMetadata(chunk_handle));
   if (!file_chunk_metadata_or.ok()) {
     LOG(ERROR) << "File chunk metadata not accessible for "
                << chunk_handle_or.ValueOrDie();
@@ -258,7 +271,19 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
   FileChunkMetadata metadata = file_chunk_metadata_or.ValueOrDie();
   *reply->mutable_metadata() = metadata;
 
-  const std::string& chunk_handle(metadata.chunk_handle());
+  // If the locations info is empty, we ask the chunk server manager. The 
+  // reason that we check the emptiness is that if we actually create a file
+  // chunk that in this request (see above), then the HandleFileChunkCreation
+  // function already did add the chunk server locations, and we do not want 
+  // to add again because this is a list instead of a set
+  if (reply->metadata().locations().empty()) {
+    auto chunk_server_locations(
+        chunk_server_manager().GetChunkLocations(chunk_handle));
+    for(auto chunk_server_location : chunk_server_locations) {
+        *reply->mutable_metadata()->add_locations() = chunk_server_location;
+    }
+  }
+
   uint32_t chunk_version(metadata.version());
   uint32_t new_chunk_version = chunk_version + 1;
 
@@ -267,7 +292,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
 
   // Now that all chunk server locations are stored in reply, the master first
   // advances the chunk version of this chunk and then send a GrantLeaseRequest
-  for (auto chunk_server_location : metadata.locations()) {
+  for (auto chunk_server_location : reply->metadata().locations()) {
     std::string chunk_server_hostname = chunk_server_location.server_hostname();
     if (resolve_hostname_) {
       chunk_server_hostname =
@@ -363,14 +388,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
               << primary_server_address << " succeeded";
   }
 
-  // Get the Metadata back to reply
-  auto updated_metadata_or(
-      metadata_manager()->GetFileChunkMetadata(chunk_handle));
-  if (!updated_metadata_or.ok()) {
-    return common::utils::ConvertProtobufStatusToGrpcStatus(
-        updated_metadata_or.status());
-  }
-  *reply->mutable_metadata() = updated_metadata_or.ValueOrDie();
+  // Update the version number in the reply as we successfully grant the lease
+  reply->mutable_metadata()->set_version(new_chunk_version);
 
   return grpc::Status::OK;
 }
