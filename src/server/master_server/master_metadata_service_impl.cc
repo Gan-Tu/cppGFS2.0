@@ -311,6 +311,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
                 << " for write operation " << chunk_handle;
       // TODO(Xi): handle if all version advancement fails
       // TODO(tugan): the client shouldn't write to this chunk server anymore
+      // TODO(tugan): should issue request to bring the replica up to date
     } else {
       LOG(INFO) << "Advanced chunk version for chunk " << chunk_handle
                 << " on chunk server " << server_address;
@@ -351,18 +352,36 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
   auto result_or = metadata_manager()->GetPrimaryLeaseMetadata(chunk_handle);
   if (result_or.second) {  // has value
     auto lease_location_expiration_time = result_or.first;
-    // lease not expired
-    if (absl::FromUnixSeconds(lease_location_expiration_time.second) >
-        absl::Now()) {
-      LOG(INFO) << "Reuse existing lease for " << chunk_handle << ", held by "
-                << primary_location.server_hostname();
-      lease_granted = true;
-      primary_location = lease_location_expiration_time.first;
+    protos::ChunkServerLocation prev_lease_holder_location =
+        lease_location_expiration_time.first;
+    // make sure the old lease helder is still valid
+    bool lease_location_is_still_valid = false;
+    for (auto& valid_location : advanced_locations) {
+      if (valid_location.server_hostname() ==
+              prev_lease_holder_location.server_hostname() ||
+          valid_location.server_port() ==
+              prev_lease_holder_location.server_port()) {
+        lease_location_is_still_valid = true;
+      }
+    }
+    if (!lease_location_is_still_valid) {
+      LOG(ERROR) << "Original lease server for " << chunk_handle
+                 << " is no longer available; will choose new lease holder"
+                 << primary_location.server_hostname();
     } else {
-      // clean up
-      LOG(INFO) << "Original lease is expired for " << chunk_handle
-                << " held by " << primary_location.server_hostname();
-      metadata_manager()->RemovePrimaryLeaseMetadata(chunk_handle);
+      // lease not expired
+      if (absl::FromUnixSeconds(lease_location_expiration_time.second) >
+          absl::Now()) {
+        LOG(INFO) << "Reuse existing lease for " << chunk_handle << ", held by "
+                  << prev_lease_holder_location.server_hostname();
+        lease_granted = true;
+        primary_location = prev_lease_holder_location;
+      } else {
+        // clean up
+        LOG(INFO) << "Original lease is expired for " << chunk_handle
+                  << " held by " << primary_location.server_hostname();
+        metadata_manager()->RemovePrimaryLeaseMetadata(chunk_handle);
+      }
     }
   }
 
