@@ -7,6 +7,7 @@ cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//src/client:gfs_client",
+        "@com_google_absl//absl/strings",
         "@com_google_benchmark//:benchmark",
         "@com_google_glog//:glog",
     ],
