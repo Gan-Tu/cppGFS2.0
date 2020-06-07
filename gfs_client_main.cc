@@ -22,9 +22,7 @@ ABSL_FLAG(std::string, mode, "",
 ABSL_FLAG(std::string, filename, "", "/filename");
 
 ABSL_FLAG(size_t, offset, 0, "Offset to read/write from; default: 0");
-ABSL_FLAG(size_t, nbytes_to_read, 0, "number of bytes to read; default: 0");
-
-ABSL_FLAG(size_t, nbytes_to_write, 0, "number of bytes to write; default: 0");
+ABSL_FLAG(size_t, nbytes, 0, "number of bytes to read; default: 0");
 ABSL_FLAG(std::string, data, "", "data to write; only applicable to writes");
 
 unsigned int ParseOpenFlag(std::string mode) {
@@ -85,12 +83,11 @@ int main(int argc, char** argv) {
   }
 
   const size_t offset = absl::GetFlag(FLAGS_offset);
-  const size_t nbytes_to_read = absl::GetFlag(FLAGS_nbytes_to_read);
-  const size_t nbytes_to_write = absl::GetFlag(FLAGS_nbytes_to_write);
+  const size_t nbytes = absl::GetFlag(FLAGS_nbytes);
   const std::string data = absl::GetFlag(FLAGS_data);
   if (mode == "read") {
     StatusOr<gfs::client::Data> read_result =
-        gfs::client::read(filename.c_str(), offset, nbytes_to_read);
+        gfs::client::read(filename.c_str(), offset, nbytes);
     if (read_result.ok()) {
       gfs::client::Data data = read_result.ValueOrDie();
       LOG(INFO) << "Read " << data.bytes_read << " bytes of data from "
@@ -102,7 +99,7 @@ int main(int argc, char** argv) {
     }
   } else if (mode == "write" || mode == "write_no_create") {
     Status write_status = gfs::client::write(
-        filename.c_str(), (void*)data.c_str(), offset, nbytes_to_write);
+        filename.c_str(), (void*)data.c_str(), offset, data.size());
     if (write_status.ok()) {
       LOG(INFO) << "Data written successfully";
     } else {
