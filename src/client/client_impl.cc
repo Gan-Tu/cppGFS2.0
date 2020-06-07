@@ -597,12 +597,10 @@ ClientImpl::GetChunkServerServiceClient(const std::string& server_address) {
 ClientImpl::ClientImpl(common::ConfigManager* config_manager,
                        const std::string& master_name,
                        const bool resolve_hostname)
-    : config_manager_(config_manager) {
+    : config_manager_(config_manager), resolve_hostname_(resolve_hostname) {
   // Instantiate the CacheManager with the configured timeout
   cache_manager_ = CacheManager::ConstructCacheManager(
       config_manager_->GetClientCacheTimeout());
-
-  resolve_hostname_ = resolve_hostname;
 
   // Instantiate the master service client
   auto master_address(

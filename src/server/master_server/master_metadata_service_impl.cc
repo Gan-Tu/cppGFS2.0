@@ -117,6 +117,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
       *(metadata.mutable_primary_location()) = primary_location;
       LOG(INFO) << "Assign " << primary_location.DebugString()
                 << " as the primary chunk location for " << chunk_handle;
+      metadata_manager->SetPrimaryChunkServerLocation(chunk_handle,
+                                                      primary_location);
     }
 
     // Prepare the InitFileChunk reply with the chunk metadata
