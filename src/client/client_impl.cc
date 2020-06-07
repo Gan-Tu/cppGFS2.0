@@ -335,9 +335,10 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
   CacheManager::ChunkServerLocationEntry chunk_server_location_entry;
 
   // Access the metadata first
+  // We force refresh the cache, because a write will advance chunk version
   auto get_metadata_status(GetMetadataForChunk(
       filename, chunk_index, OpenFileRequest::WRITE, chunk_handle,
-      chunk_version, chunk_server_location_entry));
+      chunk_version, chunk_server_location_entry, /*refresh_cache=*/true));
 
   if (!get_metadata_status.ok()) {
     return get_metadata_status;
