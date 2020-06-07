@@ -347,16 +347,21 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
   bool lease_granted = false;
   protos::ChunkServerLocation primary_location;
 
+  LOG(INFO) << "Checking if we have existing lease for " << chunk_handle;
   auto result_or = metadata_manager()->GetPrimaryLeaseMetadata(chunk_handle);
   if (result_or.second) {  // has value
     auto lease_location_expiration_time = result_or.first;
     // lease not expired
     if (absl::FromUnixSeconds(lease_location_expiration_time.second) >
         absl::Now()) {
+      LOG(INFO) << "Reuse existing lease for " << chunk_handle << ", held by "
+                << primary_location.server_hostname();
       lease_granted = true;
       primary_location = lease_location_expiration_time.first;
     } else {
       // clean up
+      LOG(INFO) << "Original lease is expired for " << chunk_handle
+                << " held by " << primary_location.server_hostname();
       metadata_manager()->RemovePrimaryLeaseMetadata(chunk_handle);
     }
   }
