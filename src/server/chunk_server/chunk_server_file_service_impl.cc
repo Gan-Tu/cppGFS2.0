@@ -476,8 +476,9 @@ grpc::Status ChunkServerFileServiceImpl::SendChunkData(
   ChunkDataCacheManager::GetInstance()->SetValue(request->checksum(),
                                                  request->data());
 
-  LOG(INFO) << "Received chunk data with checksum " << request->checksum()
-            << " and size " << request->data().size() / gfs::common::bytesPerMb
+  LOG(INFO) << "Received chunk data with checksum "
+            << request->checksum().c_str() << " and size "
+            << request->data().size() / gfs::common::bytesPerMb
             << "MB has been temporarily stored in the cache";
 
   reply->set_status(SendChunkDataReply::OK);
