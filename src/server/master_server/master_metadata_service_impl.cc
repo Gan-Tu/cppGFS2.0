@@ -74,9 +74,14 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
   FileChunkMetadata metadata;
   metadata.set_chunk_handle(chunk_handle);
   metadata.set_version(1);  // 1 is the initialized version
+  metadata_manager()->SetFileChunkMetadata(metadata);
+
+  reply->mutable_metadata()->set_chunk_handle(chunk_handle);
+  reply->mutable_metadata()->set_version(1);
 
   // Step 3. Coordinate with chunk servers to initialize the file chunk
-  for (auto chunk_server_location : chunk_server_locations) {
+  for (auto chunk_server_location :
+       chunk_server_manager().GetChunkLocations(chunk_handle)) {
     std::string server_name(chunk_server_location.server_hostname());
     if (resolve_hostname_) {
       server_name = config_manager_->ResolveHostname(server_name);
@@ -104,6 +109,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
       LOG(WARNING) << "InitFileChunkRequest for " << chunk_handle
                    << " sent to chunk server " << server_address
                    << " failed: " << init_chunk_or.status().error_message();
+      // TODO(xi): should undo file creation and file allocations
       return common::utils::ConvertProtobufStatusToGrpcStatus(
           init_chunk_or.status());
     } else {
@@ -111,29 +117,21 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
                 << " sent to chunk server " << server_address << " succeeded";
     }
 
-    // Pick a primary chunk server. Just select the first one
-    if (metadata.primary_location().server_hostname().empty()) {
-      auto primary_location(chunk_server_location);
-      *(metadata.mutable_primary_location()) = primary_location;
-      LOG(INFO) << "Assign " << primary_location.DebugString()
-                << " as the primary chunk location for " << chunk_handle;
-      metadata_manager()->SetPrimaryChunkServerLocation(chunk_handle,
-                                                      primary_location);
-    }
+    // For chunk creation, we don't need to select a primary location, since
+    // we always require WRITES to talk to the master server again due to
+    // chunk version advancement, so the client cache should (if done correctly)
+    // always be refreshed and get primary location from the WRITE call
 
     // Prepare the InitFileChunk reply with the chunk metadata
-    *metadata.add_locations() = chunk_server_location;
+    *reply->mutable_metadata()->add_locations() = chunk_server_location;
   }
 
-  if (metadata.locations().empty()) {
+  if (reply->metadata().locations().empty()) {
     LOG(ERROR) << "No chunk servers are available for allocation.";
     LOG(ERROR) << "No file chunk can be initialized for: " << chunk_handle;
     return grpc::Status(grpc::StatusCode::UNAVAILABLE,
                         "no chunk server is available");
   }
-
-  metadata_manager()->SetFileChunkMetadata(metadata);
-  *reply->mutable_metadata() = metadata;
 
   return grpc::Status::OK;
 }
@@ -200,8 +198,19 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
   }
 
   // Set the file chunk metadata in reply
-  *reply->mutable_metadata() = file_chunk_metadata_or.ValueOrDie();
-  return grpc::Status::OK;
+  FileChunkMetadata metadata = file_chunk_metadata_or.ValueOrDie();
+  reply->mutable_metadata()->set_chunk_handle(chunk_handle);
+  reply->mutable_metadata()->set_version(metadata.version());
+  for (auto chunk_server_location :
+       chunk_server_manager().GetChunkLocations(chunk_handle)) {
+    *reply->mutable_metadata()->add_locations() = chunk_server_location;
+  }
+  if (reply->metadata().locations().empty()) {
+    return grpc::Status(grpc::UNAVAILABLE,
+                        "No chunk servers available right now for file read");
+  } else {
+    return grpc::Status::OK;
+  }
 }
 
 grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
