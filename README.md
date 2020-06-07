@@ -60,7 +60,7 @@ docker-compose down
 
 ## Known Issues
 
-1. If the initialization of the first file chunk fails at any of the chunk server during file creation, the metadata will be created but chunks won't be initialized, so future file creation on the same filename fails
+1. If the initialization of the first file chunk fails at any of the chunk server during file creation, the metadata will be created but chunks won't be initialized, so future file creation on the same filename fails, and file read/write will use inconsistent chunk server locations
 
 2. If advance file version command fails on any of the chunk server replica, that chunk server address is still returned in the response to the client, when it should remove the server from return
 
