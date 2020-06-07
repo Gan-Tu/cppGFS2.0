@@ -253,6 +253,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
     if (!chunk_creation_status.ok()) {
       return chunk_creation_status;
     }
+    // Refetch the chunk handle after creation
+    chunk_handle_or = metadata_manager()->GetChunkHandle(filename, chunk_index);
   }
 
   google::protobuf::util::StatusOr<FileChunkMetadata> file_chunk_metadata_or(
