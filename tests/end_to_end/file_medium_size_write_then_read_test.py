@@ -23,9 +23,6 @@ def test_main():
     server_procs = end_to_end_lib.start_master_and_chunk_servers(
                        config_filename, log_directory)
 
-    #import time
-    #time.sleep(1000)
-
     # Launch client process as writer
     client = subprocess.Popen(
         ["tests/end_to_end/file_medium_size_write_then_read_client"])
