@@ -27,12 +27,39 @@ Then, from the root directory, you can run Bazel commands as normal. For example
 
 ```
 bazel build ...
-bazel test ...
+bazel test --test_output=errors ...
 ```
 
 To learn more about how to use Bazel, or how to write Bazel build rule for C++, see the [official documentation](https://docs.bazel.build/versions/master/bazel-overview.html).
 
-## Running servers using Docker
+## Running GFS client
+
+Make sure you have the GFS server clusters are up and running.
+
+You can either write a binary by importing the GFS client at `src/client/gfs_client.h`, or using the GFS command line binary.
+
+To build the command line binary, run
+
+```
+bazel build :gfs_client_main
+```
+
+Then, you can run any of these modes:
+
+```
+# To create a file
+bazel-bin/gfs_client_main --mode=create --filename=/test
+
+# To read a file
+bazel-bin/gfs_client_main --mode=read --filename=/test --offset=0 --nbytes=100
+
+# To write a file
+# This will create the file if it doesn't exist; if you don't want this behavior,
+# use the 'mode_no_create' mode instead
+bazel-bin/gfs_client_main --mode=write --filename=/test --offset=0 --data='Hello World!'
+```
+
+## Running GFS server clusters using Docker
 
 Make sure you have [Docker](https://docs.docker.com/engine/install/) and [Docker compose](https://docs.docker.com/compose/install/) installed
 
@@ -42,29 +69,24 @@ To start all servers and expose respective server ports outside of Docker for co
 docker-compose up --build
 ```
 
-After all servers have started, try it out by running an example client script:
+Then, you can use GFS client to interact with the cluster.
 
-```
-bazel run examples:run_mock_protocol_client_main -- \
-  --config_path=data/config.yml \
-  --use_docker_dns_server=false \
-  --master_name=master_server_01 \
-  --chunk_server_name=chunk_server_01
-```
-
-After you are done with it, turn everything off by either typing Ctrl + C, or using
+After you are done with it, turn everything off by typing Ctrl + C, and then
 
 ```
 docker-compose down
 ```
 
+## Benchmark Performance
+
+We use [Google Benchmarks](https://github.com/google/benchmark) open source library to test our performance.
+
+To run them, simply start the GFS cluster in the background, and run the benchmark binaries in `src/benchmarks`
+
 ## Known Issues
 
-1. If the initialization of the first file chunk fails at any of the chunk server during file creation, the metadata will be created but chunks won't be initialized, so future file creation on the same filename fails, and file read/write will use inconsistent chunk server locations
-
-2. If advance file version command fails on any of the chunk server replica, that chunk server address is still returned in the response to the client, when it should remove the server from return
-
-3. If anything goes wrong with the primary location, we should update the primary server for the chunk handle in both future returns, and in terms of who to send the lease
+- If the initialization of the first file chunk fails at any of the chunk server during file creation, the metadata will be created but chunks won't be initialized, so future file creation on the same filename fails, and file read/write will use inconsistent chunk server locations
+- We do not bring stale replica up to date, at the moment
 
 
 ## C++ Style Guide
