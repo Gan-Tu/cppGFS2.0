@@ -1,1 +1,14 @@
-load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+cc_binary(
+    name = "gfs_client_main",
+    srcs = ["gfs_client_main.cc"],
+    data = ["//data:config.yml"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/client:gfs_client",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/flags:parse",
+        "@com_google_protobuf//:protobuf_lite",
+    ],
+)

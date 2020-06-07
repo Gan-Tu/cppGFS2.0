@@ -9,8 +9,8 @@ cc_library(
         "//src/protos:cc_chunk_server_proto",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_protobuf//:protobuf_lite"
-    ]
+        "@com_google_protobuf//:protobuf_lite",
+    ],
 )
 
 cc_library(
@@ -26,7 +26,8 @@ cc_library(
         "//src/common/protocol_client:chunk_server_service_gfs_client",
         "//src/common/protocol_client:grpc_client_utils",
         "//src/common/protocol_client:master_metadata_service_client",
-        "@com_google_protobuf//:protobuf_lite"],
+        "@com_google_protobuf//:protobuf_lite",
+    ],
 )
 
 cc_library(
@@ -37,5 +38,6 @@ cc_library(
     deps = [
         ":client_impl",
         "//src/common:utils",
-        "@com_google_protobuf//:protobuf_lite"],
+        "@com_google_protobuf//:protobuf_lite",
+    ],
 )
