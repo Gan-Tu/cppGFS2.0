@@ -71,16 +71,21 @@ class MetadataManager {
   // Set the chunk metadata for a given chunk handle
   void SetFileChunkMetadata(const protos::FileChunkMetadata& chunk_data);
 
-  // Set the primary chunk location for a given chunk handle, return error
-  // if chunk handle not found.
-  google::protobuf::util::Status SetPrimaryChunkServerLocation(
+  // Set the primary chunk location that holds the lease for a given chunk
+  // handle, and its lease expiration time
+  void SetPrimaryLeaseMetadata(
       const std::string& chunk_handle,
-      const protos::ChunkServerLocation& server_location);
+      const protos::ChunkServerLocation& server_location,
+      const uint64_t expiration_unix_sec);
 
-  // Unset the primary chunk location for a given chunk handle,
-  // this happens when a lease expires / gets revoked.
-  google::protobuf::util::Status RemovePrimaryChunkServerLocation(
-      const std::string& chunk_handle);
+  // Unset the primary chunk location that holds the lease for a given chunk
+  // handle; this happens when a lease expires / gets revoked.
+  void RemovePrimaryLeaseMetadata(const std::string& chunk_handle);
+
+  // Return the chunk server location that last held the lease for the handle,
+  // which may or may not be expired; it's up to caller to check the expiration
+  std::pair<std::pair<protos::ChunkServerLocation, uint64_t>, bool>
+  GetPrimaryLeaseMetadata(const std::string& chunk_handle);
 
   // Assign a new chunk handle. This function returns a unique chunk handle
   // everytime when it gets called
@@ -110,6 +115,11 @@ class MetadataManager {
   // this is a parallel hash map
   gfs::common::parallel_hash_map<std::string, protos::FileChunkMetadata>
       chunk_metadata_;
+
+  // chunk handle to its lease holder and lease expiration time
+  gfs::common::parallel_hash_map<
+      std::string, std::pair<protos::ChunkServerLocation, uint64_t>>
+      lease_holders_;
 
   // Note that the file_metadata_ maps to the reference of the actual
   // FileMetadata, but file_chunk_metadata_ maps to actual copy of

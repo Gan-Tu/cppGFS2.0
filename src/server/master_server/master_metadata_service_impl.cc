@@ -346,45 +346,68 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
   // at the first one that accepted the lease
   bool lease_granted = false;
   protos::ChunkServerLocation primary_location;
-  for (auto& location : advanced_locations) {
-    std::string primary_server_hostname = location.server_hostname();
-    if (resolve_hostname_) {
-      primary_server_hostname =
-          config_manager_->ResolveHostname(primary_server_hostname);
-    }
-    const std::string& primary_server_address(
-        primary_server_hostname + ":" + std::to_string(location.server_port()));
-    auto lease_service_client(
-        GetOrCreateChunkServerProtocolClient(primary_server_address));
 
-    LOG(INFO) << "MasterMetadataService trying to grant write lease to server "
-              << primary_server_address;
-    // Prepare GrantLeaseRequest to send to chunk server
-    GrantLeaseRequest grant_lease_request;
-    grant_lease_request.set_chunk_handle(chunk_handle);
-    grant_lease_request.set_chunk_version(chunk_version + 1);
-    grant_lease_request.mutable_lease_expiration_time()->set_seconds(
-        absl::ToUnixSeconds(absl::Now() +
-                            config_manager_->GetWriteLeaseTimeout()));
-    grpc::ClientContext client_context;
-    common::SetClientContextDeadline(client_context, config_manager_);
-
-    // Issue GrantLeaseRequest request and check status
-    google::protobuf::util::StatusOr<GrantLeaseReply> grant_lease_reply_or(
-        lease_service_client->SendRequest(grant_lease_request, client_context));
-
-    // Handle error, and logging
-    if (!grant_lease_reply_or.ok()) {
-      LOG(ERROR) << "Grant lease request for chunk " << chunk_handle << " at "
-                 << primary_server_address << " failed due to "
-                 << grant_lease_reply_or.status();
-      continue;
-    } else {
-      LOG(INFO) << "Grant lease request for chunk " << chunk_handle << " at "
-                << primary_server_address << " succeeded";
+  auto result_or = metadata_manager()->GetPrimaryLeaseMetadata(chunk_handle);
+  if (result_or.second) {  // has value
+    auto lease_location_expiration_time = result_or.first;
+    // lease not expired
+    if (absl::FromUnixSeconds(lease_location_expiration_time.second) >
+        absl::Now()) {
       lease_granted = true;
-      primary_location = location;
-      break;
+      primary_location = lease_location_expiration_time.first;
+    } else {
+      // clean up
+      metadata_manager()->RemovePrimaryLeaseMetadata(chunk_handle);
+    }
+  }
+
+  if (!lease_granted) {
+    for (auto& location : advanced_locations) {
+      std::string primary_server_hostname = location.server_hostname();
+      if (resolve_hostname_) {
+        primary_server_hostname =
+            config_manager_->ResolveHostname(primary_server_hostname);
+      }
+      const std::string& primary_server_address(
+          primary_server_hostname + ":" +
+          std::to_string(location.server_port()));
+      auto lease_service_client(
+          GetOrCreateChunkServerProtocolClient(primary_server_address));
+
+      LOG(INFO)
+          << "MasterMetadataService trying to grant write lease to server "
+          << primary_server_address;
+      // Prepare GrantLeaseRequest to send to chunk server
+      GrantLeaseRequest grant_lease_request;
+      grant_lease_request.set_chunk_handle(chunk_handle);
+      grant_lease_request.set_chunk_version(chunk_version + 1);
+      uint64_t expiration_unix_sec = absl::ToUnixSeconds(
+          absl::Now() + config_manager_->GetWriteLeaseTimeout());
+      grant_lease_request.mutable_lease_expiration_time()->set_seconds(
+          expiration_unix_sec);
+      grpc::ClientContext client_context;
+      common::SetClientContextDeadline(client_context, config_manager_);
+
+      // Issue GrantLeaseRequest request and check status
+      google::protobuf::util::StatusOr<GrantLeaseReply> grant_lease_reply_or(
+          lease_service_client->SendRequest(grant_lease_request,
+                                            client_context));
+
+      // Handle error, and logging
+      if (!grant_lease_reply_or.ok()) {
+        LOG(ERROR) << "Grant lease request for chunk " << chunk_handle << " at "
+                   << primary_server_address << " failed due to "
+                   << grant_lease_reply_or.status();
+        continue;
+      } else {
+        LOG(INFO) << "Grant lease request for chunk " << chunk_handle << " at "
+                  << primary_server_address << " succeeded";
+        lease_granted = true;
+        primary_location = location;
+        metadata_manager()->SetPrimaryLeaseMetadata(chunk_handle, location,
+                                                    expiration_unix_sec);
+        break;
+      }
     }
   }
 
