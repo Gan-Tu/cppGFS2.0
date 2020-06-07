@@ -39,7 +39,7 @@ class MetadataManager {
   // Check if metadata file a file exists
   bool ExistFileMetadata(const std::string& filename);
 
-  // Delete a file metadata, and delete all chunk handles associated with 
+  // Delete a file metadata, and delete all chunk handles associated with
   // this file
   void DeleteFileMetadata(const std::string& filename);
 
@@ -47,13 +47,13 @@ class MetadataManager {
   // function needs to ensure the lock for this file is properly used.
   // return error if fileMetadata not found
   google::protobuf::util::StatusOr<std::shared_ptr<protos::FileMetadata>>
-      GetFileMetadata(const std::string& filename);
+  GetFileMetadata(const std::string& filename);
 
   // Create a file chunk for a given filename and a chunk index.
   google::protobuf::util::StatusOr<std::string> CreateChunkHandle(
       const std::string& filename, uint32_t chunk_index);
 
-  // Retrieve a chunk handle for a given filename and chunk index. Return 
+  // Retrieve a chunk handle for a given filename and chunk index. Return
   // error if filename or chunk not found
   google::protobuf::util::StatusOr<std::string> GetChunkHandle(
       const std::string& filename, uint32_t chunk_index);
@@ -63,22 +63,22 @@ class MetadataManager {
   google::protobuf::util::Status AdvanceChunkVersion(
       const std::string& chunk_handle);
 
-  // Get the chunk metadata for a given chunk handle, return error if 
-  // chunk handle not found 
-  google::protobuf::util::StatusOr<protos::FileChunkMetadata> 
-      GetFileChunkMetadata(const std::string& chunk_handle);
+  // Get the chunk metadata for a given chunk handle, return error if
+  // chunk handle not found
+  google::protobuf::util::StatusOr<protos::FileChunkMetadata>
+  GetFileChunkMetadata(const std::string& chunk_handle);
 
   // Set the chunk metadata for a given chunk handle
   void SetFileChunkMetadata(const protos::FileChunkMetadata& chunk_data);
 
   // Set the primary chunk location for a given chunk handle, return error
-  // if chunk handle not found.  
+  // if chunk handle not found.
   google::protobuf::util::Status SetPrimaryChunkServerLocation(
-      const std::string& chunk_handle, 
+      const std::string& chunk_handle,
       const protos::ChunkServerLocation& server_location);
 
-  // Unset the primary chunk location for a given chunk handle, 
-  // this happens when a lease expires / gets revoked. 
+  // Unset the primary chunk location for a given chunk handle,
+  // this happens when a lease expires / gets revoked.
   google::protobuf::util::Status RemovePrimaryChunkServerLocation(
       const std::string& chunk_handle);
 
@@ -94,21 +94,22 @@ class MetadataManager {
 
   // An atomic uint64 used to assign UUID for each chunk
   std::atomic<uint64_t> global_chunk_id_{0};
-  
+
   // Store all deleted chunk handles in a thread-safe hashset
   absl::flat_hash_set<std::string> deleted_chunk_handles_;
   // TODO: add a lock for deleted_chunk_handles_ once starting implementing
   // the deletion logic
- 
+
   // Parallel hash map for file metadata
-  gfs::common::parallel_hash_map<std::string, 
-      std::shared_ptr<protos::FileMetadata>> file_metadata_;
- 
-  // Map from chunk handle to FileChunkMetadata, which includes all 
+  gfs::common::parallel_hash_map<std::string,
+                                 std::shared_ptr<protos::FileMetadata>>
+      file_metadata_;
+
+  // Map from chunk handle to FileChunkMetadata, which includes all
   // the chunk server (replica) locations. Similar to file_metadata_
   // this is a parallel hash map
-  gfs::common::parallel_hash_map<std::string, 
-      protos::FileChunkMetadata> chunk_metadata_; 
+  gfs::common::parallel_hash_map<std::string, protos::FileChunkMetadata>
+      chunk_metadata_;
 
   // Note that the file_metadata_ maps to the reference of the actual
   // FileMetadata, but file_chunk_metadata_ maps to actual copy of
@@ -123,7 +124,7 @@ class MetadataManager {
   // replications. Therefore, we simply map to the actual copy of such
   // a data. Last but not least, we do not expect the chunk metadata
   // gets updated frequently, as failure of chunk replica occurs rarely,
-  // so some copy operation here is presumbaly tolerable. 
+  // so some copy operation here is presumbaly tolerable.
 
   // Lock manager to manager the synchronization of operations
   LockManager* lock_manager_;
@@ -132,4 +133,4 @@ class MetadataManager {
 }  // namespace server
 }  // namespace gfs
 
-#endif // GFS_SERVER_MASTER_SERVER_METADATA_MANAGER_H_
+#endif  // GFS_SERVER_MASTER_SERVER_METADATA_MANAGER_H_
