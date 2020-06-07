@@ -77,7 +77,7 @@ void SeedTestMetadata() {
   auto file_chunk_metadata(metadata_manager->GetFileChunkMetadata(
                                kSmallDataFileChunkHandle).ValueOrDie());
   file_chunk_metadata.mutable_locations()->Add(
-      tests::ChunkServerLocationBuilder(kTestChunkServerHostName,
+      tests::ChunkServerLocationBuilder(kTestChunkServerName,
                                         kTestChunkServerPort));
   metadata_manager->SetFileChunkMetadata(file_chunk_metadata);
 }
