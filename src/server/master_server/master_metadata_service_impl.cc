@@ -325,6 +325,9 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
       std::to_string(reply->metadata().primary_location().server_port()));
   auto lease_service_client(
       GetOrCreateChunkServerProtocolClient(primary_server_address));
+
+  LOG(INFO) << "MasterMetadataService granting write lease to primary server "
+            << primary_server_address;
   // Prepare GrantLeaseRequest to send to chunk server
   GrantLeaseRequest grant_lease_request;
   grant_lease_request.set_chunk_handle(chunk_handle);
