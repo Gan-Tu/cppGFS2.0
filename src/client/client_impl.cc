@@ -395,7 +395,7 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
           switch (send_chunk_reply.status()) {
             case SendChunkDataReply::OK:
               LOG(INFO) << "Send file chunk data to " << server_address
-                        << "succeeds";
+                        << " is successful";
               break;  // Good
             case SendChunkDataReply::FAILED:
               // We consider this a retry-able condition
