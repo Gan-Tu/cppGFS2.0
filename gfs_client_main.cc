@@ -77,8 +77,12 @@ int main(int argc, char** argv) {
   if (!open_status.ok()) {
     LOG(ERROR) << "Cannot open file: " << open_status;
     return 1;
+  } else if (mode == "create") {
+    LOG(INFO) << "File created " << filename;
+    return 0;
+  } else {
+    LOG(INFO) << "File opened: " << filename << " in " << mode << " mode.";
   }
-  LOG(INFO) << "File opened: " << filename << " in " << mode << " mode.";
 
   const size_t offset = absl::GetFlag(FLAGS_offset);
   const size_t nbytes_to_read = absl::GetFlag(FLAGS_nbytes_to_read);
