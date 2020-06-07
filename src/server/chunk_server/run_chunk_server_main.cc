@@ -63,6 +63,12 @@ int main(int argc, char** argv) {
   // Listen on the given address without any authentication mechanism for now.
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
 
+  // Chunkserver needs to accept large data and needs to set max message size
+  // as the default is 4MB. We all an additional 1000 bytes as the message may
+  // contain metadata on top of payload
+  builder.SetMaxReceiveMessageSize(config->GetFileChunkBlockSize() * 
+                                       gfs::common::bytesPerMb + 1000);
+
   // Chunk Server implementation
   LOG(INFO) << "Initializing main chunk server...";
   StatusOr<ChunkServerImpl*> chunk_server_impl_or =

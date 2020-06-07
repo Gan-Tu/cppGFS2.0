@@ -571,11 +571,20 @@ void ClientImpl::RegisterChunkServerServiceClient(
     const std::string& server_address) {
   LOG(INFO) << "Establishing new connection to chunk server: "
             << server_address;
+
+  // Specify max message size as the default is only 4MB, add some additional
+  // bytes as the message size is larger than the payload
+  grpc::ChannelArguments channel_args;
+  channel_args.SetMaxReceiveMessageSize(
+      config_manager_->GetFileChunkBlockSize() * gfs::common::bytesPerMb 
+          + 1000);
+  
   chunk_server_service_client_.TryInsert(
       server_address,
       std::make_shared<service::ChunkServerServiceGfsClient>(
-          grpc::CreateChannel(server_address,
-                              grpc::InsecureChannelCredentials())));
+          grpc::CreateCustomChannel(server_address,
+                                    grpc::InsecureChannelCredentials(),
+                                    channel_args)));
 }
 
 std::shared_ptr<service::ChunkServerServiceGfsClient>
