@@ -12,22 +12,24 @@ ABSL_FLAG(std::string, master_name, "master_server_01",
 
 // We write 100MB data, which causes multiple (2) chunks to be created for a file
 const size_t kGlobalFileDataSize = 100 * 1024 * 1024;
+const size_t kMaxNumOfThreads = 3;
 
 // Initialize the data by randomly generation
-const std::string InitializeData() {
+const std::vector<std::string> InitializeData() {
   static const char alphanum[] 
       = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  std::string data;
-  data.resize(kGlobalFileDataSize);
-  
-  for (size_t i = 0; i < kGlobalFileDataSize; ++i) {
-    data[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+  std::vector<std::string> data;
+  data.resize(kMaxNumOfThreads);
+  for (auto& data_item : data) {
+    data_item.resize(kGlobalFileDataSize);
+    for (size_t i = 0; i < kGlobalFileDataSize; ++i) {
+      data_item[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+    }
   }
-
   return data;
 }
 
-const std::string kGlobalFileData = InitializeData();
+const std::vector<std::string> kGlobalFileData = InitializeData();
 
 // Init function to initialize the client
 void init() {
@@ -60,7 +62,7 @@ void singleFileRead(const std::string& filename_base, ushort id) {
   }
 
   auto read_data_or(gfs::client::read(
-      filename.c_str(), 0, kGlobalFileData.size()));
+      filename.c_str(), 0, kGlobalFileData[id].size()));
 
   if (!read_data_or.ok()) {
     LOG(ERROR) << "Read request in the " + std::to_string(id) 
@@ -71,8 +73,8 @@ void singleFileRead(const std::string& filename_base, ushort id) {
   }
 
   auto read_data(read_data_or.ValueOrDie());
-  if (memcmp(read_data.buffer, kGlobalFileData.c_str(), 
-             kGlobalFileData.size()) != 0) {
+  if (memcmp(read_data.buffer, kGlobalFileData[id].c_str(), 
+             kGlobalFileData[id].size()) != 0) {
     LOG(ERROR) << "Read request in the " + std::to_string(id) 
                << " receives incorrect data";
     exit(1);
@@ -98,8 +100,8 @@ void singleFileWriteThenRead(const std::string& filename_base, ushort id) {
   }
 
   auto write_status(gfs::client::write(
-      filename.c_str(), (void*)kGlobalFileData.c_str(), 0, 
-      kGlobalFileData.size()));
+      filename.c_str(), (void*)kGlobalFileData[id].c_str(), 0, 
+      kGlobalFileData[id].size()));
 
   if (!write_status.ok()) {
     LOG(ERROR) << "Write request in the " + std::to_string(id) 
