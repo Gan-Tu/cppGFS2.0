@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
   const std::string data = absl::GetFlag(FLAGS_data);
   if (mode == "read") {
     StatusOr<gfs::client::Data> read_result =
-        gfs::client::read(filename.c_str(), offset, nbytes_to_read);
+        gfs::client::read(filename.c_str(), offset, nbytes);
     if (read_result.ok()) {
       gfs::client::Data data = read_result.ValueOrDie();
       LOG(INFO) << "Read " << data.bytes_read << " bytes of data from "
