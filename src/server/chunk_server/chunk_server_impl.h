@@ -60,7 +60,8 @@ class ChunkServerImpl {
   // to be dynamically added to the cluster, they just need to report themselves
   // and the master will become aware of them and start issuing chunk
   // allocations to them. Returns true if successful and false otherwise.
-  bool ReportToMaster(const uint64_t initial_disk_space_mb);
+  // Default, use 20GB for disk space
+  bool ReportToMaster(const uint64_t initial_disk_space_mb = 1024 * 20);
 
   // Get the configuration manager used by the chunkserver
   gfs::common::ConfigManager* GetConfigManager() const;
