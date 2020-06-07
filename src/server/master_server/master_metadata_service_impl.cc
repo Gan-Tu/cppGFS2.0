@@ -163,6 +163,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
   // Step 1. Access the chunk_handle
   const std::string& filename(request->filename());
   const uint32_t chunk_index(request->chunk_index());
+  LOG(INFO) << "MasterMetadataService handling file read: " << filename
+            << " at chunk index " << chunk_index;
 
   if (!metadata_manager()->ExistFileMetadata(filename)) {
     LOG(ERROR) << "Cannot read file because it doesn't exist" << filename;
@@ -204,6 +206,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
   // for write request
   const std::string& filename(request->filename());
   const uint32_t chunk_index(request->chunk_index());
+  LOG(INFO) << "MasterMetadataService handling file write: " << filename
+            << " at chunk index " << chunk_index;
 
   if (!metadata_manager()->ExistFileMetadata(filename) &&
       !request->create_if_not_exists()) {
