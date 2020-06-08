@@ -12,3 +12,29 @@ cc_binary(
         "@com_google_glog//:glog",
     ],
 )
+
+cc_binary(
+    name = "write_bench",
+    srcs = ["write_bench.cc"],
+    data = ["//data:config.yml"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/client:gfs_client",
+        "@com_google_absl//absl/strings",
+        "@com_google_benchmark//:benchmark",
+        "@com_google_glog//:glog",
+    ],
+)
+
+cc_binary(
+    name = "read_bench",
+    srcs = ["read_bench.cc"],
+    data = ["//data:config.yml"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/client:gfs_client",
+        "@com_google_absl//absl/strings",
+        "@com_google_benchmark//:benchmark",
+        "@com_google_glog//:glog",
+    ],
+)
