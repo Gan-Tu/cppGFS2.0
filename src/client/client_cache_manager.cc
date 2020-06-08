@@ -29,7 +29,7 @@ google::protobuf::util::Status CacheManager::SetChunkHandle(
   if (original_chunk_or.ok()) {
     // If there already exists a mapping for this but we change the
     // chunk_handle, something is wrong because master assigns unique
-    // chunk_hanle. (We can extend / relax this rule if we decide to
+    // chunk_handle. (We can extend / relax this rule if we decide to
     // support the case of delete-then-create a file).
     if (original_chunk_or.ValueOrDie() != chunk_handle) {
       return Status(google::protobuf::util::error::INVALID_ARGUMENT,
