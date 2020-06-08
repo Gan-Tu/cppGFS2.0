@@ -28,18 +28,17 @@ static std::string GenerateRandomFileName() {
 }
 
 static void BM_WRITE_NEW(benchmark::State& state) {
-  auto init_status(
-      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   uint64_t ok = 0;
   uint64_t failed = 0;
   for (auto _ : state) {
     state.PauseTiming();
+    auto init_status(gfs::client::init_client(kConfigFileName, kMasterName,
+                                              kResolveHostname));
     void* data = (void*)(GenerateData(state.range(0)).c_str());
     uint64_t offset = 0;
     std::string filename =
         absl::StrCat(GenerateRandomFileName(), "_t", state.thread_index);
     state.ResumeTiming();
-
     auto open_status_or = gfs::client::open(
         filename.c_str(), (gfs::OpenFlag::Write | gfs::OpenFlag::Create));
     state.PauseTiming();
@@ -57,6 +56,7 @@ static void BM_WRITE_NEW(benchmark::State& state) {
     } else {
       ok++;
     }
+    gfs::client::reset_client();
     state.ResumeTiming();
   }
   state.counters["ok"] = ok;
@@ -64,21 +64,23 @@ static void BM_WRITE_NEW(benchmark::State& state) {
 }
 
 static void BM_WRITE_EXISTING(benchmark::State& state) {
-  auto init_status(
-      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   // Setup
   void* data = (void*)(GenerateData(10 * 1024).c_str());  // 10MB file
   uint64_t offset = 0;
   std::string filename =
       absl::StrCat(GenerateRandomFileName(), "_t", state.thread_index);
-  auto open_status_or = gfs::client::open(
-      filename.c_str(), (gfs::OpenFlag::Write | gfs::OpenFlag::Create));
-  if (!open_status_or.ok()) {
-    return;
-  }
   uint64_t ok = 0;
   uint64_t failed = 0;
   for (auto _ : state) {
+    state.PauseTiming();
+    auto init_status(
+      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
+    auto open_status_or = gfs::client::open(
+        filename.c_str(), (gfs::OpenFlag::Write | gfs::OpenFlag::Create));
+    if (!open_status_or.ok()) {
+      return;
+    }
+    state.ResumeTiming();
     auto write_status_or =
         gfs::client::write(filename.c_str(), data, offset, state.range(0));
     state.PauseTiming();
@@ -87,6 +89,7 @@ static void BM_WRITE_EXISTING(benchmark::State& state) {
     } else {
       ok++;
     }
+    gfs::client::reset_client();
     state.ResumeTiming();
   }
   state.counters["ok"] = ok;
@@ -95,9 +98,9 @@ static void BM_WRITE_EXISTING(benchmark::State& state) {
 
 // The benchmark may fail if you run all of them at the same time, because
 // the GFS server cluster may have a limit on its disk size, with a max number
-// of chunks available for allocation. Thus, when google benchmark run thousands 
+// of chunks available for allocation. Thus, when google benchmark run thousands
 // of iterations, the GFS will quickly become unable to handle read/write
-// 
+//
 // It can also fail due to change of random filename collide and we prohibit
 // re-createing the same filename. Thus, use with caution
 
@@ -109,15 +112,15 @@ BENCHMARK(BM_WRITE_EXISTING)
     ->Iterations(500)
     ->DenseRange(1, 10 * 1000 + 1, 1000);  // 1KB to 10MB
 
-BENCHMARK(BM_WRITE_NEW)
-    ->Iterations(100)
-    ->ThreadRange(/*min_threads=*/1, /*max_threads=*/100)
-    ->Range(1, 1000);  // 1KB to 1MB
+// BENCHMARK(BM_WRITE_NEW)
+//     ->Iterations(100)
+//     ->ThreadRange(/*min_threads=*/1, /*max_threads=*/100)
+//     ->Range(1, 1000);  // 1KB to 1MB
 
-BENCHMARK(BM_WRITE_EXISTING)
-    ->Iterations(100)
-    ->ThreadRange(/*min_threads=*/1, /*max_threads=*/100)
-    ->Range(1, 1000);  // 1KB to 1MB
+// BENCHMARK(BM_WRITE_EXISTING)
+//     ->Iterations(100)
+//     ->ThreadRange(/*min_threads=*/1, /*max_threads=*/100)
+//     ->Range(1, 1000);  // 1KB to 1MB
 
 // Instead of using BENCHMARK_MAIN, we manually write the main to allows
 // use initialize the google logging, to surpress the INFO log being logged

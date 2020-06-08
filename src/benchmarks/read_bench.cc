@@ -25,10 +25,12 @@ static std::string GenerateData(size_t n_kb) {
 static void BM_READ(benchmark::State& state) {
   uint64_t ok = 0;
   uint64_t failed = 0;
-  auto init_status(
-      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
-  auto open_status_or = gfs::client::open(kFileName, (gfs::OpenFlag::Read));
   for (auto _ : state) {
+    state.PauseTiming();
+    auto init_status(gfs::client::init_client(kConfigFileName, kMasterName,
+                                              kResolveHostname));
+    auto open_status_or = gfs::client::open(kFileName, (gfs::OpenFlag::Read));
+    state.ResumeTiming();
     auto read_status_or = gfs::client::read(kFileName, 0, state.range(0));
     state.PauseTiming();
     if (!read_status_or.ok()) {
@@ -36,20 +38,24 @@ static void BM_READ(benchmark::State& state) {
     } else {
       ok++;
     }
+    gfs::client::reset_client();
     state.ResumeTiming();
   }
   state.counters["ok"] = ok;
   state.counters["failed"] = failed;
 }
 
-// The benchmark may fail if you run all of them at the same time, because
-// the GFS server cluster may have a limit on its disk size, with a max number
-// of chunks available for allocation. Thus, when google benchmark run thousands 
-// of iterations, the GFS will quickly become unable to handle read/write
-BENCHMARK(BM_READ)
-    ->Iterations(2000)
-    ->ThreadRange(/*min_threads=*/1, /*max_threads=*/100)
-    ->DenseRange(1, 20001, 1000);  // 1KB to 10MB
+// // The benchmark may fail if you run all of them at the same time, because
+// // the GFS server cluster may have a limit on its disk size, with a max number
+// // of chunks available for allocation. Thus, when google benchmark run thousands
+// // of iterations, the GFS will quickly become unable to handle read/write
+// // Note:
+// // Concurrent thread read will introduce cache on server side, and reduce 
+// // latency being benchmarked, so it should do random read instead
+// BENCHMARK(BM_READ)
+//     ->Iterations(2000)
+//     ->ThreadRange(/*min_threads=*/1, /*max_threads=*/100)
+//     ->DenseRange(1, 20001, 1000);  // 1KB to 10MB
 
 BENCHMARK(BM_READ)->DenseRange(1, 100 * 1000 + 1, 1000);  // 1KB to 10MB
 
@@ -71,7 +77,8 @@ int main(int argc, char** argv) {
   if (!open_status_or.ok()) {
     return 1;
   }
-  auto write_status_or = gfs::client::write(kFileName, data, offset, 100 * 1000);
+  auto write_status_or =
+      gfs::client::write(kFileName, data, offset, 100 * 1000);
   if (!write_status_or.ok()) {
     return 1;
   }
