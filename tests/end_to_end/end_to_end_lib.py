@@ -57,6 +57,9 @@ master_server_name_prefix = "master_server_"
 chunk_server_name_prefix = "chunk_server_"
 # Used to prevent duplicated port number assignment
 used_port_number = []
+# Use this config data as the "static" variable so that we can just use one 
+# configuration but start a cluster in separate steps for testing
+config_data_global = None
 
 # Kill a given process
 def kill_process(proc):
@@ -257,12 +260,21 @@ def generate_config_and_config_file(config_filename, num_of_master_server,
 def start_master_and_chunk_servers(config_filename, log_directory = None,
         num_of_master_server = 1, num_of_chunk_server = 3, block_size_mb = 64,
         min_free_disk_space_mb = 100, grpc_timeout_s = 10, lease_timeout_s = 60,
-        heartbeat_timeout_s = 30, client_cache_timeout_m = 10):
-    # Generate the config file and config data
-    config_data = generate_config_and_config_file(config_filename, 
-                      num_of_master_server, num_of_chunk_server, block_size_mb,
-                      min_free_disk_space_mb, grpc_timeout_s, lease_timeout_s,
-                      heartbeat_timeout_s, client_cache_timeout_m)
+        heartbeat_timeout_s = 30, client_cache_timeout_m = 10,
+        start_master = True, start_chunk = True):
+    global config_data_global
+    
+    # Generate the config file and config data if this function gets the first 
+    # time
+    if not config_data_global:
+        config_data = generate_config_and_config_file(config_filename, 
+                          num_of_master_server, num_of_chunk_server, 
+                          block_size_mb, min_free_disk_space_mb, grpc_timeout_s,
+                          lease_timeout_s, heartbeat_timeout_s, 
+                          client_cache_timeout_m)
+        config_data_global = config_data
+    else:
+        config_data = config_data_global
 
     master_and_chunk_server_procs = []
 
@@ -271,34 +283,38 @@ def start_master_and_chunk_servers(config_filename, log_directory = None,
         os.makedirs(log_directory, exist_ok=True)
 
     # Launch master servers
-    for master_server_name in config_data["servers"]["master_servers"]:
-        # Specify the command for master node
-        command = [master_server_binary(), "--config_path=%s"%config_filename,
+    if start_master:
+        for master_server_name in config_data["servers"]["master_servers"]:
+            # Specify the command for master node
+            command = [master_server_binary(), 
+                       "--config_path=%s"%config_filename,
                        "--master_name=%s"%master_server_name]
-        master_proc = None
-        if log_directory != None:
-            log_file = open(log_directory + "/" + master_server_name \
-                                + ".txt", "w+")
-            master_proc = subprocess.Popen(command, stderr=log_file)
-        else:
-            master_proc = subprocess.Popen(command)
+            master_proc = None
+            if log_directory != None:
+                log_file = open(log_directory + "/" + master_server_name \
+                                    + ".txt", "w+")
+                master_proc = subprocess.Popen(command, stderr=log_file)
+            else:
+                master_proc = subprocess.Popen(command)
         
-        master_and_chunk_server_procs.append(master_proc)
+            master_and_chunk_server_procs.append(master_proc)
  
     # Launch chunk servers
-    for chunk_server_name in config_data["servers"]["chunk_servers"]:
-        # Specify the command for chunk server node
-        command = [chunk_server_binary(), "--config_path=%s"%config_filename,
+    if start_chunk:
+        for chunk_server_name in config_data["servers"]["chunk_servers"]:
+            # Specify the command for chunk server node
+            command = [chunk_server_binary(), 
+                       "--config_path=%s"%config_filename,
                        "--chunk_server_name=%s"%chunk_server_name]
-        chunk_server_proc = None
-        if log_directory != None:
-            log_file = open(log_directory + "/" + chunk_server_name \
-                                + ".txt", "w+")
-            chunk_server_proc = subprocess.Popen(command, stderr=log_file)
-        else:
-            chunk_server_proc = subprocess.Popen(command)
+            chunk_server_proc = None
+            if log_directory != None:
+                log_file = open(log_directory + "/" + chunk_server_name \
+                                    + ".txt", "w+")
+                chunk_server_proc = subprocess.Popen(command, stderr=log_file)
+            else:
+                chunk_server_proc = subprocess.Popen(command)
         
-        master_and_chunk_server_procs.append(chunk_server_proc)
+            master_and_chunk_server_procs.append(chunk_server_proc)
     
     # Sleep for 3.0 seconds to let the server processes be up
     time.sleep(3.0)

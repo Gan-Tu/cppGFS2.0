@@ -33,7 +33,16 @@ google::protobuf::util::Status MetadataManager::CreateFileMetadata(
   // Step 2. Add a new lock for this new file, and writeLock it
   auto path_lock_or(lock_manager_->CreateLock(filename));
   if (!path_lock_or.ok()) {
-    return path_lock_or.status();
+    if (path_lock_or.status().error_code() == 
+            google::protobuf::util::error::ALREADY_EXISTS) {
+      // If lock creation fail due to ALREADY_EXISTS, we fetch the lock. 
+      // We do so because we support file metadata deletion and re-creation, 
+      // and since we do not delete locks (doing so would make things even more
+      // complex), the line below would be always be successful. 
+      path_lock_or = lock_manager_->FetchLock(filename);
+    } else {
+      return path_lock_or.status();
+    }
   }
 
   absl::WriterMutexLock path_writer_lock_guard(path_lock_or.ValueOrDie());

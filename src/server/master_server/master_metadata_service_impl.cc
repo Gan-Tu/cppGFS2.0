@@ -159,7 +159,17 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
 
   // Step 2. Create the first file chunk for this file and allocate chunk
   // servers
-  return HandleFileChunkCreation(request, reply);
+  grpc::Status chunk_creation_status(HandleFileChunkCreation(request, reply));
+
+  // If we did not create chunk successfully during file creation, we roll back
+  // and remove the file metadata and chunk metadata that got created along
+  // the way.  
+  if (!chunk_creation_status.ok()) {
+    LOG(ERROR) << "Rolling back and deleting file metadata: " << filename;
+    metadata_manager()->DeleteFileMetadata(filename);
+  }
+
+  return chunk_creation_status;
 }
 
 grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
