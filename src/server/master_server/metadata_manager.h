@@ -71,6 +71,9 @@ class MetadataManager {
   // Set the chunk metadata for a given chunk handle
   void SetFileChunkMetadata(const protos::FileChunkMetadata& chunk_data);
 
+  // Delete the file chunk metadata for a given chunk handle
+  void DeleteFileChunkMetadata(const std::string& chunk_handle);
+
   // Set the primary chunk location that holds the lease for a given chunk
   // handle, and its lease expiration time
   void SetPrimaryLeaseMetadata(
