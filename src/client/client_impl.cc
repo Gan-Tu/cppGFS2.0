@@ -9,6 +9,7 @@
 
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
+using protos::grpc::DeleteFileRequest;
 using protos::grpc::FileChunkMutationStatus;
 using protos::grpc::OpenFileReply;
 using protos::grpc::OpenFileRequest;
@@ -565,6 +566,16 @@ google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
   }
 
   return google::protobuf::util::Status::OK;
+}
+
+google::protobuf::util::Status ClientImpl::DeleteFile(
+    const std::string& filename) {
+  // Prepare the DeleteFileRequest and client context
+  DeleteFileRequest delete_file_request;
+  delete_file_request.set_filename(filename);
+  grpc::ClientContext client_context;
+  common::SetClientContextDeadline(client_context, config_manager_);
+  return master_metadata_service_client_->SendRequest(delete_file_request);
 }
 
 void ClientImpl::RegisterChunkServerServiceClient(

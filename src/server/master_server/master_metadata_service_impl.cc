@@ -499,8 +499,15 @@ grpc::Status MasterMetadataServiceImpl::OpenFile(ServerContext* context,
 grpc::Status MasterMetadataServiceImpl::DeleteFile(
     ServerContext* context, const DeleteFileRequest* request,
     google::protobuf::Empty* reply) {
-  // TODO(everyone): implement the GFS master server logic here
-  return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+  // Delete the file metadata, and all chunk metadata associated with a file
+  // when processing a delete file request. Note that this action only deletes
+  // the metadata and the garbage collection of actual chunk is achieved by 
+  // the heartbeat mechanism between master and chunk servers. 
+  const std::string& filename(request->filename());
+  LOG(INFO) << "Trying to delete file and chunk metadata associated with "
+            << filename;
+  metadata_manager()->DeleteFileMetadata(filename);
+  return grpc::Status::OK;
 }
 
 }  // namespace service
