@@ -200,6 +200,10 @@ google::protobuf::util::Status MetadataManager::AdvanceChunkVersion(
   return google::protobuf::util::Status::OK;
 }
 
+bool MetadataManager::ExistFileChunkMetadata(const std::string& chunk_handle) {
+  return chunk_metadata_.Contains(chunk_handle);
+}
+
 google::protobuf::util::StatusOr<protos::FileChunkMetadata>
 MetadataManager::GetFileChunkMetadata(const std::string& chunk_handle) {
   auto try_get_chunk_data(chunk_metadata_.TryGetValue(chunk_handle));

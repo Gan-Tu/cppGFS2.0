@@ -62,6 +62,9 @@ class MetadataManager {
   // chunk handle not found
   google::protobuf::util::Status AdvanceChunkVersion(
       const std::string& chunk_handle);
+ 
+  // Check whether file chunk metadata exists
+  bool ExistFileChunkMetadata(const std::string& chunk_handle);
 
   // Get the chunk metadata for a given chunk handle, return error if
   // chunk handle not found

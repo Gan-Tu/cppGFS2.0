@@ -96,15 +96,12 @@ int main(int argc, char** argv) {
     chunk_server_impl->RegisterMasterProtocolClient(master_server_address);
   }
 
-  // This chunkserver should report itself to the master server(s). This will
-  // enable the master be aware of this chunkserver, and to start selecting it
-  // for chunk allocation. This also allows chunk servers to be dynamically
-  // added since they just need to report themselves to master.
-  if (!chunk_server_impl->ReportToMaster()) {
-    LOG(ERROR) << "Failed to report to any master server. Probably no master "
-                  "server is running. Shutting down...";
-    return 1;
-  }
+  // Start report chunks to the master periodically, this chunkserver should 
+  // report itself to the master server(s). This will enable the master be aware
+  // of this chunkserver, and to start selecting it for chunk allocation. This 
+  // also allows chunk servers to be dynamically added since they just need to 
+  // report themselves to master.
+  chunk_server_impl->StartReportToMaster();
 
   // Register synchronous services for handling clients' metadata requests
   // Note that gRPC only support providing services through via a single port.
@@ -124,6 +121,9 @@ int main(int argc, char** argv) {
   // Wait for the server to shutdown. Note that some other thread must be
   // responsible for shutting down the server for this call to ever return.
   server->Wait();
+
+  // Terminate the reporting service
+  chunk_server_impl->TerminateReportToMaster();
 
   return 0;
 }

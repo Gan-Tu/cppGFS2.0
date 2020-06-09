@@ -1,5 +1,7 @@
 #include "src/server/chunk_server/chunk_server_impl.h"
 
+#include <chrono>
+
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "src/common/system_logger.h"
@@ -154,8 +156,15 @@ bool ChunkServerImpl::ReportToMaster() {
 
     auto reply = master_chunk_server_mgr_client.second->SendRequest(request);
     if (reply.ok()) {
-      // TODO(bmokutub): Check the reply for stale chunks, if any, for deletion.
-      // Not needed for now.
+      // Check the reply for stale chunks, if any, for deletion. Call the 
+      // FileChunkManager to delete the file chunk
+      auto report_reply(reply.ValueOrDie());
+      for (auto& stale_chunk_handle : report_reply.stale_chunk_handles()) {
+        LOG(INFO) << "Received stale / deleted chunk handle " 
+                  << stale_chunk_handle << ". File chunk server deleting "
+                  << "the actual file chunk";
+        FileChunkManager::GetInstance()->DeleteChunk(stale_chunk_handle);
+      }
       ++successful_report;
     } else {
       // failed
@@ -168,6 +177,32 @@ bool ChunkServerImpl::ReportToMaster() {
   // For now return true if atleast one of the report request succeeded. Meaning
   // atleast one master server knows about this chunk server.
   return successful_report > 0;
+}
+
+void ChunkServerImpl::StartReportToMaster() {
+  chunk_reporting_thread_ = new std::thread([&]() {
+    // Periodically run ReportToMaster until instructed to terminate
+    while (!reporting_thread_terminated_.load()) {
+      if (!this->ReportToMaster()) {
+        LOG(ERROR) << "Failed to report to any master server, retry laster";
+      }
+
+      // TODO(Xi/bmokutub): Ideally need to make this sleep duration a separate
+      // configurable parameter.
+      auto sleep_duration_secs 
+          = this->config_manager_->GetHeartBeatTaskSleepDuration() 
+                / absl::Seconds(1);
+      LOG(INFO) << "Chunk server ReportToMaster service going to sleep for "
+                << sleep_duration_secs << " secs";
+      // Sleep for the heartbeat interval
+      std::this_thread::sleep_for(std::chrono::seconds(sleep_duration_secs));
+    }
+  }); 
+}
+
+void ChunkServerImpl::TerminateReportToMaster() {
+  // Simply set the automic flag to be true
+  reporting_thread_terminated_.store(true);
 }
 
 gfs::common::ConfigManager* ChunkServerImpl::GetConfigManager() const {

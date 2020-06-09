@@ -107,8 +107,13 @@ int main(int argc, char** argv) {
       return 1;
     }
   } else if (mode == "remove") {
-    LOG(ERROR) << "Remove Not implemented yet";
-    return 1;
+    Status remove_status = gfs::client::remove(filename.c_str());
+    if (remove_status.ok()) {
+      LOG(INFO) << "File removed";
+    } else {
+      LOG(ERROR) << "Failed to remove: " << remove_status;
+      return 1;
+    }
   }
 
   return 0;
