@@ -120,7 +120,7 @@ class ChunkServerImpl {
       lease_and_expiration_unix_sec_;
  
   // A separate thread that executes the ReportToMaster periodically
-  std::thread* chunk_reporting_thread_;
+  std::unique_ptr<std::thread> chunk_reporting_thread_;
 
   // An atomic flag to terminate the reporting thread
   std::atomic<bool> reporting_thread_terminated_{false};

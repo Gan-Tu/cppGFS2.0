@@ -41,7 +41,7 @@ class MetadataManager {
 
   // Delete a file metadata, and delete all chunk handles associated with
   // this file
-  void DeleteFileMetadata(const std::string& filename);
+  void DeleteFileAndChunkMetadata(const std::string& filename);
 
   // Access the file metadata for a given file path. The caller of this
   // function needs to ensure the lock for this file is properly used.

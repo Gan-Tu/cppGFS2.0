@@ -501,7 +501,7 @@ TEST_F(MetadataManagerUnitTest, FileDeletionTest) {
   for (int i = 1; i < num_of_threads; i++) {
     threads.push_back(std::thread([&, i]() {
       std::string filename_to_be_deleted(filename_base + std::to_string(i-1));
-      metadata_manager_->DeleteFileMetadata(filename_to_be_deleted);
+      metadata_manager_->DeleteFileAndChunkMetadata(filename_to_be_deleted);
     }));
 
     threads.push_back(std::thread([&, i]() {
@@ -580,7 +580,7 @@ TEST_F(MetadataManagerUnitTest, FileDeletionConcurrentTest) {
   for (int i = 0; i < num_of_threads; i++) {
     threads.push_back(std::thread([&, i]() {
       std::string filename(filename_base + std::to_string(i));
-      metadata_manager_->DeleteFileMetadata(filename);
+      metadata_manager_->DeleteFileAndChunkMetadata(filename);
     }));
   }
   JoinAndClearThreads(threads);

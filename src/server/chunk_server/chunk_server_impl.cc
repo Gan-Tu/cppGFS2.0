@@ -19,6 +19,9 @@ namespace gfs {
 namespace server {
 
 ChunkServerImpl::~ChunkServerImpl() {
+  // Terminate the reporting thread before cleaning up other data structures as they
+  // may be in use by that thread
+  TerminateReportToMaster();
   master_server_clients_.clear();
   chunk_server_clients_.clear();
   chunk_versions_.clear();
@@ -163,7 +166,12 @@ bool ChunkServerImpl::ReportToMaster() {
         LOG(INFO) << "Received stale / deleted chunk handle " 
                   << stale_chunk_handle << ". File chunk server deleting "
                   << "the actual file chunk";
-        FileChunkManager::GetInstance()->DeleteChunk(stale_chunk_handle);
+        auto delete_chunk_status(
+            FileChunkManager::GetInstance()->DeleteChunk(stale_chunk_handle));
+        if (!delete_chunk_status.ok()) {
+          LOG(ERROR) << "Error encountered when deleting file chunk " 
+                     << stale_chunk_handle << " due to " << delete_chunk_status;
+        }
       }
       ++successful_report;
     } else {
@@ -180,11 +188,11 @@ bool ChunkServerImpl::ReportToMaster() {
 }
 
 void ChunkServerImpl::StartReportToMaster() {
-  chunk_reporting_thread_ = new std::thread([&]() {
+  chunk_reporting_thread_ = std::unique_ptr<std::thread>(new std::thread([&]() {
     // Periodically run ReportToMaster until instructed to terminate
     while (!reporting_thread_terminated_.load()) {
       if (!this->ReportToMaster()) {
-        LOG(ERROR) << "Failed to report to any master server, retry laster";
+        LOG(ERROR) << "Failed to report to any master server, retry later";
       }
 
       // TODO(Xi/bmokutub): Ideally need to make this sleep duration a separate
@@ -197,12 +205,17 @@ void ChunkServerImpl::StartReportToMaster() {
       // Sleep for the heartbeat interval
       std::this_thread::sleep_for(std::chrono::seconds(sleep_duration_secs));
     }
-  }); 
+  })); 
 }
 
 void ChunkServerImpl::TerminateReportToMaster() {
-  // Simply set the automic flag to be true
+  // Simply set the reporting flag to be true, and wait for the thread to finish by
+  // joining it. This happens during destruction time of this object. 
+  // (Caveat): because the reporting thread only wakes up once in a while (every 30s
+  // by default), joining it may mean the server thread needs to have a big pause but
+  // this is ok since this only happens at teardown stage. 
   reporting_thread_terminated_.store(true);
+  chunk_reporting_thread_->join();
 }
 
 gfs::common::ConfigManager* ChunkServerImpl::GetConfigManager() const {

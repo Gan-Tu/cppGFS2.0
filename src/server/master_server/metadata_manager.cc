@@ -252,7 +252,7 @@ MetadataManager::GetPrimaryLeaseMetadata(const std::string& chunk_handle) {
 // corresonding chunk handle is no longer existing and therefore garbage collect
 // them when finding them out via heartbeat mechanism.
 // Note that we do not rename upon deletion as described from the paper. 
-void MetadataManager::DeleteFileMetadata(const std::string& filename) {
+void MetadataManager::DeleteFileAndChunkMetadata(const std::string& filename) {
   // Step 1. readlock the parent directories
   ParentLocksAnchor parentLockAnchor(lock_manager_, filename);
   if (!parentLockAnchor.ok()) {

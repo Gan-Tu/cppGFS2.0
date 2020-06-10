@@ -79,8 +79,8 @@ grpc::Status MasterChunkServerManagerServiceImpl::ReportChunkServer(
                    << " no longer existed in the master's metadata,"
                    << " marking as staled chunk to chunk server "
                    << new_server_info.DebugString();
-         reply->mutable_stale_chunk_handles()->Add(
-             std::move(stored_chunk_handles));
+         *reply->add_stale_chunk_handles() = stored_chunk_handles;
+         chunks_to_add.erase(stored_chunk_handles);
       }
     }
 

@@ -166,7 +166,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
   // the way.  
   if (!chunk_creation_status.ok()) {
     LOG(ERROR) << "Rolling back and deleting file metadata: " << filename;
-    metadata_manager()->DeleteFileMetadata(filename);
+    metadata_manager()->DeleteFileAndChunkMetadata(filename);
   }
 
   return chunk_creation_status;
@@ -506,7 +506,7 @@ grpc::Status MasterMetadataServiceImpl::DeleteFile(
   const std::string& filename(request->filename());
   LOG(INFO) << "Trying to delete file and chunk metadata associated with "
             << filename;
-  metadata_manager()->DeleteFileMetadata(filename);
+  metadata_manager()->DeleteFileAndChunkMetadata(filename);
   return grpc::Status::OK;
 }
 

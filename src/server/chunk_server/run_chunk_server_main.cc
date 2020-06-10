@@ -122,8 +122,5 @@ int main(int argc, char** argv) {
   // responsible for shutting down the server for this call to ever return.
   server->Wait();
 
-  // Terminate the reporting service
-  chunk_server_impl->TerminateReportToMaster();
-
   return 0;
 }
