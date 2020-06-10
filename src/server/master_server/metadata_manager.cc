@@ -33,7 +33,16 @@ google::protobuf::util::Status MetadataManager::CreateFileMetadata(
   // Step 2. Add a new lock for this new file, and writeLock it
   auto path_lock_or(lock_manager_->CreateLock(filename));
   if (!path_lock_or.ok()) {
-    return path_lock_or.status();
+    if (path_lock_or.status().error_code() == 
+            google::protobuf::util::error::ALREADY_EXISTS) {
+      // If lock creation fail due to ALREADY_EXISTS, we fetch the lock. 
+      // We do so because we support file metadata deletion and re-creation, 
+      // and since we do not delete locks (doing so would make things even more
+      // complex), the line below would be always be successful. 
+      path_lock_or = lock_manager_->FetchLock(filename);
+    } else {
+      return path_lock_or.status();
+    }
   }
 
   absl::WriterMutexLock path_writer_lock_guard(path_lock_or.ValueOrDie());
@@ -131,9 +140,6 @@ MetadataManager::CreateChunkHandle(const std::string& filename,
   new_chunk_metadata.set_chunk_handle(new_chunk_handle);
   SetFileChunkMetadata(new_chunk_metadata);
 
-  // TODO(Xi,Michael): Call ChunkServerManager::AllocateChunkServers to
-  // allocate chunk servers for this new chunk handle
-
   return new_chunk_handle;
 }
 
@@ -194,6 +200,10 @@ google::protobuf::util::Status MetadataManager::AdvanceChunkVersion(
   return google::protobuf::util::Status::OK;
 }
 
+bool MetadataManager::ExistFileChunkMetadata(const std::string& chunk_handle) {
+  return chunk_metadata_.Contains(chunk_handle);
+}
+
 google::protobuf::util::StatusOr<protos::FileChunkMetadata>
 MetadataManager::GetFileChunkMetadata(const std::string& chunk_handle) {
   auto try_get_chunk_data(chunk_metadata_.TryGetValue(chunk_handle));
@@ -211,6 +221,10 @@ void MetadataManager::SetFileChunkMetadata(
     const protos::FileChunkMetadata& chunk_data) {
   const std::string& chunk_handle(chunk_data.chunk_handle());
   chunk_metadata_.SetValue(chunk_handle, chunk_data);
+}
+
+void MetadataManager::DeleteFileChunkMetadata(const std::string& chunk_handle) {
+  chunk_metadata_.Erase(chunk_handle);
 }
 
 void MetadataManager::SetPrimaryLeaseMetadata(
@@ -232,22 +246,46 @@ MetadataManager::GetPrimaryLeaseMetadata(const std::string& chunk_handle) {
   return lease_holders_.TryGetValue(chunk_handle);
 }
 
-// TODO(Xi): In phase 1 the deletion of file is not fully supported but
-// it would be good to lay out a plan as deletion involves removing items
-// from the shared states. When DeleteFileMetadata is called, the following
-// steps should be taken:
-// 1) Loop over all chunk handles for a file, and mark them as deleted
-// by inserting them to deleted_chunk_handles
-// 2) Mark their entries in chunk_metadata_ as default
-//
-// We defer the removal of these entries from the above collections to
-// when the chunks have been garbage collected. By then we
-// 1) Remove the entry in file_metadata_ (TODO) there is still a bit of
-// detailed question here as to how to detect the filename when garbage
-// collection occurs on chunk level
-// 2) Remove the entry in chunk_version_ and chunk_metadata_
-void MetadataManager::DeleteFileMetadata(const std::string& filename) {
-  // [TODO]: phase 2
+// Delete the file metadata, furthermore, delete all chunk handles assocated
+// with that file metadata, this means all the associated chunk metadata
+// are removed from the metadata manager. The chunk server will detect the 
+// corresonding chunk handle is no longer existing and therefore garbage collect
+// them when finding them out via heartbeat mechanism.
+// Note that we do not rename upon deletion as described from the paper. 
+void MetadataManager::DeleteFileAndChunkMetadata(const std::string& filename) {
+  // Step 1. readlock the parent directories
+  ParentLocksAnchor parentLockAnchor(lock_manager_, filename);
+  if (!parentLockAnchor.ok()) {
+    // If this operation fails, which means some of the parent directory
+    // does not exist, we just return as the deletion is a no-op
+    return;
+  }
+
+  // Step 2. writelock the lock for this path
+  auto path_lock_or(lock_manager_->FetchLock(filename));
+  if (!path_lock_or.ok()) {
+    return;
+  }
+
+  // This writer lock to protect this file, as we are deleting it
+  absl::WriterMutexLock path_writer_lock_guard(path_lock_or.ValueOrDie());
+
+  // Step 3. fetch the file metadata
+  auto file_metadata_or(GetFileMetadata(filename));
+  if (!file_metadata_or.ok()) {
+    return;
+  }
+  auto file_metadata(file_metadata_or.ValueOrDie());
+
+  // Now we can remove the smart pointer of the file metadata from the 
+  // file_metadata collection
+  file_metadata_.Erase(filename);
+
+  // We can still access the file metadata as the shared pointer anchored it
+  // Delete all the file chunk metadata
+  for (auto& chunk_index_and_chunk_handle : file_metadata->chunk_handles()) {
+    DeleteFileChunkMetadata(chunk_index_and_chunk_handle.second);  
+  }
 }
 
 std::string MetadataManager::AllocateNewChunkHandle() {

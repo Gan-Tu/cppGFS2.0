@@ -82,6 +82,7 @@ void singleFileRead(const std::string& filename_base, ushort id) {
     LOG(INFO) << "Read request in the " + std::to_string(id)
               << " receives correct data";
   }
+  free(read_data.buffer);
 }
 
 // Write a file and then read it from a different thread (so acting as a 

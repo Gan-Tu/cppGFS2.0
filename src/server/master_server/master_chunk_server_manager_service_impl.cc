@@ -5,8 +5,10 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
 #include "grpcpp/grpcpp.h"
+#include "src/common/system_logger.h"
 #include "src/protos/grpc/master_chunk_server_manager_service.grpc.pb.h"
 #include "src/server/master_server/chunk_server_manager.h"
+#include "src/server/master_server/metadata_manager.h"
 
 using grpc::ServerContext;
 using protos::grpc::ReportChunkServerReply;
@@ -34,6 +36,7 @@ grpc::Status MasterChunkServerManagerServiceImpl::ReportChunkServer(
     ServerContext* context, const ReportChunkServerRequest* request,
     ReportChunkServerReply* reply) {
   auto& new_server_info = request->chunk_server();
+  LOG(INFO) << "Master handling report from " << new_server_info.DebugString();
   auto existing_server_info =
       gfs::server::ChunkServerManager::GetInstance().GetChunkServer(
           new_server_info.location());
@@ -62,6 +65,24 @@ grpc::Status MasterChunkServerManagerServiceImpl::ReportChunkServer(
     // The chunks that we think exist on the chunkserver but no longer exist
     // on it.
     absl::flat_hash_set<std::string> chunks_to_remove;
+
+    // Check for deleted chunk with metadata mgr. If a chunk handle is found
+    // deleted, we add it to stale chunks in reply so chunk server can delete
+    // them.
+    // TODO(Xi/bmokutub): Not sure if this piece of logic should / need to be 
+    // combined with below. TBD
+    for(auto stored_chunk_handles : 
+            request->chunk_server().stored_chunk_handles()) {
+      if (!gfs::server::MetadataManager::GetInstance()->ExistFileChunkMetadata(
+              stored_chunk_handles)) {
+         LOG(INFO) << "Chunk handle " << stored_chunk_handles 
+                   << " no longer existed in the master's metadata,"
+                   << " marking as staled chunk to chunk server "
+                   << new_server_info.DebugString();
+         *reply->add_stale_chunk_handles() = stored_chunk_handles;
+         chunks_to_add.erase(stored_chunk_handles);
+      }
+    }
 
     // Compare with our stored chunk handles for the chunk server. To see
     // which reported chunks we have or don't have.
