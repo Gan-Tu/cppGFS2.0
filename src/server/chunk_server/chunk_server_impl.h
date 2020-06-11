@@ -63,7 +63,7 @@ class ChunkServerImpl {
   // and the master will become aware of them and start issuing chunk
   // allocations to them. Returns true if successful and false otherwise.
   // Default, use 20GB for disk space
-  bool ReportToMaster(const uint64_t initial_disk_space_mb);
+  bool ReportToMaster(const uint64_t initial_disk_space_mb = 1024 * 20);
 
   // Start calling ReportToMaster periodically to master server. For
   // dynamically adding chunk servers and for garbage collecting deleted chunks
