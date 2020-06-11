@@ -41,7 +41,7 @@ class MetadataManager {
 
   // Delete a file metadata, and delete all chunk handles associated with
   // this file
-  void DeleteFileMetadata(const std::string& filename);
+  void DeleteFileAndChunkMetadata(const std::string& filename);
 
   // Access the file metadata for a given file path. The caller of this
   // function needs to ensure the lock for this file is properly used.
@@ -62,6 +62,9 @@ class MetadataManager {
   // chunk handle not found
   google::protobuf::util::Status AdvanceChunkVersion(
       const std::string& chunk_handle);
+ 
+  // Check whether file chunk metadata exists
+  bool ExistFileChunkMetadata(const std::string& chunk_handle);
 
   // Get the chunk metadata for a given chunk handle, return error if
   // chunk handle not found
@@ -70,6 +73,9 @@ class MetadataManager {
 
   // Set the chunk metadata for a given chunk handle
   void SetFileChunkMetadata(const protos::FileChunkMetadata& chunk_data);
+
+  // Delete the file chunk metadata for a given chunk handle
+  void DeleteFileChunkMetadata(const std::string& chunk_handle);
 
   // Set the primary chunk location that holds the lease for a given chunk
   // handle, and its lease expiration time

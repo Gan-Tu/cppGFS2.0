@@ -97,7 +97,7 @@ void singleFileRead(const std::string& filename_base, ushort id) {
 
   auto read_data(read_data_or.ValueOrDie());
   if (memcmp(read_data.buffer, kGlobalFileData[id].c_str(), 
-            kGlobalFileData[id].size() != 0)) {
+            kGlobalFileData[id].size()) != 0) {
     LOG(ERROR) << "Read request in the " + std::to_string(id) 
               << " receives incorrect data";
     exit(1);
@@ -105,6 +105,7 @@ void singleFileRead(const std::string& filename_base, ushort id) {
     LOG(INFO) << "Read request in the " + std::to_string(id)
               << " receives correct data";
   }
+  free(read_data.buffer);
 }
 
 // Launch a number of threads and each to create and write to a different file

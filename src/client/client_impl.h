@@ -34,6 +34,9 @@ class ClientImpl {
   google::protobuf::util::Status WriteFile(const char* filename, void* buffer,
       size_t offset, size_t nbytes);
 
+  // Internal impl call that issues a DeleteFileRequest to the master
+  google::protobuf::util::Status DeleteFile(const std::string& filename); 
+
   // Construct and return a ClientImpl objects with proper configurations 
   // using the given config file. The ClientImpl object uses the config 
   // file to initialize the cache manager and two clients objects used to 

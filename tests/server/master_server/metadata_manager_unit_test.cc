@@ -483,3 +483,119 @@ TEST_F(MetadataManagerUnitTest, UpdateChunkMetadataInParallelTest) {
     }
   }
 }
+
+// Have some simple concurrent creation / deletion, first create file "del0",
+// then create file "del1", and delete "del0" concurrently, then create file 
+// "del2", and delete "del1" concurrently. Make sure that at the end only the 
+// last file is present
+TEST_F(MetadataManagerUnitTest, FileDeletionTest) {
+  std::string filename_base("/FileToBeDeleted");
+  int num_of_threads(24);
+  int num_of_chunk_per_file(10);
+  metadata_manager_->CreateFileMetadata(filename_base + "0");
+  EXPECT_TRUE(metadata_manager_->ExistFileMetadata(filename_base + "0"));
+  std::vector<std::thread> threads;
+  // Store the chunk_handles that are supposed to be deleted in this test
+  gfs::common::thread_safe_flat_hash_set<std::string> deleted_chunk_handles;
+
+  for (int i = 1; i < num_of_threads; i++) {
+    threads.push_back(std::thread([&, i]() {
+      std::string filename_to_be_deleted(filename_base + std::to_string(i-1));
+      metadata_manager_->DeleteFileAndChunkMetadata(filename_to_be_deleted);
+    }));
+
+    threads.push_back(std::thread([&, i]() {
+      std::string filename_to_be_created(filename_base + std::to_string(i));
+      metadata_manager_->CreateFileMetadata(filename_to_be_created);
+      for (int j = 0; j < num_of_chunk_per_file; j++) {
+        auto chunk_handle_or = 
+            metadata_manager_->CreateChunkHandle(filename_to_be_created, j);
+        auto chunk_handle(chunk_handle_or.ValueOrDie());
+        // If this is not the last batch, it would get deleted so mark them
+        if (i < num_of_threads - 1) {
+          deleted_chunk_handles.insert(chunk_handle);
+        }
+
+        protos::FileChunkMetadata chunk_data;
+        InitializeChunkMetadata(chunk_data, chunk_handle, 0,
+                                std::make_pair("localhost", 5000),
+                                {std::make_pair("localhost", 5000 + j),
+                                 std::make_pair("localhost", 5001 + j),
+                                 std::make_pair("localhost", 5002)});
+        metadata_manager_->SetFileChunkMetadata(chunk_data);
+      }
+    }));
+
+    // Join every time, so that in the next iteration we know that the (i-1)-th
+    // file exists
+    JoinAndClearThreads(threads);
+  }
+
+  // Verify that only the last file exists, and all chunk handles that are 
+  // supposed to be deleted were deleted
+  for (int i = 0; i < num_of_threads; i++) {
+    std::string filename(filename_base + std::to_string(i));
+    if (i < num_of_threads - 1) {
+      EXPECT_FALSE(metadata_manager_->ExistFileMetadata(filename));
+    } else {
+      EXPECT_TRUE(metadata_manager_->ExistFileMetadata(filename));
+    }
+  }
+
+  for(auto& deleted_chunk_handle : deleted_chunk_handles) {
+    auto get_chunk_data(metadata_manager_->GetFileChunkMetadata(
+                            deleted_chunk_handle));
+    EXPECT_FALSE(get_chunk_data.ok());
+    EXPECT_EQ(get_chunk_data.status().error_code(),
+              google::protobuf::util::error::NOT_FOUND);
+  }
+}
+
+// Test creates a number of files and concurrently delete them
+TEST_F(MetadataManagerUnitTest, FileDeletionConcurrentTest) {
+  std::string filename_base("/FileConcurrentDeletion");
+  int num_of_threads(24);
+  int num_of_chunk_per_file(10);
+  std::vector<std::thread> threads;
+  gfs::common::thread_safe_flat_hash_set<std::string> deleted_chunk_handles;
+
+  for (int i = 0; i < num_of_threads; i++) {
+    auto filename(filename_base + std::to_string(i));
+    metadata_manager_->CreateFileMetadata(filename);
+    for (int j = 0; j < num_of_chunk_per_file; j++) {
+      auto chunk_handle(
+          metadata_manager_->CreateChunkHandle(filename, j).ValueOrDie());
+      protos::FileChunkMetadata chunk_data;
+      InitializeChunkMetadata(chunk_data, chunk_handle, 0,
+                              std::make_pair("localhost", 5000),
+                              {std::make_pair("localhost", 5000 + j),
+                               std::make_pair("localhost", 5001 + j),
+                               std::make_pair("localhost", 5002)});
+      metadata_manager_->SetFileChunkMetadata(chunk_data);
+      deleted_chunk_handles.insert(chunk_handle);
+    }
+  }
+
+  // Delete concurrently
+  for (int i = 0; i < num_of_threads; i++) {
+    threads.push_back(std::thread([&, i]() {
+      std::string filename(filename_base + std::to_string(i));
+      metadata_manager_->DeleteFileAndChunkMetadata(filename);
+    }));
+  }
+  JoinAndClearThreads(threads);
+
+  // Verify that no file exists nor chunk_handle
+  for (int i = 0; i < num_of_threads; i++) {
+    std::string filename(filename_base + std::to_string(i));
+    EXPECT_FALSE(metadata_manager_->ExistFileMetadata(filename));
+  }
+
+  for(auto& deleted_chunk_handle : deleted_chunk_handles) {
+    auto get_chunk_data(metadata_manager_->GetFileChunkMetadata(
+                            deleted_chunk_handle));
+    EXPECT_FALSE(get_chunk_data.ok());
+    EXPECT_EQ(get_chunk_data.status().error_code(),
+              google::protobuf::util::error::NOT_FOUND);
+  }
+}

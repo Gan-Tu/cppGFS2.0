@@ -1,6 +1,8 @@
 #ifndef GFS_SERVER_CHUNK_SERVER_IMPL_H_
 #define GFS_SERVER_CHUNK_SERVER_IMPL_H_
 
+#include <thread>
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/time/time.h"
 #include "google/protobuf/stubs/statusor.h"
@@ -61,7 +63,15 @@ class ChunkServerImpl {
   // and the master will become aware of them and start issuing chunk
   // allocations to them. Returns true if successful and false otherwise.
   // Default, use 20GB for disk space
-  bool ReportToMaster(const uint64_t initial_disk_space_mb = 1024 * 20);
+  bool ReportToMaster(const uint64_t initial_disk_space_mb);
+
+  // Start calling ReportToMaster periodically to master server. For
+  // dynamically adding chunk servers and for garbage collecting deleted chunks
+  void StartReportToMaster(const uint64_t initial_disk_space_mb = 1024 * 20);
+
+  // Instruct to terminate the reporting threads by stopping its service and
+  // joining them. This function call is useful when peacefully teardown
+  void TerminateReportToMaster();
 
   // Get the configuration manager used by the chunkserver
   gfs::common::ConfigManager* GetConfigManager() const;
@@ -109,6 +119,12 @@ class ChunkServerImpl {
   // Write leases that chunk server holds, and their respective expiration time
   gfs::common::thread_safe_flat_hash_map<std::string, uint64_t>
       lease_and_expiration_unix_sec_;
+
+  // A separate thread that executes the ReportToMaster periodically
+  std::unique_ptr<std::thread> chunk_reporting_thread_;
+
+  // An atomic flag to terminate the reporting thread
+  std::atomic<bool> reporting_thread_terminated_{false};
 };
 
 }  // namespace server

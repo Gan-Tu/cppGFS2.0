@@ -137,7 +137,7 @@ google::protobuf::util::Status write(const char* filename, void* buffer,
 }
 
 google::protobuf::util::Status remove(const char* filename) {
-  return google::protobuf::util::Status::OK;
+  return client_impl_->DeleteFile(filename);
 }
 
 }  // namespace client

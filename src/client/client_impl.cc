@@ -9,6 +9,7 @@
 
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
+using protos::grpc::DeleteFileRequest;
 using protos::grpc::FileChunkMutationStatus;
 using protos::grpc::OpenFileReply;
 using protos::grpc::OpenFileRequest;
@@ -567,15 +568,34 @@ google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
   return google::protobuf::util::Status::OK;
 }
 
+google::protobuf::util::Status ClientImpl::DeleteFile(
+    const std::string& filename) {
+  // Prepare the DeleteFileRequest and client context
+  DeleteFileRequest delete_file_request;
+  delete_file_request.set_filename(filename);
+  grpc::ClientContext client_context;
+  common::SetClientContextDeadline(client_context, config_manager_);
+  return master_metadata_service_client_->SendRequest(delete_file_request);
+}
+
 void ClientImpl::RegisterChunkServerServiceClient(
     const std::string& server_address) {
   LOG(INFO) << "Establishing new connection to chunk server: "
             << server_address;
+
+  // Specify max message size as the default is only 4MB, add some additional
+  // bytes as the message size is larger than the payload
+  grpc::ChannelArguments channel_args;
+  channel_args.SetMaxReceiveMessageSize(
+      config_manager_->GetFileChunkBlockSize() * gfs::common::bytesPerMb 
+          + 1000);
+  
   chunk_server_service_client_.TryInsert(
       server_address,
       std::make_shared<service::ChunkServerServiceGfsClient>(
-          grpc::CreateChannel(server_address,
-                              grpc::InsecureChannelCredentials())));
+          grpc::CreateCustomChannel(server_address,
+                                    grpc::InsecureChannelCredentials(),
+                                    channel_args)));
 }
 
 std::shared_ptr<service::ChunkServerServiceGfsClient>

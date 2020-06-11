@@ -1,5 +1,7 @@
 #include "src/server/chunk_server/chunk_server_impl.h"
 
+#include <chrono>
+
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "src/common/system_logger.h"
@@ -17,6 +19,9 @@ namespace gfs {
 namespace server {
 
 ChunkServerImpl::~ChunkServerImpl() {
+  // Terminate the reporting thread before cleaning up other data structures as they
+  // may be in use by that thread
+  TerminateReportToMaster();
   master_server_clients_.clear();
   chunk_server_clients_.clear();
   chunk_versions_.clear();
@@ -154,8 +159,20 @@ bool ChunkServerImpl::ReportToMaster(const uint64_t initial_disk_space_mb) {
 
     auto reply = master_chunk_server_mgr_client.second->SendRequest(request);
     if (reply.ok()) {
-      // TODO(bmokutub): Check the reply for stale chunks, if any, for deletion.
-      // Not needed for now.
+      // Check the reply for stale chunks, if any, for deletion. Call the
+      // FileChunkManager to delete the file chunk
+      auto report_reply(reply.ValueOrDie());
+      for (auto& stale_chunk_handle : report_reply.stale_chunk_handles()) {
+        LOG(INFO) << "Received stale / deleted chunk handle "
+                  << stale_chunk_handle << ". File chunk server deleting "
+                  << "the actual file chunk";
+        auto delete_chunk_status(
+            FileChunkManager::GetInstance()->DeleteChunk(stale_chunk_handle));
+        if (!delete_chunk_status.ok()) {
+          LOG(ERROR) << "Error encountered when deleting file chunk "
+                     << stale_chunk_handle << " due to " << delete_chunk_status;
+        }
+      }
       ++successful_report;
     } else {
       // failed
@@ -168,6 +185,37 @@ bool ChunkServerImpl::ReportToMaster(const uint64_t initial_disk_space_mb) {
   // For now return true if atleast one of the report request succeeded. Meaning
   // atleast one master server knows about this chunk server.
   return successful_report > 0;
+}
+
+void ChunkServerImpl::StartReportToMaster(const uint64_t initial_disk_space_mb) {
+  chunk_reporting_thread_ = std::unique_ptr<std::thread>(new std::thread([&]() {
+    // Periodically run ReportToMaster until instructed to terminate
+    while (!reporting_thread_terminated_.load()) {
+      if (!this->ReportToMaster(initial_disk_space_mb)) {
+        LOG(ERROR) << "Failed to report to any master server, retry later";
+      }
+
+      // TODO(Xi/bmokutub): Ideally need to make this sleep duration a separate
+      // configurable parameter.
+      auto sleep_duration_secs
+          = this->config_manager_->GetHeartBeatTaskSleepDuration()
+                / absl::Seconds(1);
+      LOG(INFO) << "Chunk server ReportToMaster service going to sleep for "
+                << sleep_duration_secs << " secs";
+      // Sleep for the heartbeat interval
+      std::this_thread::sleep_for(std::chrono::seconds(sleep_duration_secs));
+    }
+  }));
+}
+
+void ChunkServerImpl::TerminateReportToMaster() {
+  // Simply set the reporting flag to be true, and wait for the thread to finish by
+  // joining it. This happens during destruction time of this object.
+  // (Caveat): because the reporting thread only wakes up once in a while (every 30s
+  // by default), joining it may mean the server thread needs to have a big pause but
+  // this is ok since this only happens at teardown stage.
+  reporting_thread_terminated_.store(true);
+  chunk_reporting_thread_->join();
 }
 
 gfs::common::ConfigManager* ChunkServerImpl::GetConfigManager() const {

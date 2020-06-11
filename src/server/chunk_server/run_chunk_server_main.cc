@@ -63,6 +63,12 @@ int main(int argc, char** argv) {
   // Listen on the given address without any authentication mechanism for now.
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
 
+  // Chunkserver needs to accept large data and needs to set max message size
+  // as the default is 4MB. We all an additional 1000 bytes as the message may
+  // contain metadata on top of payload
+  builder.SetMaxReceiveMessageSize(config->GetFileChunkBlockSize() *
+                                       gfs::common::bytesPerMb + 1000);
+
   // Chunk Server implementation
   LOG(INFO) << "Initializing main chunk server...";
   StatusOr<ChunkServerImpl*> chunk_server_impl_or =
@@ -90,18 +96,15 @@ int main(int argc, char** argv) {
     chunk_server_impl->RegisterMasterProtocolClient(master_server_address);
   }
 
-  // This chunkserver should report itself to the master server(s). This will
-  // enable the master be aware of this chunkserver, and to start selecting it
-  // for chunk allocation. This also allows chunk servers to be dynamically
-  // added since they just need to report themselves to master.
+  // Start report chunks to the master periodically, this chunkserver should
+  // report itself to the master server(s). This will enable the master be aware
+  // of this chunkserver, and to start selecting it for chunk allocation. This
+  // also allows chunk servers to be dynamically added since they just need to
+  // report themselves to master.
   //
   // TODO(tugan): initial setting as 2TB for now, useful for benchmarking
   const uint64_t initial_disk_space_mb = 1024 * 1024 * 2;
-  if (!chunk_server_impl->ReportToMaster(initial_disk_space_mb)) {
-    LOG(ERROR) << "Failed to report to any master server. Probably no master "
-                  "server is running. Shutting down...";
-    return 1;
-  }
+  chunk_server_impl->StartReportToMaster(initial_disk_space_mb);
 
   // Register synchronous services for handling clients' metadata requests
   // Note that gRPC only support providing services through via a single port.

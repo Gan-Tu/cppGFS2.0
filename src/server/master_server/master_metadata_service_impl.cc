@@ -159,7 +159,17 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
 
   // Step 2. Create the first file chunk for this file and allocate chunk
   // servers
-  return HandleFileChunkCreation(request, reply);
+  grpc::Status chunk_creation_status(HandleFileChunkCreation(request, reply));
+
+  // If we did not create chunk successfully during file creation, we roll back
+  // and remove the file metadata and chunk metadata that got created along
+  // the way.  
+  if (!chunk_creation_status.ok()) {
+    LOG(ERROR) << "Rolling back and deleting file metadata: " << filename;
+    metadata_manager()->DeleteFileAndChunkMetadata(filename);
+  }
+
+  return chunk_creation_status;
 }
 
 grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
@@ -253,6 +263,8 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
     if (!chunk_creation_status.ok()) {
       return chunk_creation_status;
     }
+    // Refetch the chunk handle after creation
+    chunk_handle_or = metadata_manager()->GetChunkHandle(filename, chunk_index);
   }
 
   google::protobuf::util::StatusOr<FileChunkMetadata> file_chunk_metadata_or(
@@ -487,8 +499,15 @@ grpc::Status MasterMetadataServiceImpl::OpenFile(ServerContext* context,
 grpc::Status MasterMetadataServiceImpl::DeleteFile(
     ServerContext* context, const DeleteFileRequest* request,
     google::protobuf::Empty* reply) {
-  // TODO(everyone): implement the GFS master server logic here
-  return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "needs implementation");
+  // Delete the file metadata, and all chunk metadata associated with a file
+  // when processing a delete file request. Note that this action only deletes
+  // the metadata and the garbage collection of actual chunk is achieved by 
+  // the heartbeat mechanism between master and chunk servers. 
+  const std::string& filename(request->filename());
+  LOG(INFO) << "Trying to delete file and chunk metadata associated with "
+            << filename;
+  metadata_manager()->DeleteFileAndChunkMetadata(filename);
+  return grpc::Status::OK;
 }
 
 }  // namespace service
