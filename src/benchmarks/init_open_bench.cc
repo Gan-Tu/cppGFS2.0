@@ -26,12 +26,14 @@ static void BM_INIT_CLIENT(benchmark::State& state) {
 }
 
 static void BM_OPEN_WITH_READ_MODE(benchmark::State& state) {
-  auto init_status(
-      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   // Benchmark the init_client function
   uint64_t ok = 0;
   uint64_t failed = 0;
   for (auto _ : state) {
+    state.PauseTiming();
+    auto init_status(
+      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
+    state.ResumeTiming();
     auto status_or = gfs::client::open("/open_with_read", gfs::OpenFlag::Read);
     state.PauseTiming();
     if (status_or.ok()) {
@@ -39,6 +41,7 @@ static void BM_OPEN_WITH_READ_MODE(benchmark::State& state) {
     } else {
       failed++;
     }
+    gfs::client::reset_client();
     state.ResumeTiming();
   }
   state.counters["ok"] = ok;
@@ -46,12 +49,14 @@ static void BM_OPEN_WITH_READ_MODE(benchmark::State& state) {
 }
 
 static void BM_OPEN_WITH_WRITE_MODE(benchmark::State& state) {
-  auto init_status(
-      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   // Benchmark the init_client function
   uint64_t ok = 0;
   uint64_t failed = 0;
   for (auto _ : state) {
+    state.PauseTiming();
+    auto init_status(
+      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
+    state.ResumeTiming();
     auto status_or =
         gfs::client::open("/open_with_write", gfs::OpenFlag::Write);
     state.PauseTiming();
@@ -60,6 +65,7 @@ static void BM_OPEN_WITH_WRITE_MODE(benchmark::State& state) {
     } else {
       failed++;
     }
+    gfs::client::reset_client();
     state.ResumeTiming();
   }
   state.counters["ok"] = ok;
@@ -67,12 +73,14 @@ static void BM_OPEN_WITH_WRITE_MODE(benchmark::State& state) {
 }
 
 static void BM_OPEN_WITH_CREATE_MODE_SINGLE_THREADED(benchmark::State& state) {
-  auto init_status(
-      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   // Benchmark the init_client function
   uint64_t ok = 0;
   uint64_t failed = 0;
   for (auto _ : state) {
+    state.PauseTiming();
+    auto init_status(
+      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
+    state.ResumeTiming();
     auto status_or = gfs::client::open(
         absl::StrCat("/open_with_create_one_thread_", rand_string()).c_str(),
         gfs::OpenFlag::Create);
@@ -82,6 +90,7 @@ static void BM_OPEN_WITH_CREATE_MODE_SINGLE_THREADED(benchmark::State& state) {
     } else {
       failed++;
     }
+    gfs::client::reset_client();
     state.ResumeTiming();
   }
   state.counters["ok"] = ok;
@@ -89,12 +98,14 @@ static void BM_OPEN_WITH_CREATE_MODE_SINGLE_THREADED(benchmark::State& state) {
 }
 
 static void BM_OPEN_WITH_CREATE_MODE_MULTI_THREADED(benchmark::State& state) {
-  auto init_status(
-      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
   // Benchmark the init_client function
   uint64_t ok = 0;
   uint64_t failed = 0;
   for (auto _ : state) {
+    state.PauseTiming();
+    auto init_status(
+      gfs::client::init_client(kConfigFileName, kMasterName, kResolveHostname));
+    state.ResumeTiming();
     auto status_or =
         gfs::client::open(absl::StrCat("/open_with_create_t_",
                                        state.thread_index, "_", rand_string())
@@ -106,6 +117,7 @@ static void BM_OPEN_WITH_CREATE_MODE_MULTI_THREADED(benchmark::State& state) {
     } else {
       failed++;
     }
+    gfs::client::reset_client();
     state.ResumeTiming();
   }
   state.counters["ok"] = ok;

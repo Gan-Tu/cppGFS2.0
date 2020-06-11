@@ -112,15 +112,15 @@ BENCHMARK(BM_WRITE_EXISTING)
     ->Iterations(500)
     ->DenseRange(1, 10 * 1000 + 1, 1000);  // 1KB to 10MB
 
-// BENCHMARK(BM_WRITE_NEW)
-//     ->Iterations(100)
-//     ->ThreadRange(/*min_threads=*/1, /*max_threads=*/100)
-//     ->Range(1, 1000);  // 1KB to 1MB
+BENCHMARK(BM_WRITE_NEW)
+    ->Iterations(100)
+    ->ThreadRange(/*min_threads=*/1, /*max_threads=*/100)
+    ->Range(1, 1000);  // 1KB to 1MB
 
-// BENCHMARK(BM_WRITE_EXISTING)
-//     ->Iterations(100)
-//     ->ThreadRange(/*min_threads=*/1, /*max_threads=*/100)
-//     ->Range(1, 1000);  // 1KB to 1MB
+BENCHMARK(BM_WRITE_EXISTING)
+    ->Iterations(100)
+    ->ThreadRange(/*min_threads=*/1, /*max_threads=*/100)
+    ->Range(1, 1000);  // 1KB to 1MB
 
 // Instead of using BENCHMARK_MAIN, we manually write the main to allows
 // use initialize the google logging, to surpress the INFO log being logged
