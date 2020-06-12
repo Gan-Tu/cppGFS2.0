@@ -4,6 +4,12 @@
 # cppGFS2.0
 A distributed Google File System (GFS) with multiple masters, implemented in C++
 
+## Demo
+
+* [Presentation Slide](https://docs.google.com/presentation/d/1bQr_XluTRHOCHalKPw1VULvgMpBHS4MAqIj6UrpRQPM/edit?usp=sharing)
+* [Demo Video](https://youtu.be/EX-ELL_43Og)
+* [Our Paper](data/CS244B_Final_Paper.pdf)
+
 ## Getting Started
 
 In this project, we plan to use [Bazel](http://bazel.build) as our main build tool. You can install Bazel by following their website [instructions](https://docs.bazel.build/versions/master/install.html).
