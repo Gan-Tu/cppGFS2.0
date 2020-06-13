@@ -2,7 +2,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 # cppGFS2.0
-A distributed Google File System (GFS) with multiple masters, implemented in C++
+A distributed Google File System (GFS), implemented in C++
 
 ## Demo
 
