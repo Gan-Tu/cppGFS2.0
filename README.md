@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.com/Michael-Tu/cppGFS2.0.svg?branch=master)](https://travis-ci.com/Michael-Tu/cppGFS2.0)
-![Docker Image Build](https://github.com/Michael-Tu/cppGFS2.0/workflows/Docker%20Image%20CI/badge.svg)
+[![Build Status](https://travis-ci.com/Gan-Tu/cppGFS2.0.svg?branch=master)](https://travis-ci.com/Gan-Tu/cppGFS2.0)
+![Docker Image Build](https://github.com/Gan-Tu/cppGFS2.0/workflows/Docker%20Image%20CI/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 # cppGFS2.0
