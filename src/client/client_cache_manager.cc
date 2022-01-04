@@ -9,12 +9,12 @@ namespace client {
 google::protobuf::util::StatusOr<std::string> CacheManager::GetChunkHandle(
     const std::string& filename, uint32_t chunk_index) const {
   if (!file_chunk_handle_.contains(filename)) {
-    return Status(google::protobuf::util::error::NOT_FOUND,
+    return Status(google::protobuf::util::kNotFound,
                   "Filename does not exist: " + filename);
   }
 
   if (!file_chunk_handle_.at(filename).contains(chunk_index)) {
-    return Status(google::protobuf::util::error::NOT_FOUND,
+    return Status(google::protobuf::util::kNotFound,
                   "Chunk index " + std::to_string(chunk_index) +
                       " does not exist in file: " + filename);
   }
@@ -32,7 +32,7 @@ google::protobuf::util::Status CacheManager::SetChunkHandle(
     // chunk_hanle. (We can extend / relax this rule if we decide to
     // support the case of delete-then-create a file).
     if (original_chunk_or.ValueOrDie() != chunk_handle) {
-      return Status(google::protobuf::util::error::INVALID_ARGUMENT,
+      return Status(google::protobuf::util::kInvalidArgument,
                     "Reassigning a chunk handle for " + filename +
                         " at chunk_index " + std::to_string(chunk_index) +
                         "from " + original_chunk_or.ValueOrDie() + " to" +
@@ -49,7 +49,7 @@ google::protobuf::util::Status CacheManager::SetChunkHandle(
 google::protobuf::util::StatusOr<uint32_t> CacheManager::GetChunkVersion(
     const std::string& chunk_handle) const {
   if (!chunk_handle_version_.contains(chunk_handle)) {
-    return Status(google::protobuf::util::error::NOT_FOUND,
+    return Status(google::protobuf::util::kNotFound,
                   "Chunk handle not found: " + chunk_handle);
   }
   return chunk_handle_version_.at(chunk_handle);
@@ -58,7 +58,7 @@ google::protobuf::util::StatusOr<uint32_t> CacheManager::GetChunkVersion(
 google::protobuf::util::Status CacheManager::SetChunkVersion(
     const std::string& chunk_handle, uint32_t version) {
   if (!valid_chunk_handle_.contains(chunk_handle)) {
-    return Status(google::protobuf::util::error::INVALID_ARGUMENT,
+    return Status(google::protobuf::util::kInvalidArgument,
                   "Invalid chunk handle " + chunk_handle);
   }
   chunk_handle_version_[chunk_handle] = version;
@@ -68,7 +68,7 @@ google::protobuf::util::Status CacheManager::SetChunkVersion(
 google::protobuf::util::StatusOr<CacheManager::ChunkServerLocationEntry>
 CacheManager::GetChunkServerLocation(const std::string& chunk_handle) const {
   if (!chunk_server_location_.contains(chunk_handle)) {
-    return Status(google::protobuf::util::error::NOT_FOUND,
+    return Status(google::protobuf::util::kNotFound,
                   "Chunk handle not found: " + chunk_handle);
   }
 
@@ -81,7 +81,7 @@ CacheManager::GetChunkServerLocation(const std::string& chunk_handle) const {
   // the master again.
   if (now - entryTimestamp > timeout_) {
     return Status(
-        google::protobuf::util::error::DEADLINE_EXCEEDED,
+        google::protobuf::util::kDeadlineExceeded,
         "Chunk server location info for " + chunk_handle + "timed out");
   }
 
@@ -92,7 +92,7 @@ google::protobuf::util::Status CacheManager::SetChunkServerLocation(
     const std::string& chunk_handle,
     const CacheManager::ChunkServerLocationEntry& entry) {
   if (!valid_chunk_handle_.contains(chunk_handle)) {
-    return Status(google::protobuf::util::error::INVALID_ARGUMENT,
+    return Status(google::protobuf::util::kInvalidArgument,
                   "Invalid chunk handle " + chunk_handle);
   }
   chunk_server_location_[chunk_handle] = entry;

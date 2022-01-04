@@ -93,16 +93,16 @@ TEST_F(LockManagerUnitTest, CheckErrorCases) {
   EXPECT_TRUE(create_lock_or.ok());
   auto duplicate_create_lock_or(lockManager_->CreateLock("/duplicate"));
   EXPECT_EQ(duplicate_create_lock_or.status().error_code(),
-            google::protobuf::util::error::ALREADY_EXISTS);
+            google::protobuf::util::kAlreadyExists);
 
   auto non_exist_lock_or(lockManager_->FetchLock("/nonExist"));
   EXPECT_EQ(non_exist_lock_or.ok(), false);
   EXPECT_EQ(non_exist_lock_or.status().error_code(),
-            google::protobuf::util::error::NOT_FOUND);
+            google::protobuf::util::kNotFound);
 
   auto non_exist_path_lock_or("/aa/bb/cc");
   ParentLocksAnchor anchor(lockManager_, non_exist_path_lock_or);
   EXPECT_EQ(anchor.ok(), false);
   EXPECT_EQ(anchor.status().error_code(),
-            google::protobuf::util::error::NOT_FOUND);
+            google::protobuf::util::kNotFound);
 }

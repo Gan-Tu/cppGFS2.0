@@ -7,7 +7,7 @@
 
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
-using StatusCode = google::protobuf::util::error::Code;
+using StatusCode = google::protobuf::util::kCode;
 using gfs::common::utils::ValidateConfigFile;
 
 namespace gfs {

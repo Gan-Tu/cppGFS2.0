@@ -80,7 +80,7 @@ TEST_F(ChunkDataCacheManagerTest, ConcurrentInsertionAndDeletionTest) {
         chunk_data_cache_mgr_->RemoveValue(key);
         auto get_or(chunk_data_cache_mgr_->GetValue(key));
         EXPECT_EQ(get_or.status().error_code(),
-                  google::protobuf::util::error::NOT_FOUND);
+                  google::protobuf::util::kNotFound);
       }
     }));
   }

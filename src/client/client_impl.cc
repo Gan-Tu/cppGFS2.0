@@ -171,7 +171,7 @@ google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
   // If no locations are there, we need to return error
   if (chunk_server_location_entry.locations.empty()) {
     return google::protobuf::util::Status(
-        google::protobuf::util::error::UNAVAILABLE,
+        google::protobuf::util::kUnavailable,
         "No chunk server has been found");
   }
 
@@ -261,7 +261,7 @@ google::protobuf::util::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
 
   // Failed to read from all chunk servers
   return google::protobuf::util::Status(
-      google::protobuf::util::error::INTERNAL,
+      google::protobuf::util::kInternal,
       "Failed to read from all chunk servers for " + chunk_handle);
 }
 
@@ -286,7 +286,7 @@ google::protobuf::util::StatusOr<std::pair<size_t, void*>> ClientImpl::ReadFile(
   void* buffer(malloc(nbytes));
   if (!buffer) {
     return google::protobuf::util::Status(
-        google::protobuf::util::error::RESOURCE_EXHAUSTED,
+        google::protobuf::util::kResourceExhausted,
         "Not enough memory: malloc fails");
   }
 
@@ -429,7 +429,7 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
       // are using multi-threading to send data this is a little tricky. Due
       // to time constraint, simply use an internal error indicating that
       return google::protobuf::util::Status(
-          google::protobuf::util::error::INTERNAL,
+          google::protobuf::util::kInternal,
           "Send data encountered irrecoverable failure");
     }
 
@@ -505,7 +505,7 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
                      << nbytes << " byte failed due to "
                      << write_reply.status();
           return google::protobuf::util::Status(
-              google::protobuf::util::error::INTERNAL,
+              google::protobuf::util::kInternal,
               "Write to file " + std::string(filename) + " at chunk_index " +
                   std::to_string(chunk_index) + " and offset " +
                   std::to_string(offset) + "for " + std::to_string(nbytes) +
@@ -518,7 +518,7 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
 
   LOG(ERROR) << "Write file chunk failed after 3 retries";
   return google::protobuf::util::Status(
-      google::protobuf::util::error::INTERNAL,
+      google::protobuf::util::kInternal,
       "Write file chunk failed after 3 retries");
 }
 

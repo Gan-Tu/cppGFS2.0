@@ -144,7 +144,7 @@ TEST_F(MetadataManagerUnitTest, ConcurrentChunkCreationOverlap) {
             metadata_manager_->CreateChunkHandle(filename, chunk_id));
         if (!create_chunk_handle_or.ok()) {
           EXPECT_EQ(create_chunk_handle_or.status().error_code(),
-                    google::protobuf::util::error::ALREADY_EXISTS);
+                    google::protobuf::util::kAlreadyExists);
           cnt_fail++;
         }
       }
@@ -178,24 +178,24 @@ TEST_F(MetadataManagerUnitTest, CheckErrorCases) {
   auto duplicate_create_metadata_or(
       metadata_manager_->CreateFileMetadata(new_filename));
   EXPECT_EQ(duplicate_create_metadata_or.error_code(),
-            google::protobuf::util::error::ALREADY_EXISTS);
+            google::protobuf::util::kAlreadyExists);
 
   auto non_exist_file("/nonExist");
   auto non_exist_metadata_or(
       metadata_manager_->GetFileMetadata(non_exist_file));
   EXPECT_EQ(non_exist_metadata_or.status().error_code(),
-            google::protobuf::util::error::NOT_FOUND);
+            google::protobuf::util::kNotFound);
 
   auto non_exist_chunk_handle(
       metadata_manager_->CreateChunkHandle(non_exist_file, 0));
   EXPECT_EQ(non_exist_chunk_handle.status().error_code(),
-            google::protobuf::util::error::NOT_FOUND);
+            google::protobuf::util::kNotFound);
 
   auto non_exist_file2("/newFile/foo");
   auto non_exist_chunk_handle2(
       metadata_manager_->CreateChunkHandle(non_exist_file2, 0));
   EXPECT_EQ(non_exist_chunk_handle2.status().error_code(),
-            google::protobuf::util::error::NOT_FOUND);
+            google::protobuf::util::kNotFound);
 }
 
 // Stress test for contentious creation of file metadata. We spawn
@@ -547,7 +547,7 @@ TEST_F(MetadataManagerUnitTest, FileDeletionTest) {
                             deleted_chunk_handle));
     EXPECT_FALSE(get_chunk_data.ok());
     EXPECT_EQ(get_chunk_data.status().error_code(),
-              google::protobuf::util::error::NOT_FOUND);
+              google::protobuf::util::kNotFound);
   }
 }
 
@@ -596,6 +596,6 @@ TEST_F(MetadataManagerUnitTest, FileDeletionConcurrentTest) {
                             deleted_chunk_handle));
     EXPECT_FALSE(get_chunk_data.ok());
     EXPECT_EQ(get_chunk_data.status().error_code(),
-              google::protobuf::util::error::NOT_FOUND);
+              google::protobuf::util::kNotFound);
   }
 }

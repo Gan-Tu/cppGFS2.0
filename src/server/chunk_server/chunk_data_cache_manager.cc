@@ -8,7 +8,7 @@ google::protobuf::util::StatusOr<std::string> ChunkDataCacheManager::GetValue(
   auto try_get_value(data_cache_.TryGetValue(key));
   if (!try_get_value.second) {
     return google::protobuf::util::Status(
-        google::protobuf::util::error::NOT_FOUND,
+        google::protobuf::util::kNotFound,
         "Value not found for key: " + key);
   }
   return try_get_value.first;
