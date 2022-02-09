@@ -41,7 +41,7 @@ grpc::Status ChunkServerLeaseServiceImpl::GrantLease(
       chunk_server_impl_->GetChunkVersion(request->chunk_handle());
   if (!owned_version_or.ok()) {
     if (owned_version_or.status().code() ==
-        google::protobuf::util::kCode::NOT_FOUND) {
+        google::protobuf::util::error::Code::NOT_FOUND) {
       LOG(INFO) << "Cannot accept lease because " << request->chunk_handle()
                 << " doesn't exit on this chunk server";
       reply->set_status(GrantLeaseReply::REJECTED_NOT_FOUND);
@@ -95,7 +95,7 @@ grpc::Status ChunkServerLeaseServiceImpl::RevokeLease(
       chunk_server_impl_->GetLeaseExpirationTime(request->chunk_handle());
   if (!current_lease_expiration_time_or.ok()) {
     if (current_lease_expiration_time_or.status().code() ==
-        google::protobuf::util::kCode::NOT_FOUND) {
+        google::protobuf::util::error::Code::NOT_FOUND) {
       LOG(INFO) << "No lease to revoke for " << request->chunk_handle();
       reply->set_status(RevokeLeaseReply::REJECTED_NOT_FOUND);
       return grpc::Status::OK;

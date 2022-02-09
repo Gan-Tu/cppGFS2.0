@@ -34,7 +34,7 @@ google::protobuf::util::Status MetadataManager::CreateFileMetadata(
   auto path_lock_or(lock_manager_->CreateLock(filename));
   if (!path_lock_or.ok()) {
     if (path_lock_or.status().error_code() == 
-            google::protobuf::util::kAlreadyExists) {
+            google::protobuf::util::error::ALREADY_EXISTS) {
       // If lock creation fail due to ALREADY_EXISTS, we fetch the lock. 
       // We do so because we support file metadata deletion and re-creation, 
       // and since we do not delete locks (doing so would make things even more
@@ -58,7 +58,7 @@ google::protobuf::util::Status MetadataManager::CreateFileMetadata(
 
   if (!try_create_file_metadata) {
     return google::protobuf::util::Status(
-        google::protobuf::util::kAlreadyExists,
+        google::protobuf::util::error::ALREADY_EXISTS,
         "File metadata already exists for " + filename);
   }
   return google::protobuf::util::Status::OK;
@@ -74,7 +74,7 @@ MetadataManager::GetFileMetadata(const std::string& filename) {
 
   if (!try_get_file_metadata.second) {
     return google::protobuf::util::Status(
-        google::protobuf::util::kNotFound,
+        google::protobuf::util::error::NOT_FOUND,
         "File metadata does not exist: " + filename);
   }
   return try_get_file_metadata.first;
@@ -127,7 +127,7 @@ MetadataManager::CreateChunkHandle(const std::string& filename,
     // Return null UUID if this chunk_index exists
     if (chunk_handle_map.contains(chunk_index)) {
       return google::protobuf::util::Status(
-          google::protobuf::util::kAlreadyExists,
+          google::protobuf::util::error::ALREADY_EXISTS,
           "Chunk " + std::to_string(chunk_index) + "already exists in file " +
               filename);
     }
@@ -174,7 +174,7 @@ google::protobuf::util::StatusOr<std::string> MetadataManager::GetChunkHandle(
   // If chunk_index does not exist, return error
   if (!chunk_handle_map.contains(chunk_index)) {
     return google::protobuf::util::Status(
-        google::protobuf::util::kNotFound,
+        google::protobuf::util::error::NOT_FOUND,
         "Chunk " + std::to_string(chunk_index) + "not found in file " +
             filename);
   }
@@ -210,7 +210,7 @@ MetadataManager::GetFileChunkMetadata(const std::string& chunk_handle) {
 
   if (!try_get_chunk_data.second) {
     return google::protobuf::util::Status(
-        google::protobuf::util::kNotFound,
+        google::protobuf::util::error::NOT_FOUND,
         "Chunk handle " + chunk_handle + "'s metadata not found.");
   }
 

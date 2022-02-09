@@ -39,19 +39,19 @@ TEST_F(ClientCacheManagerUnitTest, ChunkHandleMappingTest) {
   auto set_status(manager->SetChunkHandle(filename, 0, "1"));
   EXPECT_FALSE(set_status.ok());
   EXPECT_EQ(set_status.error_code(),
-            google::protobuf::util::kInvalidArgument);
+            google::protobuf::util::error::INVALID_ARGUMENT);
 
   // Try to get a chunk from a non-existing filename
   auto get_status(manager->GetChunkHandle("/nonExist", 0));
   EXPECT_FALSE(get_status.ok());
   EXPECT_EQ(get_status.status().error_code(),
-            google::protobuf::util::kNotFound);
+            google::protobuf::util::error::NOT_FOUND);
 
   // Try to get a chunk index that is non-existing in a file
   get_status = manager->GetChunkHandle(filename, num_of_chunk);
   EXPECT_FALSE(get_status.ok());
   EXPECT_EQ(get_status.status().error_code(),
-            google::protobuf::util::kNotFound);
+            google::protobuf::util::error::NOT_FOUND);
 
   delete manager;
 }
@@ -66,11 +66,11 @@ TEST_F(ClientCacheManagerUnitTest, ChunkVersionTest) {
   auto set_status(manager->SetChunkVersion(chunk_handle, 0));
   EXPECT_FALSE(set_status.ok());
   EXPECT_EQ(set_status.error_code(),
-            google::protobuf::util::kInvalidArgument);
+            google::protobuf::util::error::INVALID_ARGUMENT);
   auto get_status(manager->GetChunkVersion(chunk_handle));
   EXPECT_FALSE(get_status.ok());
   EXPECT_EQ(get_status.status().error_code(),
-            google::protobuf::util::kNotFound);
+            google::protobuf::util::error::NOT_FOUND);
 
   // Now we assign a valid chunk_handle, the set version action should suceed
   std::string filename("/bar");
@@ -136,7 +136,7 @@ TEST_F(ClientCacheManagerUnitTest, ChunkServerLocationTest) {
              manager->GetChunkServerLocation(chunk_handle));
     EXPECT_FALSE(get_chunk_location_or.ok());
     EXPECT_EQ(get_chunk_location_or.status().error_code(),
-              google::protobuf::util::kDeadlineExceeded);
+              google::protobuf::util::error::DEADLINE_EXCEEDED);
   }
 
   // Re-insert an entry again and verify that we can still access it

@@ -10,19 +10,19 @@ class UtilsUnitTest : public ::testing::Test {};
 TEST_F(UtilsUnitTest, ValidPathnameTest) {
   auto emptyPathnameRes(CheckFilenameValidity(""));
   EXPECT_EQ(emptyPathnameRes.error_code(),
-            google::protobuf::util::kInvalidArgument);
+            google::protobuf::util::error::INVALID_ARGUMENT);
 
   auto relativePathnameRes(CheckFilenameValidity("a/b/c"));
   EXPECT_EQ(relativePathnameRes.error_code(),
-            google::protobuf::util::kInvalidArgument);
+            google::protobuf::util::error::INVALID_ARGUMENT);
 
   auto trailingSlashPathnameRes(CheckFilenameValidity("/a/b/c/"));
   EXPECT_EQ(trailingSlashPathnameRes.error_code(),
-            google::protobuf::util::kInvalidArgument);
+            google::protobuf::util::error::INVALID_ARGUMENT);
 
   auto consecutiveSlashPathnameRes(CheckFilenameValidity("//a/b//c"));
   EXPECT_EQ(consecutiveSlashPathnameRes.error_code(),
-            google::protobuf::util::kInvalidArgument);
+            google::protobuf::util::error::INVALID_ARGUMENT);
 
   auto validPathnameRes(CheckFilenameValidity("/foo/bar/baz"));
   EXPECT_TRUE(validPathnameRes.ok());

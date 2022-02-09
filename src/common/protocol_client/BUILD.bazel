@@ -20,7 +20,7 @@ cc_library(
         "//src/common:utils",
         "//src/protos/grpc:cc_master_metadata_service_grpc",
         "@com_github_grpc_grpc//:grpc++",
-        "@com_google_protobuf//:protobuf",
+        "@com_google_protobuf//:protobuf_lite",
     ],
 )
 
@@ -33,7 +33,7 @@ cc_library(
         "//src/common:utils",
         "//src/protos/grpc:cc_master_chunk_server_manager_service_grpc",
         "@com_github_grpc_grpc//:grpc++",
-        "@com_google_protobuf//:protobuf",
+        "@com_google_protobuf//:protobuf_lite",
     ],
 )
 
@@ -46,7 +46,7 @@ cc_library(
         "//src/common:utils",
         "//src/protos/grpc:cc_chunk_server_file_service_grpc",
         "@com_github_grpc_grpc//:grpc++",
-        "@com_google_protobuf//:protobuf",
+        "@com_google_protobuf//:protobuf_lite",
     ],
 )
 
@@ -60,7 +60,7 @@ cc_library(
         "//src/protos/grpc:cc_chunk_server_file_service_grpc",
         "//src/protos/grpc:cc_chunk_server_lease_service_grpc",
         "@com_github_grpc_grpc//:grpc++",
-        "@com_google_protobuf//:protobuf",
+        "@com_google_protobuf//:protobuf_lite",
     ],
 )
 
@@ -73,6 +73,6 @@ cc_library(
         "//src/common:utils",
         "//src/protos/grpc:cc_chunk_server_control_service_grpc",
         "@com_github_grpc_grpc//:grpc++",
-        "@com_google_protobuf//:protobuf",
+        "@com_google_protobuf//:protobuf_lite",
     ],
 )

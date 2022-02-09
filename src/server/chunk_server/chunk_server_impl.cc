@@ -66,7 +66,7 @@ StatusOr<absl::Time> ChunkServerImpl::GetLeaseExpirationTime(
     const std::string& file_handle) {
   if (!lease_and_expiration_unix_sec_.contains(file_handle)) {
     return Status(
-        google::protobuf::util::kNotFound,
+        google::protobuf::util::error::NOT_FOUND,
         absl::StrCat("Lease is not found for file handle: ", file_handle));
   } else {
     return absl::FromUnixSeconds(lease_and_expiration_unix_sec_[file_handle]);

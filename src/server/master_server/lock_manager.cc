@@ -20,7 +20,7 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
   // lock, or this thread has been created previously by the current
   // thread
   if (!file_path_locks_.TryInsert(filename, new_lock)) {
-    return Status(google::protobuf::util::kAlreadyExists,
+    return Status(google::protobuf::util::error::ALREADY_EXISTS,
                   "Lock already exists for " + filename);
   }
 
@@ -47,7 +47,7 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::FetchLock(
   bool lock_exist(try_get_lock.second);
 
   if (!lock_exist) {
-    return Status(google::protobuf::util::kNotFound,
+    return Status(google::protobuf::util::error::NOT_FOUND,
                   "Lock does not exist for " + filename);
   }
   return try_get_lock.first.get();
@@ -70,7 +70,7 @@ ParentLocksAnchor::ParentLocksAnchor(LockManager* lock_manager,
     // Otherwise, grab the reader lock for dir and push it to the stack
     StatusOr<absl::Mutex*> path_lock_or(lock_manager->FetchLock(dir));
     if (!path_lock_or.ok()) {
-      status_ = Status(google::protobuf::util::kNotFound,
+      status_ = Status(google::protobuf::util::error::NOT_FOUND,
                        "Lock for " + dir + " does not exist");
       return;
     }
