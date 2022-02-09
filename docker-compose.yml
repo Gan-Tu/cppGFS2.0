@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: gfs-image:latest
+    image: gfs-image
     command: bazel run src/server/master_server:run_master_server_main --
       --config_path=data/config.yml
       --use_docker_dns_server
@@ -20,7 +20,7 @@ services:
   # Start chunk server #1 on port 50052
   chunk_server_01:
     container_name: chunk_server_01
-    image: gfs-image:latest
+    image: gfs-image
     command: bazel run src/server/chunk_server:run_chunk_server_main --
       --config_path=data/config.yml
       --use_docker_dns_server
@@ -36,7 +36,7 @@ services:
   # Start chunk server #2 on port 50053
   chunk_server_02:
     container_name: chunk_server_02
-    image: gfs-image:latest
+    image: gfs-image
     command: bazel run src/server/chunk_server:run_chunk_server_main --
       --config_path=data/config.yml
       --use_docker_dns_server
@@ -52,7 +52,7 @@ services:
   # Start chunk server #3 on port 50054
   chunk_server_03:
     container_name: chunk_server_03
-    image: gfs-image:latest
+    image: gfs-image
     command: bazel run src/server/chunk_server:run_chunk_server_main --
       --config_path=data/config.yml
       --use_docker_dns_server
