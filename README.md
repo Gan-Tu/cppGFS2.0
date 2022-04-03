@@ -64,7 +64,7 @@ bazel-bin/gfs_client_main --mode=read --filename=/test --offset=0 --nbytes=100
 
 # To write a file
 # This will create the file if it doesn't exist; if you don't want this behavior,
-# use the 'mode_no_create' mode instead
+# use the 'write_no_create' mode instead
 bazel-bin/gfs_client_main --mode=write --filename=/test --offset=0 --data='Hello World!'
 ```
 
