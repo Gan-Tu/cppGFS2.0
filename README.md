@@ -17,27 +17,19 @@ In this project, we plan to use [Bazel](http://bazel.build) as our main build to
 
 As of writing, you will need at least Bazel version 5.1.0 for a proper working demo.
 
-For MacOS, you can use:
+Installation scripts have been provided to install bazel in `scripts` folder.
+
+For example, for Linux, run with desired Bazel version:
 
 ```
 export BAZEL_VERSION=5.1.0
-curl -fLO "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
-chmod +x "bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
-./bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh --user
-
-export PATH="$PATH:$HOME/bin"
-bazel --version
+chmod +x scripts/install_bazel_linux_x86_64.sh
+scripts/install_bazel_linux_x86_64.sh
 ```
 
-For Linux, you can run the `scripts/install_bazel.sh` with desired Bazel version:
+For MacBook (Intel Chip), use `scripts/install_bazel_darwin_x86_64.sh`.
 
-```
-export BAZEL_VERSION=5.1.0
-chmod +x scripts/install_bazel.sh
-scripts/install_bazel.sh
-```
-
-_For ARM64 architecture (such as Apple M1 chips), use `scripts/install_bazel_arm64.sh`. You may need to comment out the `apt` lines._
+For MacBook (Apple Chips), use `scripts/install_bazel_darwin_arm64.sh`.
 
 Then, from the root directory, you can run Bazel commands as normal. For example:
 
