@@ -7,8 +7,13 @@
 #include "src/common/system_logger.h"
 #include "src/common/utils.h"
 
+using google::protobuf::util::InternalError;
+using google::protobuf::util::OkStatus;
+using google::protobuf::util::ResourceExhaustedError;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
+using google::protobuf::util::UnavailableError;
+using google::protobuf::util::UnknownError;
 using protos::grpc::DeleteFileRequest;
 using protos::grpc::FileChunkMutationStatus;
 using protos::grpc::OpenFileReply;
@@ -34,7 +39,7 @@ void ClientImpl::cache_file_chunk_metadata(
   if (!set_chunk_handle_status.ok()) {
     LOG(ERROR) << "CacheManager failed to set chunk handle mapping for "
                << chunk_handle
-               << "due to: " << set_chunk_handle_status.error_message();
+               << "due to: " << set_chunk_handle_status.message();
     return;
   }
 
@@ -42,12 +47,12 @@ void ClientImpl::cache_file_chunk_metadata(
   // If this chunk version has not been cached, or the replied version is
   // higher than the current one, we cache the version
   auto new_version(open_file_reply.metadata().version());
-  if (!chunk_version_or.ok() || new_version > chunk_version_or.ValueOrDie()) {
+  if (!chunk_version_or.ok() || new_version > chunk_version_or.value()) {
     cache_manager_->SetChunkVersion(chunk_handle, new_version);
   } else {
     // Falling into this block means chnk_version_or.ok() is true and the
     // new version is less or equal than the current value
-    auto cur_version(chunk_version_or.ValueOrDie());
+    auto cur_version(chunk_version_or.value());
     LOG(ERROR) << "Skip updating the version number for " << chunk_handle
                << "because the current version " << cur_version << " >= "
                << "received " << new_version;
@@ -87,8 +92,8 @@ google::protobuf::util::Status ClientImpl::CreateFile(
 
   // The master creates the first chunk for this file, and the client
   // should cache the FileChunkMetadata for this chunk
-  cache_file_chunk_metadata(filename, 0, open_file_or.ValueOrDie());
-  return google::protobuf::util::Status::OK;
+  cache_file_chunk_metadata(filename, 0, open_file_or.value());
+  return OkStatus();
 }
 
 google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
@@ -105,15 +110,14 @@ google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
   if (!refresh_cache) {
     auto chunk_handle_or(cache_manager_->GetChunkHandle(filename, chunk_index));
     if (chunk_handle_or.ok()) {
-      chunk_handle = chunk_handle_or.ValueOrDie();
+      chunk_handle = chunk_handle_or.value();
       auto chunk_version_or(cache_manager_->GetChunkVersion(chunk_handle));
       if (chunk_version_or.ok()) {
-        chunk_version = chunk_version_or.ValueOrDie();
+        chunk_version = chunk_version_or.value();
         auto chunk_server_location_entry_or(
             cache_manager_->GetChunkServerLocation(chunk_handle));
         if (chunk_server_location_entry_or.ok()) {
-          chunk_server_location_entry =
-              chunk_server_location_entry_or.ValueOrDie();
+          chunk_server_location_entry = chunk_server_location_entry_or.value();
         } else {
           file_chunk_metadata_in_cache = false;
         }
@@ -153,29 +157,27 @@ google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
     // Handle error
     if (!open_file_or.ok()) {
       LOG(ERROR) << "OpenFileRequest failed due to "
-                 << open_file_or.status().error_message();
+                 << open_file_or.status().message();
       return open_file_or.status();
     }
 
     // Cache file chunk metadata
-    auto open_file_reply(open_file_or.ValueOrDie());
+    auto open_file_reply(open_file_or.value());
     cache_file_chunk_metadata(filename, chunk_index, open_file_reply);
 
     chunk_handle =
-        cache_manager_->GetChunkHandle(filename, chunk_index).ValueOrDie();
-    chunk_version = cache_manager_->GetChunkVersion(chunk_handle).ValueOrDie();
+        cache_manager_->GetChunkHandle(filename, chunk_index).value();
+    chunk_version = cache_manager_->GetChunkVersion(chunk_handle).value();
     chunk_server_location_entry =
-        cache_manager_->GetChunkServerLocation(chunk_handle).ValueOrDie();
+        cache_manager_->GetChunkServerLocation(chunk_handle).value();
   }
 
   // If no locations are there, we need to return error
   if (chunk_server_location_entry.locations.empty()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::UNAVAILABLE,
-        "No chunk server has been found");
+    return UnavailableError("No chunk server has been found");
   }
 
-  return google::protobuf::util::Status::OK;
+  return OkStatus();
 }
 
 google::protobuf::util::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
@@ -227,12 +229,12 @@ google::protobuf::util::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
     if (!read_file_chunk_reply_or.ok()) {
       LOG(ERROR) << "Read file chunk " << chunk_handle << " from "
                  << server_address << " failed due to "
-                 << read_file_chunk_reply_or.status().error_message();
+                 << read_file_chunk_reply_or.status().message();
       continue;
     }
 
     // Handle chunk status error, log and continue
-    auto read_file_chunk_reply(read_file_chunk_reply_or.ValueOrDie());
+    auto read_file_chunk_reply(read_file_chunk_reply_or.value());
     switch (read_file_chunk_reply.status()) {
       case ReadFileChunkReply::UNKNOWN:
         LOG(ERROR) << "Unknown error while reading " + chunk_handle;
@@ -260,9 +262,8 @@ google::protobuf::util::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
   }
 
   // Failed to read from all chunk servers
-  return google::protobuf::util::Status(
-      google::protobuf::util::error::INTERNAL,
-      "Failed to read from all chunk servers for " + chunk_handle);
+  return InternalError("Failed to read from all chunk servers for " +
+                       chunk_handle);
 }
 
 google::protobuf::util::StatusOr<std::pair<size_t, void*>> ClientImpl::ReadFile(
@@ -285,9 +286,7 @@ google::protobuf::util::StatusOr<std::pair<size_t, void*>> ClientImpl::ReadFile(
   // this optimization opportunity as it may cost more to realloc
   void* buffer(malloc(nbytes));
   if (!buffer) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::RESOURCE_EXHAUSTED,
-        "Not enough memory: malloc fails");
+    return ResourceExhaustedError("Not enough memory: malloc fails");
   }
 
   for (size_t chunk_index = offset / chunk_block_size; remain_bytes > 0 && !eof;
@@ -308,9 +307,8 @@ google::protobuf::util::StatusOr<std::pair<size_t, void*>> ClientImpl::ReadFile(
     }
 
     // Concatenate the read data to buffer
-    size_t chunk_bytes_read(file_chunk_data_or.ValueOrDie().bytes_read());
-    const void* chunk_buffer_read(
-        file_chunk_data_or.ValueOrDie().data().c_str());
+    size_t chunk_bytes_read(file_chunk_data_or.value().bytes_read());
+    const void* chunk_buffer_read(file_chunk_data_or.value().data().c_str());
     memmove((char*)buffer + bytes_read, chunk_buffer_read, chunk_bytes_read);
 
     // Update chunk_start_offset,  bytes_read and remain_bytes counts
@@ -392,7 +390,7 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
                      << "failed due to " << send_chunk_reply_or.status();
           send_data_recoverable_error.store(true);
         } else {
-          auto send_chunk_reply(send_chunk_reply_or.ValueOrDie());
+          auto send_chunk_reply(send_chunk_reply_or.value());
           switch (send_chunk_reply.status()) {
             case SendChunkDataReply::OK:
               LOG(INFO) << "Send file chunk data to " << server_address
@@ -428,9 +426,7 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
       // TODO(Xi): ideally return the actual status from send reply but as we
       // are using multi-threading to send data this is a little tricky. Due
       // to time constraint, simply use an internal error indicating that
-      return google::protobuf::util::Status(
-          google::protobuf::util::error::INTERNAL,
-          "Send data encountered irrecoverable failure");
+      return InternalError("Send data encountered irrecoverable failure");
     }
 
     if (send_data_recoverable_error.load()) {
@@ -475,7 +471,7 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
                  << primary_server_address << "failed due to "
                  << write_reply_or.status();
     } else {
-      auto write_reply(write_reply_or.ValueOrDie());
+      auto write_reply(write_reply_or.value());
       switch (write_reply.status()) {
         case FileChunkMutationStatus::OK:
           LOG(INFO) << "Write to file " << filename << " at chunk_index "
@@ -504,12 +500,11 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
                      << chunk_index << " and offset " << offset << " for "
                      << nbytes << " byte failed due to "
                      << write_reply.status();
-          return google::protobuf::util::Status(
-              google::protobuf::util::error::INTERNAL,
+          return InternalError(
               "Write to file " + std::string(filename) + " at chunk_index " +
-                  std::to_string(chunk_index) + " and offset " +
-                  std::to_string(offset) + "for " + std::to_string(nbytes) +
-                  " failed due to internal error");
+              std::to_string(chunk_index) + " and offset " +
+              std::to_string(offset) + "for " + std::to_string(nbytes) +
+              " failed due to internal error");
       }
     }
 
@@ -517,9 +512,7 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
   }
 
   LOG(ERROR) << "Write file chunk failed after 3 retries";
-  return google::protobuf::util::Status(
-      google::protobuf::util::error::INTERNAL,
-      "Write file chunk failed after 3 retries");
+  return InternalError("Write file chunk failed after 3 retries");
 }
 
 google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
@@ -556,7 +549,7 @@ google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
 
     // Currently, we consier the case of bytes_written < bytes requested to be
     // an error, so chunk_bytes_written should be equal to bytes_to_write
-    size_t chunk_bytes_written(write_data_or.ValueOrDie().bytes_written());
+    size_t chunk_bytes_written(write_data_or.value().bytes_written());
 
     // Update chunk_start_offset, bytes_written and remain_bytes counts.
     // Starting from the second chunk, chunk_start_offset is zero
@@ -565,7 +558,7 @@ google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
     remain_bytes -= chunk_bytes_written;
   }
 
-  return google::protobuf::util::Status::OK;
+  return OkStatus();
 }
 
 google::protobuf::util::Status ClientImpl::DeleteFile(
@@ -587,9 +580,9 @@ void ClientImpl::RegisterChunkServerServiceClient(
   // bytes as the message size is larger than the payload
   grpc::ChannelArguments channel_args;
   channel_args.SetMaxReceiveMessageSize(
-      config_manager_->GetFileChunkBlockSize() * gfs::common::bytesPerMb 
-          + 1000);
-  
+      config_manager_->GetFileChunkBlockSize() * gfs::common::bytesPerMb +
+      1000);
+
   chunk_server_service_client_.TryInsert(
       server_address,
       std::make_shared<service::ChunkServerServiceGfsClient>(
@@ -639,7 +632,7 @@ google::protobuf::util::StatusOr<ClientImpl*> ClientImpl::ConstructClientImpl(
   if (!config_manager_or.ok()) {
     return config_manager_or.status();
   }
-  common::ConfigManager* config_manager = config_manager_or.ValueOrDie();
+  common::ConfigManager* config_manager = config_manager_or.value();
 
   return new ClientImpl(config_manager, master_name, resolve_hostname);
 }

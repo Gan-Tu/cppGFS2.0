@@ -1,14 +1,17 @@
 #include "src/server/chunk_server/chunk_data_cache_manager.h"
 
 #include <thread>
+
 #include "gtest/gtest.h"
 #include "tests/utils.h"
 
 using namespace gfs::server;
 using namespace tests;
 
+using google::protobuf::util::IsNotFound;
+
 class ChunkDataCacheManagerTest : public ::testing::Test {
- protected:  
+ protected:
   void SetUp() override {
     chunk_data_cache_mgr_ = ChunkDataCacheManager::GetInstance();
   }
@@ -27,10 +30,10 @@ TEST_F(ChunkDataCacheManagerTest, BasicTestCase) {
 
   // Check value for all
   for (int i = 0; i < 100; i++) {
-    auto get_or(chunk_data_cache_mgr_->GetValue(
-                    key_base_name + std::to_string(i)));
+    auto get_or(
+        chunk_data_cache_mgr_->GetValue(key_base_name + std::to_string(i)));
     EXPECT_TRUE(get_or.ok());
-    EXPECT_EQ(get_or.ValueOrDie(), data_base + std::to_string(i));
+    EXPECT_EQ(get_or.value(), data_base + std::to_string(i));
   }
 }
 
@@ -60,10 +63,10 @@ TEST_F(ChunkDataCacheManagerTest, ConcurrentInsertionAndDeletionTest) {
       std::string key_base_thread(key_base_name + std::to_string(i));
       std::string data_base_thread(data_base + std::to_string(i));
       for (int j = 0; j < 100; j++) {
-        auto get_or(chunk_data_cache_mgr_->GetValue(key_base_thread 
-                                                        + std::to_string(j)));
+        auto get_or(chunk_data_cache_mgr_->GetValue(key_base_thread +
+                                                    std::to_string(j)));
         EXPECT_TRUE(get_or.ok());
-        EXPECT_EQ(get_or.ValueOrDie(), data_base_thread + std::to_string(j));
+        EXPECT_EQ(get_or.value(), data_base_thread + std::to_string(j));
       }
     }));
   }
@@ -79,12 +82,10 @@ TEST_F(ChunkDataCacheManagerTest, ConcurrentInsertionAndDeletionTest) {
         std::string key(key_base_thread + std::to_string(j));
         chunk_data_cache_mgr_->RemoveValue(key);
         auto get_or(chunk_data_cache_mgr_->GetValue(key));
-        EXPECT_EQ(get_or.status().error_code(),
-                  google::protobuf::util::error::NOT_FOUND);
+        EXPECT_TRUE(IsNotFound(get_or.status()));
       }
     }));
   }
 
   JoinAndClearThreads(threads);
 }
-

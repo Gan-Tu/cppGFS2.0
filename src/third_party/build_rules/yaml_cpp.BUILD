@@ -23,21 +23,15 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
 
 cc_library(
     name = "yaml-cpp_internal",
-    hdrs = glob(["src/**/*.h"]),
-    strip_include_prefix = "src",
     visibility = ["//:__subpackages__"],
+    strip_include_prefix = "src",
+    hdrs = glob(["src/**/*.h"]),
 )
 
 cc_library(
     name = "yaml-cpp",
-    srcs = glob([
-        "src/*.cpp",
-        "src/**/*.cpp",
-    ]),
-    hdrs = glob([
-        "include/**/*.h",
-        "src/**/*.h",
-    ]),
-    includes = ["include"],
     visibility = ["//visibility:public"],
+    includes = ["include"],
+    hdrs = glob(["include/**/*.h"]),
+    srcs = glob(["src/**/*.cpp", "src/**/*.h"]),
 )

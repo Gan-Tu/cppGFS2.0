@@ -92,7 +92,7 @@ class ChunkServerHeartBeatMonitorTaskTest : public ::testing::Test {
   void SetUp() override {
     // Create the config manager for the test to read test config.
     config_mgr_ = std::shared_ptr<ConfigManager>(
-        ConfigManager::GetConfig(kTestConfigPath).ValueOrDie());
+        ConfigManager::GetConfig(kTestConfigPath).value());
 
     ChunkServerHeartBeatMonitorTask::GetInstance()->Start(
         config_mgr_.get(), /*resolve_hostname=*/true);
@@ -124,7 +124,7 @@ TEST_F(ChunkServerHeartBeatMonitorTaskTest, MonitorHeartBeatTest) {
     StatusOr<ChunkServerImpl*> chunk_server_or =
         ChunkServerImpl::ConstructChunkServerImpl(kTestConfigPath,
                                                   chunk_server_name);
-    ChunkServerImpl* chunk_server = chunk_server_or.ValueOrDie();
+    ChunkServerImpl* chunk_server = chunk_server_or.value();
 
     // Start the chunkserver control service in another thread, that responds to
     // heartbeat messages from master.

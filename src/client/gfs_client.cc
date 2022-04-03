@@ -6,6 +6,12 @@
 namespace gfs {
 namespace client {
 
+using google::protobuf::util::AlreadyExistsError;
+using google::protobuf::util::FailedPreconditionError;
+using google::protobuf::util::InvalidArgumentError;
+using google::protobuf::util::IsAlreadyExists;
+using google::protobuf::util::OkStatus;
+
 // A per-thread object that serves as the interface for the impl code to access
 // and issue calls to internal units such as cache manager, service clients to
 // master and chunk servers
@@ -23,8 +29,7 @@ google::protobuf::util::Status init_client(const std::string& config_filename,
                                            const std::string& master_name,
                                            const bool resolve_hostname) {
   if (client_impl_) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::ALREADY_EXISTS,
+    return AlreadyExistsError(
         "ClientImpl has already been initialized successfully");
   }
 
@@ -35,8 +40,8 @@ google::protobuf::util::Status init_client(const std::string& config_filename,
     return client_impl_or.status();
   }
 
-  client_impl_ = client_impl_or.ValueOrDie();
-  return google::protobuf::util::Status::OK;
+  client_impl_ = client_impl_or.value();
+  return OkStatus();
 }
 
 void reset_client() {
@@ -47,17 +52,14 @@ void reset_client() {
 google::protobuf::util::Status open(const char* filename, unsigned int flags) {
   // Make sure that init_client is called as a pre-condition
   if (!client_impl_) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::FAILED_PRECONDITION,
+    return FailedPreconditionError(
         "init_client must be called before calling client APIs");
   }
 
   // Check and validate the flags, e.g. it doesn't make sense to
   // open with both read and write flags
   if (!ValidateOpenFlag(flags)) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::INVALID_ARGUMENT,
-        "Invalid open flag : " + std::to_string(flags));
+    return InvalidArgumentError("Invalid open flag : " + std::to_string(flags));
   }
 
   // Check and validate the filename
@@ -75,8 +77,7 @@ google::protobuf::util::Status open(const char* filename, unsigned int flags) {
     }
   } else if (flags == (OpenFlag::Create | OpenFlag::Write)) {
     auto create_status(client_impl_->CreateFile(filename));
-    if (!create_status.ok() &&
-        create_status.code() != google::protobuf::util::error::ALREADY_EXISTS) {
+    if (IsAlreadyExists(create_status)) {
       return create_status;
     }
   }
@@ -84,19 +85,18 @@ google::protobuf::util::Status open(const char* filename, unsigned int flags) {
   // Note that real GFS does permission check when a read or write open flags
   // is passed to the open call. Beause we do not worry about permission
   // in this work, we simply do nothing here if a read / write flag is given
-  return google::protobuf::util::Status::OK;
+  return OkStatus();
 }
 
 google::protobuf::util::Status close(const char* filename) {
-  return google::protobuf::util::Status::OK;
+  return OkStatus();
 }
 
 google::protobuf::util::StatusOr<Data> read(const char* filename, size_t offset,
                                             size_t nbytes) {
   // Make sure that init_client is called as a pre-condition
   if (!client_impl_) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::FAILED_PRECONDITION,
+    return FailedPreconditionError(
         "init_client must be called before calling client APIs");
   }
 
@@ -112,16 +112,14 @@ google::protobuf::util::StatusOr<Data> read(const char* filename, size_t offset,
     return read_data_or.status();
   }
 
-  return Data(read_data_or.ValueOrDie().first,
-              read_data_or.ValueOrDie().second);
+  return Data(read_data_or.value().first, read_data_or.value().second);
 }
 
 google::protobuf::util::Status write(const char* filename, void* buffer,
                                      size_t offset, size_t nbytes) {
   // Make sure that init_client is called as a pre-condition
   if (!client_impl_) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::FAILED_PRECONDITION,
+    return FailedPreconditionError(
         "init_client must be called before calling client APIs");
   }
 

@@ -63,7 +63,7 @@ void SeedTestChunkData() {
       chunk_handle, version, /*start_offset=*/0, kSmallData.size(), kSmallData);
 
   // verify that all the data was written.
-  ASSERT_EQ(kSmallData.size(), write_result.ValueOrDie());
+  ASSERT_EQ(kSmallData.size(), write_result.value());
 }
 
 void SeedTestMetadata() {
@@ -79,7 +79,7 @@ void SeedTestMetadata() {
   // Set the chunk server location to be the one used in this test
   auto file_chunk_metadata(
       metadata_manager->GetFileChunkMetadata(kSmallDataFileChunkHandle)
-          .ValueOrDie());
+          .value());
   file_chunk_metadata.mutable_locations()->Add(
       tests::ChunkServerLocationBuilder(kTestChunkServerName,
                                         kTestChunkServerPort));
@@ -105,7 +105,7 @@ void StartTestChunkServer() {
   StatusOr<ChunkServerImpl*> chunk_server_or =
       ChunkServerImpl::ConstructChunkServerImpl(kTestConfigPath,
                                                 kTestChunkServerName);
-  ChunkServerImpl* chunk_server = chunk_server_or.ValueOrDie();
+  ChunkServerImpl* chunk_server = chunk_server_or.value();
   ChunkServerFileServiceImpl file_service(chunk_server);
   builder.RegisterService(&file_service);
   // Initialize test data on the chunk server
@@ -122,7 +122,7 @@ void StartTestMasterServer() {
   builder.AddListeningPort(kTestMasterServerAddress, credentials);
   // Register the master metadata service impl
   ConfigManager* config =
-      ConfigManager::GetConfig(kTestConfigPath).ValueOrDie();
+      ConfigManager::GetConfig(kTestConfigPath).value();
   MasterMetadataServiceImpl metadata_service(config);
   builder.RegisterService(&metadata_service);
   // Initialize test data on the master server
@@ -161,7 +161,7 @@ void SingleClientReadData(const std::string& data_filename,
   auto read_result(gfs::client::read(data_filename.c_str(), offset, length));
   EXPECT_TRUE(read_result.ok()) << "Failed to read: " << read_result.status();
   // Make sure that the read data is expected
-  auto read_data(read_result.ValueOrDie());
+  auto read_data(read_result.value());
   EXPECT_EQ(read_data.bytes_read, actual_read_bytes);
   EXPECT_EQ(
       memcmp(read_data.buffer, data.c_str() + offset, read_data.bytes_read), 0);

@@ -3,11 +3,10 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 # Google Protocol Buffers.
 http_archive(
     name = "rules_proto",
-    sha256 = "602e7161d9195e50246177e7c55b2f39950a9cf7366f74ed5f22fd45750cd208",
-    strip_prefix = "rules_proto-97d8af4dc474595af3900dd85cb3a29ad28cc313",
+    sha256 = "c22cfcb3f22a0ae2e684801ea8dfed070ba5bed25e73f73580564f250475e72d",
+    strip_prefix = "rules_proto-4.0.0-3.19.2",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_proto/archive/97d8af4dc474595af3900dd85cb3a29ad28cc313.tar.gz",
-        "https://github.com/bazelbuild/rules_proto/archive/97d8af4dc474595af3900dd85cb3a29ad28cc313.tar.gz",
+        "https://github.com/bazelbuild/rules_proto/archive/refs/tags/4.0.0-3.19.2.tar.gz",
     ],
 )
 
@@ -19,10 +18,10 @@ rules_proto_toolchains()
 # Example Useage: #include "absl/string"
 http_archive(
     name = "com_google_absl",
-    sha256 = "59b862f50e710277f8ede96f083a5bb8d7c9595376146838b9580be90374ee1f",
-    strip_prefix = "abseil-cpp-20210324.2",
+    sha256 = "dcf71b9cba8dc0ca9940c4b316a0c796be8fab42b070bb6b7cab62b48f0e66c4",
+    strip_prefix = "abseil-cpp-20211102.0",
     urls = [
-        "https://github.com/abseil/abseil-cpp/archive/refs/tags/20210324.2.tar.gz",
+        "https://github.com/abseil/abseil-cpp/archive/refs/tags/20211102.0.tar.gz",
     ],
 )
 
@@ -30,20 +29,20 @@ http_archive(
 # Example Useage: #include "gtest/gtest.h"
 http_archive(
     name = "com_google_test",
-    sha256 = "9dc9157a9a1551ec7a7e43daea9a694a0bb5fb8bec81235d8a1e6ef64c716dcb",
-    strip_prefix = "googletest-release-1.10.0",
+    sha256 = "b4870bf121ff7795ba20d20bcdd8627b8e088f2d1dab299a031c1034eddc93d5",
+    strip_prefix = "googletest-release-1.11.0",
     urls = [
-        "https://github.com/google/googletest/archive/release-1.10.0.tar.gz",
+        "https://github.com/google/googletest/archive/refs/tags/release-1.11.0.tar.gz",
     ],
 )
 
 # gRPC
 http_archive(
     name = "com_github_grpc_grpc",
-    sha256 = "d6277f77e0bb922d3f6f56c0f93292bb4cfabfc3c92b31ee5ccea0e100303612",
-    strip_prefix = "grpc-1.28.0",
+    sha256 = "46ee3d12c6d42a4ded46ba025c8ba09850425312c710c6ee6e084bd808ebc1e8",
+    strip_prefix = "grpc-1.45.1",
     urls = [
-        "https://github.com/grpc/grpc/archive/v1.28.0.tar.gz",
+        "https://github.com/grpc/grpc/archive/refs/tags/v1.45.1.tar.gz",
     ],
 )
 
@@ -75,6 +74,16 @@ http_archive(
     urls = ["https://github.com/greg7mdp/parallel-hashmap/archive/1.31.tar.gz"],
 )
 
+# Google gFlags
+http_archive(
+    name = "com_github_gflags_gflags",
+    sha256 = "34af2f15cf7367513b352bdcd2493ab14ce43692d2dcd9dfc499492966c64dcf",
+    strip_prefix = "gflags-2.2.2",
+    urls = [
+        "https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.tar.gz",
+    ],
+)
+
 # Google glog C++ logging library
 # Note: Don't use directly in your code,
 #       see examples/system_logger_main.cc for how to log.
@@ -82,10 +91,10 @@ http_archive(
 # Example dependency: "@com_google_glog//:glog"
 http_archive(
     name = "com_google_glog",
-    sha256 = "f28359aeba12f30d73d9e4711ef356dc842886968112162bc73002645139c39c",
-    strip_prefix = "glog-0.4.0",
+    sha256 = "eede71f28371bf39aa69b45de23b329d37214016e2055269b3b5e7cfd40b59f5",
+    strip_prefix = "glog-0.5.0",
     urls = [
-        "https://github.com/google/glog/archive/v0.4.0.tar.gz",
+        "https://github.com/google/glog/archive/refs/tags/v0.5.0.tar.gz",
     ],
 )
 
@@ -94,17 +103,17 @@ http_archive(
 http_archive(
     name = "yaml_cpp",
     build_file = "//src/third_party/build_rules:yaml_cpp.BUILD",
-    sha256 = "77ea1b90b3718aa0c324207cb29418f5bced2354c2e483a9523d98c3460af1ed",
-    strip_prefix = "yaml-cpp-yaml-cpp-0.6.3",
-    urls = ["https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-0.6.3.tar.gz"],
+    sha256 = "43e6a9fcb146ad871515f0d0873947e5d497a1c9c60c58cb102a97b47208b7c3",
+    strip_prefix = "yaml-cpp-yaml-cpp-0.7.0",
+    urls = ["https://github.com/jbeder/yaml-cpp/archive/refs/tags/yaml-cpp-0.7.0.tar.gz"],
 )
 
 # Google Benchmark library
 http_archive(
     name = "com_google_benchmark",
-    sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
-    strip_prefix = "benchmark-1.5.0",
+    sha256 = "6132883bc8c9b0df5375b16ab520fac1a85dc9e4cf5be59480448ece74b278d4",
+    strip_prefix = "benchmark-1.6.1",
     urls = [
-        "https://github.com/google/benchmark/archive/v1.5.0.tar.gz",
+        "https://github.com/google/benchmark/archive/refs/tags/v1.6.1.tar.gz",
     ],
 )

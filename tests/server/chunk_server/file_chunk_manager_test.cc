@@ -48,7 +48,7 @@ TEST_F(FileChunkManagerTest, BasicCrudOperationTest) {
       handle, version, /*start_offset=*/0, data.size(), data);
 
   // verify that all the data was written.
-  EXPECT_EQ(data.size(), write_result.ValueOrDie());
+  EXPECT_EQ(data.size(), write_result.value());
 
   // Read the data
   const uint32_t read_start_offset = 5;
@@ -57,7 +57,7 @@ TEST_F(FileChunkManagerTest, BasicCrudOperationTest) {
       handle, version, read_start_offset, read_length);
 
   EXPECT_EQ(data.substr(read_start_offset, read_length),
-            read_result.ValueOrDie());
+            read_result.value());
 
   // bump the chunk version
   EXPECT_TRUE(
@@ -70,16 +70,16 @@ TEST_F(FileChunkManagerTest, BasicCrudOperationTest) {
   auto update_result = file_chunk_mgr->WriteToChunk(
       handle, version, update_offset, update_data.size(), update_data);
 
-  EXPECT_EQ(update_data.size(), update_result.ValueOrDie());
+  EXPECT_EQ(update_data.size(), update_result.value());
 
   // Read the last data we wrote
   auto update_read_result = file_chunk_mgr->ReadFromChunk(
       handle, version, update_offset, update_data.size());
 
-  EXPECT_EQ(update_data, update_read_result.ValueOrDie());
+  EXPECT_EQ(update_data, update_read_result.value());
 
   // Verify chunk version
-  EXPECT_EQ(version, file_chunk_mgr->GetChunkVersion(handle).ValueOrDie());
+  EXPECT_EQ(version, file_chunk_mgr->GetChunkVersion(handle).value());
 
   EXPECT_TRUE(file_chunk_mgr->DeleteChunk(handle).ok());
 
@@ -111,7 +111,7 @@ TEST_F(FileChunkManagerTest, GetAllFileChunkMetadata) {
     auto write_result = file_chunk_mgr->WriteToChunk(
         handle, version, /*start_offset=*/0, data.size(), data);
 
-    EXPECT_EQ(data.size(), write_result.ValueOrDie());
+    EXPECT_EQ(data.size(), write_result.value());
 
     chunk_handles.insert(handle);
   }

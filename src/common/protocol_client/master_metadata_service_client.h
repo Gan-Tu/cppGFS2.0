@@ -34,7 +34,7 @@ namespace service {
 //  StatusOr<OpenFileReply> status_or =
 //    metadata_client.SendRequest(request, client_context);
 //  if (status_or.ok()) {
-//    std::cout << status_or.ValueOrDie().DebugString() << std::endl;
+//    std::cout << status_or.value().DebugString() << std::endl;
 //  }
 class MasterMetadataServiceClient {
  public:

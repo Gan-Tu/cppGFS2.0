@@ -5,10 +5,10 @@
 #include "absl/strings/str_cat.h"
 #include "src/common/utils.h"
 
+using gfs::common::utils::ValidateConfigFile;
+using google::protobuf::util::InvalidArgumentError;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
-using StatusCode = google::protobuf::util::error::Code;
-using gfs::common::utils::ValidateConfigFile;
 
 namespace gfs {
 namespace common {
@@ -25,9 +25,9 @@ StatusOr<ConfigManager*> ConfigManager::GetConfig(
       return validation_status;
     }
   } catch (YAML::ParserException& e) {
-    return Status(StatusCode::INVALID_ARGUMENT, e.msg);
+    return InvalidArgumentError(e.msg);
   } catch (YAML::BadFile& e) {
-    return Status(StatusCode::INVALID_ARGUMENT, e.msg);
+    return InvalidArgumentError(e.msg);
   }
 }
 

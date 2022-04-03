@@ -1,5 +1,6 @@
-#include <openssl/md5.h>
 #include "src/common/utils.h"
+
+#include <openssl/md5.h>
 
 #include "google/protobuf/stubs/status.h"
 #include "grpcpp/grpcpp.h"
@@ -8,212 +9,185 @@ namespace gfs {
 namespace common {
 namespace utils {
 
+using google::protobuf::util::AbortedError;
+using google::protobuf::util::AlreadyExistsError;
+using google::protobuf::util::CancelledError;
+using google::protobuf::util::DataLossError;
+using google::protobuf::util::DeadlineExceededError;
+using google::protobuf::util::FailedPreconditionError;
+using google::protobuf::util::InternalError;
+using google::protobuf::util::InvalidArgumentError;
+using google::protobuf::util::IsAborted;
+using google::protobuf::util::IsAlreadyExists;
+using google::protobuf::util::IsCancelled;
+using google::protobuf::util::IsDataLoss;
+using google::protobuf::util::IsDeadlineExceeded;
+using google::protobuf::util::IsFailedPrecondition;
+using google::protobuf::util::IsInternal;
+using google::protobuf::util::IsInvalidArgument;
+using google::protobuf::util::IsNotFound;
+using google::protobuf::util::IsOutOfRange;
+using google::protobuf::util::IsPermissionDenied;
+using google::protobuf::util::IsResourceExhausted;
+using google::protobuf::util::IsUnauthenticated;
+using google::protobuf::util::IsUnavailable;
+using google::protobuf::util::IsUnimplemented;
+using google::protobuf::util::NotFoundError;
+using google::protobuf::util::OkStatus;
+using google::protobuf::util::OutOfRangeError;
+using google::protobuf::util::PermissionDeniedError;
+using google::protobuf::util::ResourceExhaustedError;
+using google::protobuf::util::UnauthenticatedError;
+using google::protobuf::util::UnavailableError;
+using google::protobuf::util::UnimplementedError;
+using google::protobuf::util::UnknownError;
+
 google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
     const grpc::Status& status) {
-  google::protobuf::util::error::Code error_code;
+  const auto msg = status.error_message();
   switch (status.error_code()) {
     case grpc::StatusCode::OK:
-      error_code = google::protobuf::util::error::OK;
-      break;
+      return OkStatus();
     case grpc::StatusCode::CANCELLED:
-      error_code = google::protobuf::util::error::CANCELLED;
-      break;
+      return CancelledError(msg);
     case grpc::StatusCode::INVALID_ARGUMENT:
-      error_code = google::protobuf::util::error::INVALID_ARGUMENT;
-      break;
+      return InvalidArgumentError(msg);
     case grpc::StatusCode::DEADLINE_EXCEEDED:
-      error_code = google::protobuf::util::error::DEADLINE_EXCEEDED;
-      break;
+      return DeadlineExceededError(msg);
     case grpc::StatusCode::NOT_FOUND:
-      error_code = google::protobuf::util::error::NOT_FOUND;
-      break;
+      return NotFoundError(msg);
     case grpc::StatusCode::ALREADY_EXISTS:
-      error_code = google::protobuf::util::error::ALREADY_EXISTS;
-      break;
+      return AlreadyExistsError(msg);
     case grpc::StatusCode::PERMISSION_DENIED:
-      error_code = google::protobuf::util::error::PERMISSION_DENIED;
-      break;
+      return PermissionDeniedError(msg);
     case grpc::StatusCode::UNAUTHENTICATED:
-      error_code = google::protobuf::util::error::UNAUTHENTICATED;
-      break;
+      return UnauthenticatedError(msg);
     case grpc::StatusCode::RESOURCE_EXHAUSTED:
-      error_code = google::protobuf::util::error::RESOURCE_EXHAUSTED;
-      break;
+      return ResourceExhaustedError(msg);
     case grpc::StatusCode::FAILED_PRECONDITION:
-      error_code = google::protobuf::util::error::FAILED_PRECONDITION;
-      break;
+      return FailedPreconditionError(msg);
     case grpc::StatusCode::ABORTED:
-      error_code = google::protobuf::util::error::ABORTED;
-      break;
+      return AbortedError(msg);
     case grpc::StatusCode::OUT_OF_RANGE:
-      error_code = google::protobuf::util::error::OUT_OF_RANGE;
-      break;
+      return OutOfRangeError(msg);
     case grpc::StatusCode::UNIMPLEMENTED:
-      error_code = google::protobuf::util::error::UNIMPLEMENTED;
-      break;
+      return UnimplementedError(msg);
     case grpc::StatusCode::INTERNAL:
-      error_code = google::protobuf::util::error::INTERNAL;
-      break;
+      return InternalError(msg);
     case grpc::StatusCode::UNAVAILABLE:
-      error_code = google::protobuf::util::error::UNAVAILABLE;
-      break;
+      return UnavailableError(msg);
     case grpc::StatusCode::DATA_LOSS:
-      error_code = google::protobuf::util::error::DATA_LOSS;
-      break;
-    default:
-      error_code = google::protobuf::util::error::UNKNOWN;
-      break;
+      return DataLossError(msg);
   }
-  return google::protobuf::util::Status(error_code, status.error_message());
+  return InternalError("Unknown error message code");
 }
 
 grpc::Status ConvertProtobufStatusToGrpcStatus(
     const google::protobuf::util::Status& status) {
-  grpc::StatusCode error_code;
-  switch (status.error_code()) {
-    case google::protobuf::util::error::OK:
-      error_code = grpc::StatusCode::OK;
-      break;
-    case google::protobuf::util::error::CANCELLED:
-      error_code = grpc::StatusCode::CANCELLED;
-      break;
-    case google::protobuf::util::error::INVALID_ARGUMENT:
-      error_code = grpc::StatusCode::INVALID_ARGUMENT;
-      break;
-    case google::protobuf::util::error::DEADLINE_EXCEEDED:
-      error_code = grpc::StatusCode::DEADLINE_EXCEEDED;
-      break;
-    case google::protobuf::util::error::NOT_FOUND:
-      error_code = grpc::StatusCode::NOT_FOUND;
-      break;
-    case google::protobuf::util::error::ALREADY_EXISTS:
-      error_code = grpc::StatusCode::ALREADY_EXISTS;
-      break;
-    case google::protobuf::util::error::PERMISSION_DENIED:
-      error_code = grpc::StatusCode::PERMISSION_DENIED;
-      break;
-    case google::protobuf::util::error::UNAUTHENTICATED:
-      error_code = grpc::StatusCode::UNAUTHENTICATED;
-      break;
-    case google::protobuf::util::error::RESOURCE_EXHAUSTED:
-      error_code = grpc::StatusCode::RESOURCE_EXHAUSTED;
-      break;
-    case google::protobuf::util::error::FAILED_PRECONDITION:
-      error_code = grpc::StatusCode::FAILED_PRECONDITION;
-      break;
-    case google::protobuf::util::error::ABORTED:
-      error_code = grpc::StatusCode::ABORTED;
-      break;
-    case google::protobuf::util::error::OUT_OF_RANGE:
-      error_code = grpc::StatusCode::OUT_OF_RANGE;
-      break;
-    case google::protobuf::util::error::UNIMPLEMENTED:
-      error_code = grpc::StatusCode::UNIMPLEMENTED;
-      break;
-    case google::protobuf::util::error::INTERNAL:
-      error_code = grpc::StatusCode::INTERNAL;
-      break;
-    case google::protobuf::util::error::UNAVAILABLE:
-      error_code = grpc::StatusCode::UNAVAILABLE;
-      break;
-    case google::protobuf::util::error::DATA_LOSS:
-      error_code = grpc::StatusCode::DATA_LOSS;
-      break;
-    default:
-      error_code = grpc::StatusCode::UNKNOWN;
-      break;
+  const std::string msg = status.message().as_string();
+  if (status.ok()) {
+    return grpc::Status(grpc::StatusCode::OK, msg);
   }
-  return grpc::Status(error_code, status.error_message());
+  if (IsCancelled(status)) {
+    return grpc::Status(grpc::StatusCode::CANCELLED, msg);
+  }
+  if (IsInvalidArgument(status)) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, msg);
+  }
+  if (IsDeadlineExceeded(status)) {
+    return grpc::Status(grpc::StatusCode::DEADLINE_EXCEEDED, msg);
+  }
+  if (IsNotFound(status)) {
+    return grpc::Status(grpc::StatusCode::NOT_FOUND, msg);
+  }
+  if (IsAlreadyExists(status)) {
+    return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, msg);
+  }
+  if (IsPermissionDenied(status)) {
+    return grpc::Status(grpc::StatusCode::PERMISSION_DENIED, msg);
+  }
+  if (IsUnauthenticated(status)) {
+    return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, msg);
+  }
+  if (IsResourceExhausted(status)) {
+    return grpc::Status(grpc::StatusCode::RESOURCE_EXHAUSTED, msg);
+  }
+  if (IsFailedPrecondition(status)) {
+    return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, msg);
+  }
+  if (IsAborted(status)) {
+    return grpc::Status(grpc::StatusCode::ABORTED, msg);
+  }
+  if (IsOutOfRange(status)) {
+    return grpc::Status(grpc::StatusCode::OUT_OF_RANGE, msg);
+  }
+  if (IsUnimplemented(status)) {
+    return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, msg);
+  }
+  if (IsInternal(status)) {
+    return grpc::Status(grpc::StatusCode::INTERNAL, msg);
+  }
+  if (IsUnavailable(status)) {
+    return grpc::Status(grpc::StatusCode::UNAVAILABLE, msg);
+  }
+  if (IsDataLoss(status)) {
+    return grpc::Status(grpc::StatusCode::DATA_LOSS, msg);
+  }
+  return grpc::Status(grpc::StatusCode::UNKNOWN, "Unrecognized status code");
 }
 
 google::protobuf::util::Status CheckFilenameValidity(
     const std::string& filename) {
   if (filename.empty()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::INVALID_ARGUMENT,
-        "Empty filename is not allowed");
+    return InvalidArgumentError("Empty filename is not allowed");
   }
 
   if (filename[0] != '/') {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::INVALID_ARGUMENT,
-        "Relative path is not allowed");
+    return InvalidArgumentError("Relative path is not allowed");
   }
 
   if (filename.back() == '/') {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::INVALID_ARGUMENT,
-        "Trailing slash is not allowed");
+    return InvalidArgumentError("Trailing slash is not allowed");
   }
 
   if (filename.find("//") != std::string::npos) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::INVALID_ARGUMENT,
-        "Consecutive slash is not allowed");
+    return InvalidArgumentError("Consecutive slash is not allowed");
   }
 
-  return google::protobuf::util::Status::OK;
+  return OkStatus();
 }
 
 google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node) {
   if (!node.IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT, "empty config");
+    return InvalidArgumentError("empty config");
   } else if (!node["servers"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: servers");
+    return InvalidArgumentError("missing: servers");
   } else if (!node["network"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: network");
+    return InvalidArgumentError("missing: network");
   } else if (!node["disk"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT, "missing: disk");
+    return InvalidArgumentError("missing: disk");
   } else if (!node["timeout"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: timeout");
+    return InvalidArgumentError("missing: timeout");
   } else if (!node["servers"]["master_servers"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: servers.master_servers");
+    return InvalidArgumentError("missing: servers.master_servers");
   } else if (!node["servers"]["chunk_servers"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: servers.chunk_servers");
+    return InvalidArgumentError("missing: servers.chunk_servers");
   } else if (!node["network"]["dns_lookup_table"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: network.dns_lookup_table");
+    return InvalidArgumentError("missing: network.dns_lookup_table");
   } else if (!node["disk"]["block_size_mb"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: disk.block_size_mb");
+    return InvalidArgumentError("missing: disk.block_size_mb");
   } else if (!node["disk"]["min_free_disk_space_mb"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: disk.min_free_disk_space_mb");
+    return InvalidArgumentError("missing: disk.min_free_disk_space_mb");
   } else if (!node["disk"]["leveldb"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: disk.leveldb");
+    return InvalidArgumentError("missing: disk.leveldb");
   } else if (!node["timeout"]["grpc"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: timeout.grpc");
+    return InvalidArgumentError("missing: timeout.grpc");
   } else if (!node["timeout"]["lease"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: timeout.lease");
+    return InvalidArgumentError("missing: timeout.lease");
   } else if (!node["timeout"]["heartbeat"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: timeout.heartbeat");
+    return InvalidArgumentError("missing: timeout.heartbeat");
   } else if (!node["timeout"]["client_cache"].IsDefined()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::Code::INVALID_ARGUMENT,
-        "missing: timeout.client_cache");
+    return InvalidArgumentError("missing: timeout.client_cache");
   }
 
   std::vector<std::string> server_types = {"master_servers", "chunk_servers"};
@@ -222,40 +196,32 @@ google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node) {
       std::string server_name =
           node["servers"][server_type][i].as<std::string>();
       if (!node["network"][server_name].IsDefined()) {
-        return google::protobuf::util::Status(
-            google::protobuf::util::error::Code::INVALID_ARGUMENT,
-            "missing: network definition for " + server_name);
+        return InvalidArgumentError("missing: network definition for " +
+                                    server_name);
       } else if (!node["network"][server_name]["hostname"].IsDefined()) {
-        return google::protobuf::util::Status(
-            google::protobuf::util::error::Code::INVALID_ARGUMENT,
-            "missing: hostname for " + server_name);
+        return InvalidArgumentError("missing: hostname for " + server_name);
       } else if (!node["network"][server_name]["port"].IsDefined()) {
-        return google::protobuf::util::Status(
-            google::protobuf::util::error::Code::INVALID_ARGUMENT,
-            "missing: port for " + server_name);
+        return InvalidArgumentError("missing: port for " + server_name);
       } else if (server_type == "chunk_servers" &&
                  !node["disk"]["leveldb"][server_name].IsDefined()) {
-        return google::protobuf::util::Status(
-            google::protobuf::util::error::Code::INVALID_ARGUMENT,
-            "missing: leveldb database name for " + server_name);
+        return InvalidArgumentError("missing: leveldb database name for " +
+                                    server_name);
       }
       std::string hostname =
           node["network"][server_name]["hostname"].as<std::string>();
       if (!node["network"]["dns_lookup_table"][hostname].IsDefined()) {
-        return google::protobuf::util::Status(
-            google::protobuf::util::error::Code::INVALID_ARGUMENT,
-            "missing: dns lookup for " + hostname);
+        return InvalidArgumentError("missing: dns lookup for " + hostname);
       }
     }
   }
-  return google::protobuf::util::Status::OK;
+  return OkStatus();
 }
 
 const std::string calc_checksum(const std::string& data) {
   std::string checksum_string(MD5_DIGEST_LENGTH, ' ');
-  // The casting below is necessary to fit with openssl's MD5 function 
-  // signature, which is a pretty ugly interface 
-  MD5((const unsigned char*)&data[0], data.size(), 
+  // The casting below is necessary to fit with openssl's MD5 function
+  // signature, which is a pretty ugly interface
+  MD5((const unsigned char*)&data[0], data.size(),
       (unsigned char*)&checksum_string[0]);
   return checksum_string;
 }

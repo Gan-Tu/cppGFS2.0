@@ -14,14 +14,14 @@ int main(int argc, char** argv) {
                                             resolve_hostname));
   if (!init_status.ok()) {
     LOG(ERROR) << "Client initialiation failed with error: " 
-               << init_status.error_message();
+               << init_status.message();
     return 1;
   }
  
   auto create_foo_status(gfs::client::open("/foo", gfs::OpenFlag::Create));
   if (!create_foo_status.ok()) {
     LOG(ERROR) << "Open to create /foo failed with error: "
-               << create_foo_status.error_message();
+               << create_foo_status.message();
     return 1;
   } else {
     LOG(INFO) << "Open to create /foo succeeded";

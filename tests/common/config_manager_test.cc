@@ -8,7 +8,7 @@ class ConfigManagerTest : public ::testing::Test {
  protected:
   void SetUp() override {
     config_ =
-        ConfigManager::GetConfig("./tests/common/test_config.yml").ValueOrDie();
+        ConfigManager::GetConfig("./tests/common/test_config.yml").value();
   }
   ConfigManager* config_ = nullptr;
 };

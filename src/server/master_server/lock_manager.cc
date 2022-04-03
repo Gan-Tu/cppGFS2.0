@@ -2,11 +2,15 @@
 
 #include <thread>
 
+using google::protobuf::util::AlreadyExistsError;
+using google::protobuf::util::NotFoundError;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
 
 namespace gfs {
 namespace server {
+
+using google::protobuf::util::OkStatus;
 
 bool LockManager::Exist(const std::string& filename) {
   return file_path_locks_.Contains(filename);
@@ -20,8 +24,7 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
   // lock, or this thread has been created previously by the current
   // thread
   if (!file_path_locks_.TryInsert(filename, new_lock)) {
-    return Status(google::protobuf::util::error::ALREADY_EXISTS,
-                  "Lock already exists for " + filename);
+    return AlreadyExistsError("Lock already exists for " + filename);
   }
 
   // TODO: We have not finalized the plan regarding to the removal of locks.
@@ -47,8 +50,7 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::FetchLock(
   bool lock_exist(try_get_lock.second);
 
   if (!lock_exist) {
-    return Status(google::protobuf::util::error::NOT_FOUND,
-                  "Lock does not exist for " + filename);
+    return NotFoundError("Lock does not exist for " + filename);
   }
   return try_get_lock.first.get();
 }
@@ -70,17 +72,16 @@ ParentLocksAnchor::ParentLocksAnchor(LockManager* lock_manager,
     // Otherwise, grab the reader lock for dir and push it to the stack
     StatusOr<absl::Mutex*> path_lock_or(lock_manager->FetchLock(dir));
     if (!path_lock_or.ok()) {
-      status_ = Status(google::protobuf::util::error::NOT_FOUND,
-                       "Lock for " + dir + " does not exist");
+      status_ = NotFoundError("Lock for " + dir + " does not exist");
       return;
     }
 
-    auto path_lock(path_lock_or.ValueOrDie());
+    auto path_lock(path_lock_or.value());
     path_lock->ReaderLock();
     locks_.push(path_lock);
     slashPos = filename.find('/', slashPos + 1);
   }
-  status_ = google::protobuf::util::Status::OK;
+  status_ = OkStatus();
 }
 
 bool ParentLocksAnchor::ok() const { return status_.ok(); }

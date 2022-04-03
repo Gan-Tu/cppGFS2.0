@@ -25,7 +25,7 @@ brew install bazelbuild/tap/bazel
 For Linux, you can run the `scripts/install_bazel.sh` with desired Bazel version:
 
 ```
-export BAZEL_VERSION=3.1.0
+export BAZEL_VERSION=5.1.0
 chmod +x scripts/install_bazel.sh
 scripts/install_bazel.sh
 ```
@@ -33,8 +33,8 @@ scripts/install_bazel.sh
 Then, from the root directory, you can run Bazel commands as normal. For example:
 
 ```
-bazel build --features=-supports_dynamic_linker ...
-bazel test --features=-supports_dynamic_linker --test_output=errors ...
+bazel build ...
+bazel test --test_output=errors ...
 ```
 
 To learn more about how to use Bazel, or how to write Bazel build rule for C++, see the [official documentation](https://docs.bazel.build/versions/master/bazel-overview.html).
@@ -50,7 +50,7 @@ You can either write a binary by importing the GFS client at `src/client/gfs_cli
 To build the command line binary, run
 
 ```
-bazel build --features=-supports_dynamic_linker :gfs_client_main
+bazel build :gfs_client_main
 ```
 
 Then, you can run any of these modes:
