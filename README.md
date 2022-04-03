@@ -15,11 +15,18 @@ A [distributed Google File System (GFS)](https://research.google/pubs/pub51), im
 
 In this project, we plan to use [Bazel](http://bazel.build) as our main build tool. You can install Bazel by following their website [instructions](https://docs.bazel.build/versions/master/install.html).
 
-For MacOS, you can use Homebrew:
+As of writing, you will need at least Bazel version 5.1.0 for a proper working demo.
+
+For MacOS, you can use:
 
 ```
-brew tap bazelbuild/tap
-brew install bazelbuild/tap/bazel
+export BAZEL_VERSION=5.1.0
+curl -fLO "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
+chmod +x "bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
+./bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh --user
+
+export PATH="$PATH:$HOME/bin"
+bazel --version
 ```
 
 For Linux, you can run the `scripts/install_bazel.sh` with desired Bazel version:
@@ -29,6 +36,8 @@ export BAZEL_VERSION=5.1.0
 chmod +x scripts/install_bazel.sh
 scripts/install_bazel.sh
 ```
+
+_For ARM64 architecture (such as Apple M1 chips), use `scripts/install_bazel_arm64.sh`. You may need to comment out the `apt` lines._
 
 Then, from the root directory, you can run Bazel commands as normal. For example:
 
@@ -77,6 +86,8 @@ To start all servers and expose respective server ports outside of Docker for co
 ```
 docker-compose up --build
 ```
+
+_As of writing, the Dockerfile doesn't support MacBook M1 Max yet. You will need to manually update the file to install/use a ARM64 compatible Bazel image. You can refer to the `scripts` folder for installation instructions._
 
 Then, you can use GFS client to interact with the cluster.
 
