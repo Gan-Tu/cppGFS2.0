@@ -21,7 +21,7 @@ class ChunkServerImplTest : public ::testing::Test {
             "tests/server/chunk_server/test_config.yml",
             /*chunk_server_name=*/"chunk_server_01",
             /*resolve_hostname=*/false);
-    chunk_server_ = chunk_server_or.ValueOrDie();
+    chunk_server_ = chunk_server_or.value();
   }
   ChunkServerImpl* chunk_server_;
 };
@@ -40,7 +40,7 @@ TEST_F(ChunkServerImplTest, AddOrUpdateLease) {
   StatusOr<absl::Time> actual_expiration_or =
       chunk_server_->GetLeaseExpirationTime(file_handle);
   EXPECT_TRUE(actual_expiration_or.ok());
-  EXPECT_EQ(absl::ToUnixSeconds(actual_expiration_or.ValueOrDie()),
+  EXPECT_EQ(absl::ToUnixSeconds(actual_expiration_or.value()),
             expected_expiration_sec);
   EXPECT_TRUE(chunk_server_->HasWriteLease(file_handle));
 
@@ -50,7 +50,7 @@ TEST_F(ChunkServerImplTest, AddOrUpdateLease) {
   chunk_server_->AddOrUpdateLease(file_handle, expected_expiration_sec);
   actual_expiration_or = chunk_server_->GetLeaseExpirationTime(file_handle);
   EXPECT_TRUE(actual_expiration_or.ok());
-  EXPECT_EQ(absl::ToUnixSeconds(actual_expiration_or.ValueOrDie()),
+  EXPECT_EQ(absl::ToUnixSeconds(actual_expiration_or.value()),
             expected_expiration_sec);
   // lease should have expired, as we set the expiration to NOW at update time
   EXPECT_FALSE(chunk_server_->HasWriteLease(file_handle));
@@ -87,7 +87,7 @@ TEST_F(ChunkServerImplTest, ChunkVersionGetterSetter) {
   StatusOr<uint32_t> actual_chunk_version_or =
       chunk_server_->GetChunkVersion(file_handle);
   EXPECT_TRUE(actual_chunk_version_or.ok());
-  EXPECT_EQ(actual_chunk_version_or.ValueOrDie(), expected_chunk_version);
+  EXPECT_EQ(actual_chunk_version_or.value(), expected_chunk_version);
 }
 
 TEST_F(ChunkServerImplTest, GetMasterProtocolClient) {

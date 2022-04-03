@@ -42,7 +42,7 @@ void init() {
                                             resolve_hostname));
   if (!init_status.ok()) {
     LOG(ERROR) << "Client initialization failed with error: " 
-               << init_status.error_message();
+               << init_status.message();
     exit(-1);
   }
 }
@@ -72,7 +72,7 @@ void singleFileRead(const std::string& filename_base, ushort id) {
     LOG(INFO) << "Read request in the " + std::to_string(id) << " succeeded"; 
   }
 
-  auto read_data(read_data_or.ValueOrDie());
+  auto read_data(read_data_or.value());
   if (memcmp(read_data.buffer, kGlobalFileData[id].c_str(), 
              kGlobalFileData[id].size()) != 0) {
     LOG(ERROR) << "Read request in the " + std::to_string(id) 

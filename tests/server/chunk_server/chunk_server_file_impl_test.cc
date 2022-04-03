@@ -96,7 +96,7 @@ void StartTestServer(const std::string& server_address,
   StatusOr<ChunkServerImpl*> chunk_server_or =
       ChunkServerImpl::ConstructChunkServerImpl(kTestConfigPath, server_name,
                                                 /*resolve_hostname=*/true);
-  ChunkServerImpl* chunk_server = chunk_server_or.ValueOrDie();
+  ChunkServerImpl* chunk_server = chunk_server_or.value();
 
   if (seed_data) {
     // seed test data
@@ -142,7 +142,7 @@ class ChunkServerFileImplTest : public ::testing::Test {
         std::make_shared<ChunkServerServiceGfsClient>(grpc::CreateChannel(
             kTestServerAddress, grpc::InsecureChannelCredentials()));
     config_mgr_ = std::shared_ptr<ConfigManager>(
-        ConfigManager::GetConfig(kTestConfigPath).ValueOrDie());
+        ConfigManager::GetConfig(kTestConfigPath).value());
   }
 
   ReadFileChunkRequest MakeValidReadFileChunkRequest() {
@@ -179,7 +179,7 @@ TEST_F(ChunkServerFileImplTest, InitNewFileChunk) {
   grpc::ClientContext client_context;
   auto reply_or = master_server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(), InitFileChunkReply::CREATED);
+  EXPECT_EQ(reply_or.value().status(), InitFileChunkReply::CREATED);
 }
 
 TEST_F(ChunkServerFileImplTest, InitExistingFileChunk) {
@@ -190,7 +190,7 @@ TEST_F(ChunkServerFileImplTest, InitExistingFileChunk) {
   grpc::ClientContext client_context;
   auto reply_or = master_server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(), InitFileChunkReply::ALREADY_EXISTS);
+  EXPECT_EQ(reply_or.value().status(), InitFileChunkReply::ALREADY_EXISTS);
 }
 
 TEST_F(ChunkServerFileImplTest, ReadFileChunkOK) {
@@ -199,9 +199,9 @@ TEST_F(ChunkServerFileImplTest, ReadFileChunkOK) {
   grpc::ClientContext client_context;
   auto reply_or = gfs_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(), ReadFileChunkReply::OK);
-  EXPECT_EQ(reply_or.ValueOrDie().data(), kTestData);
-  EXPECT_EQ(reply_or.ValueOrDie().bytes_read(), kTestData.length());
+  EXPECT_EQ(reply_or.value().status(), ReadFileChunkReply::OK);
+  EXPECT_EQ(reply_or.value().data(), kTestData);
+  EXPECT_EQ(reply_or.value().bytes_read(), kTestData.length());
 }
 
 //
@@ -216,9 +216,9 @@ TEST_F(ChunkServerFileImplTest, ReadFileChunkFullRead) {
   grpc::ClientContext client_context;
   auto reply_or = gfs_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(), ReadFileChunkReply::OK);
-  EXPECT_EQ(reply_or.ValueOrDie().data(), kTestData.substr(0, read_length));
-  EXPECT_EQ(reply_or.ValueOrDie().bytes_read(), read_length);
+  EXPECT_EQ(reply_or.value().status(), ReadFileChunkReply::OK);
+  EXPECT_EQ(reply_or.value().data(), kTestData.substr(0, read_length));
+  EXPECT_EQ(reply_or.value().bytes_read(), read_length);
 }
 
 TEST_F(ChunkServerFileImplTest, ReadFileChunkPartialRead) {
@@ -228,12 +228,12 @@ TEST_F(ChunkServerFileImplTest, ReadFileChunkPartialRead) {
   grpc::ClientContext client_context;
   auto reply_or = gfs_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(), ReadFileChunkReply::OK);
+  EXPECT_EQ(reply_or.value().status(), ReadFileChunkReply::OK);
 
   // We will reach end of file before we read the requested number of bytes, so
   // this should be a partial read
-  EXPECT_EQ(reply_or.ValueOrDie().data(), kTestData);
-  EXPECT_EQ(reply_or.ValueOrDie().bytes_read(), kTestData.length());
+  EXPECT_EQ(reply_or.value().data(), kTestData);
+  EXPECT_EQ(reply_or.value().bytes_read(), kTestData.length());
 }
 
 TEST_F(ChunkServerFileImplTest, ReadFileChunkFullReadWithOffset) {
@@ -246,10 +246,10 @@ TEST_F(ChunkServerFileImplTest, ReadFileChunkFullReadWithOffset) {
   grpc::ClientContext client_context;
   auto reply_or = gfs_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(), ReadFileChunkReply::OK);
-  EXPECT_EQ(reply_or.ValueOrDie().data(),
+  EXPECT_EQ(reply_or.value().status(), ReadFileChunkReply::OK);
+  EXPECT_EQ(reply_or.value().data(),
             kTestData.substr(offset_start, offset_start + read_length));
-  EXPECT_EQ(reply_or.ValueOrDie().bytes_read(), read_length);
+  EXPECT_EQ(reply_or.value().bytes_read(), read_length);
 }
 
 TEST_F(ChunkServerFileImplTest, ReadFileChunkPartialReadWithOffset) {
@@ -261,9 +261,9 @@ TEST_F(ChunkServerFileImplTest, ReadFileChunkPartialReadWithOffset) {
   grpc::ClientContext client_context;
   auto reply_or = gfs_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(), ReadFileChunkReply::OK);
-  EXPECT_EQ(reply_or.ValueOrDie().data(), kTestData.substr(offset_start));
-  EXPECT_EQ(reply_or.ValueOrDie().bytes_read(),
+  EXPECT_EQ(reply_or.value().status(), ReadFileChunkReply::OK);
+  EXPECT_EQ(reply_or.value().data(), kTestData.substr(offset_start));
+  EXPECT_EQ(reply_or.value().bytes_read(),
             kTestData.length() - offset_start);
 }
 
@@ -274,7 +274,7 @@ TEST_F(ChunkServerFileImplTest, ReadFileChunkNoFileChunk) {
   grpc::ClientContext client_context;
   auto reply_or = gfs_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             ReadFileChunkReply::FAILED_NOT_FOUND);
 }
 
@@ -286,14 +286,14 @@ TEST_F(ChunkServerFileImplTest, ReadFileChunkNoChunkVersion) {
   StatusOr<ReadFileChunkReply> reply_or =
       gfs_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             ReadFileChunkReply::FAILED_VERSION_OUT_OF_SYNC);
 
   req.set_chunk_version(kTestFileVersion - 1);
   grpc::ClientContext client_context2;
   reply_or = gfs_client_->SendRequest(req, client_context2);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             ReadFileChunkReply::FAILED_VERSION_OUT_OF_SYNC);
 }
 
@@ -304,7 +304,7 @@ TEST_F(ChunkServerFileImplTest, ReadFileChunkOKOutOfRange) {
   grpc::ClientContext client_context;
   auto reply_or = gfs_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             ReadFileChunkReply::FAILED_OUT_OF_RANGE);
 }
 
@@ -322,8 +322,8 @@ TEST_F(ChunkServerFileImplTest, AdvanceFileChunkVersionOK) {
   grpc::ClientContext client_context;
   auto reply_or = master_server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(), AdvanceFileChunkVersionReply::OK);
-  EXPECT_EQ(reply_or.ValueOrDie().chunk_version(), req.new_chunk_version());
+  EXPECT_EQ(reply_or.value().status(), AdvanceFileChunkVersionReply::OK);
+  EXPECT_EQ(reply_or.value().chunk_version(), req.new_chunk_version());
 }
 
 TEST_F(ChunkServerFileImplTest, AdvanceFileChunkVersionNoFileChunk) {
@@ -334,7 +334,7 @@ TEST_F(ChunkServerFileImplTest, AdvanceFileChunkVersionNoFileChunk) {
   grpc::ClientContext client_context;
   auto reply_or = master_server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             AdvanceFileChunkVersionReply::FAILED_NOT_FOUND);
 }
 
@@ -347,21 +347,21 @@ TEST_F(ChunkServerFileImplTest, AdvanceFileChunkVersionOutOfSyncVersionError) {
   StatusOr<AdvanceFileChunkVersionReply> reply_or =
       master_server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             AdvanceFileChunkVersionReply::FAILED_VERSION_OUT_OF_SYNC);
 
   req.set_new_chunk_version(kTestFileVersion);
   grpc::ClientContext client_context2;
   reply_or = master_server_client_->SendRequest(req, client_context2);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             AdvanceFileChunkVersionReply::FAILED_VERSION_OUT_OF_SYNC);
 
   req.set_new_chunk_version(kTestFileVersion - 1);
   grpc::ClientContext client_context3;
   reply_or = master_server_client_->SendRequest(req, client_context3);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             AdvanceFileChunkVersionReply::FAILED_VERSION_OUT_OF_SYNC);
 }
 
@@ -415,7 +415,7 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
         write_data, write_data_checksum);
 
     EXPECT_TRUE(reply.ok());
-    EXPECT_EQ(reply.ValueOrDie().status(), SendChunkDataReply::OK);
+    EXPECT_EQ(reply.value().status(), SendChunkDataReply::OK);
   }
 
   // Grant primary write lease on file chunk
@@ -428,7 +428,7 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
   auto lease_reply = master_server_client_->SendRequest(lease_request);
 
   EXPECT_TRUE(lease_reply.ok());
-  EXPECT_EQ(lease_reply.ValueOrDie().status(), GrantLeaseReply::ACCEPTED);
+  EXPECT_EQ(lease_reply.value().status(), GrantLeaseReply::ACCEPTED);
 
   // Case 1:
   // Now ask primary to write data, once primary is done it will tell replicas
@@ -459,7 +459,7 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
 
   EXPECT_TRUE(write_reply_or.ok());
 
-  auto write_reply = write_reply_or.ValueOrDie();
+  auto write_reply = write_reply_or.value();
 
   EXPECT_EQ(write_reply.status(), FileChunkMutationStatus::OK);
 
@@ -482,7 +482,7 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
         write_data, write_data_checksum);
 
     EXPECT_TRUE(reply.ok());
-    EXPECT_EQ(reply.ValueOrDie().status(), SendChunkDataReply::OK);
+    EXPECT_EQ(reply.value().status(), SendChunkDataReply::OK);
   }
 
   write_request.mutable_header()->set_chunk_version(kTestFileVersion + 1);
@@ -491,7 +491,7 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
 
   EXPECT_TRUE(write_reply_or.ok());
 
-  write_reply = write_reply_or.ValueOrDie();
+  write_reply = write_reply_or.value();
 
   EXPECT_EQ(write_reply.status(),
             FileChunkMutationStatus::FAILED_STALE_VERSION);
@@ -510,7 +510,7 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
         write_data, write_data_checksum);
 
     EXPECT_TRUE(reply.ok());
-    EXPECT_EQ(reply.ValueOrDie().status(), SendChunkDataReply::OK);
+    EXPECT_EQ(reply.value().status(), SendChunkDataReply::OK);
   }
 
   // Set correct version
@@ -522,7 +522,7 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
 
   EXPECT_TRUE(write_reply_or.ok());
 
-  write_reply = write_reply_or.ValueOrDie();
+  write_reply = write_reply_or.value();
 
   EXPECT_EQ(write_reply.status(), FileChunkMutationStatus::FAILED_OUT_OF_RANGE);
 
@@ -545,7 +545,7 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
 
   EXPECT_TRUE(write_reply_or.ok());
 
-  write_reply = write_reply_or.ValueOrDie();
+  write_reply = write_reply_or.value();
 
   EXPECT_EQ(write_reply.status(),
             FileChunkMutationStatus::FAILED_DATA_NOT_FOUND);

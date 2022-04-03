@@ -23,7 +23,7 @@ void init() {
                                             resolve_hostname));
   if (!init_status.ok()) {
     LOG(ERROR) << "Client initialization failed with error: " 
-               << init_status.error_message();
+               << init_status.message();
     exit(-1);
   }
 }
@@ -35,7 +35,7 @@ void singleFileCreation(const std::string& filename) {
                                            gfs::OpenFlag::Create));
   if (!create_foo_status.ok()) {
     LOG(ERROR) << "Open to create " + filename + " failed with error: "
-               << create_foo_status.error_message();
+               << create_foo_status.message();
     exit(1);
   } else {
     LOG(INFO) << "Open to create " + filename +  " succeeded";

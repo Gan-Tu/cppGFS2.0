@@ -7,6 +7,7 @@
 #include "src/protos/grpc/chunk_server_lease_service.grpc.pb.h"
 
 using gfs::common::utils::ConvertProtobufStatusToGrpcStatus;
+using google::protobuf::util::IsNotFound;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
 using grpc::ServerContext;
@@ -40,8 +41,7 @@ grpc::Status ChunkServerLeaseServiceImpl::GrantLease(
   StatusOr<uint32_t> owned_version_or =
       chunk_server_impl_->GetChunkVersion(request->chunk_handle());
   if (!owned_version_or.ok()) {
-    if (owned_version_or.status().code() ==
-        google::protobuf::util::error::Code::NOT_FOUND) {
+    if (IsNotFound(owned_version_or.status())) {
       LOG(INFO) << "Cannot accept lease because " << request->chunk_handle()
                 << " doesn't exit on this chunk server";
       reply->set_status(GrantLeaseReply::REJECTED_NOT_FOUND);
@@ -51,12 +51,12 @@ grpc::Status ChunkServerLeaseServiceImpl::GrantLease(
                  << owned_version_or.status();
       return ConvertProtobufStatusToGrpcStatus(owned_version_or.status());
     }
-  } else if (owned_version_or.ValueOrDie() < request->chunk_version()) {
+  } else if (owned_version_or.value() < request->chunk_version()) {
     LOG(INFO) << "Cannot accept lease because " << request->chunk_handle()
               << " is stale on this chunk server";
     reply->set_status(GrantLeaseReply::REJECTED_STALE_VERSION);
     return grpc::Status::OK;
-  } else if (owned_version_or.ValueOrDie() > request->chunk_version()) {
+  } else if (owned_version_or.value() > request->chunk_version()) {
     LOG(INFO) << "Cannot accept lease because " << request->chunk_handle()
               << " has a newer version on this chunk server";
     reply->set_status(GrantLeaseReply::UNKNOWN);
@@ -94,8 +94,7 @@ grpc::Status ChunkServerLeaseServiceImpl::RevokeLease(
   StatusOr<absl::Time> current_lease_expiration_time_or =
       chunk_server_impl_->GetLeaseExpirationTime(request->chunk_handle());
   if (!current_lease_expiration_time_or.ok()) {
-    if (current_lease_expiration_time_or.status().code() ==
-        google::protobuf::util::error::Code::NOT_FOUND) {
+    if (IsNotFound(current_lease_expiration_time_or.status())) {
       LOG(INFO) << "No lease to revoke for " << request->chunk_handle();
       reply->set_status(RevokeLeaseReply::REJECTED_NOT_FOUND);
       return grpc::Status::OK;
@@ -109,7 +108,7 @@ grpc::Status ChunkServerLeaseServiceImpl::RevokeLease(
   absl::Time original_lease_expiration_time = absl::FromUnixSeconds(
       request->original_lease_expiration_time().seconds());
   if (original_lease_expiration_time <
-      current_lease_expiration_time_or.ValueOrDie()) {
+      current_lease_expiration_time_or.value()) {
     LOG(INFO) << "Server already holds a newer lease that expires in future: "
               << request->chunk_handle();
     reply->set_status(RevokeLeaseReply::IGNORED_HAS_NEWER_LEASE);

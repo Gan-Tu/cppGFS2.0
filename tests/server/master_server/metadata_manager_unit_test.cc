@@ -8,6 +8,9 @@
 using namespace gfs::server;
 using namespace tests;
 
+using google::protobuf::util::IsAlreadyExists;
+using google::protobuf::util::IsNotFound;
+
 class MetadataManagerUnitTest : public ::testing::Test {
  protected:
   void SetUp() override { metadata_manager_ = MetadataManager::GetInstance(); }
@@ -23,12 +26,12 @@ TEST_F(MetadataManagerUnitTest, CreateSingleFileMetadata) {
   EXPECT_TRUE(metadata_manager_->ExistFileMetadata("/foo"));
   auto foo_metadata_or(metadata_manager_->GetFileMetadata("/foo"));
   EXPECT_TRUE(foo_metadata_or.ok());
-  auto foo_metadata(foo_metadata_or.ValueOrDie());
+  auto foo_metadata(foo_metadata_or.value());
   EXPECT_EQ(foo_metadata->filename(), "/foo");
 
   auto first_chunk_handle_or(metadata_manager_->CreateChunkHandle("/foo", 0));
   EXPECT_TRUE(first_chunk_handle_or.ok());
-  auto first_chunk_handle(first_chunk_handle_or.ValueOrDie());
+  auto first_chunk_handle(first_chunk_handle_or.value());
   EXPECT_EQ(first_chunk_handle, "0");
   EXPECT_EQ(foo_metadata->chunk_handles_size(), (unsigned int)1);
 }
@@ -56,7 +59,7 @@ TEST_F(MetadataManagerUnitTest, CreateMultiFileMetadataInParallel) {
     EXPECT_TRUE(metadata_manager_->ExistFileMetadata(filename));
     auto file_metadata_or(metadata_manager_->GetFileMetadata(filename));
     EXPECT_TRUE(file_metadata_or.ok());
-    auto file_metadata(file_metadata_or.ValueOrDie());
+    auto file_metadata(file_metadata_or.value());
     EXPECT_EQ(file_metadata->filename(), filename);
     auto& chunk_handles(*file_metadata->mutable_chunk_handles());
     // Ensure that chunk handle exists for chunk_index 0 for each file
@@ -105,7 +108,7 @@ TEST_F(MetadataManagerUnitTest, CreateSingleFileMultiChunksInParallel) {
 
   auto file_metadata_or(metadata_manager_->GetFileMetadata(filename));
   EXPECT_TRUE(file_metadata_or.ok());
-  auto file_metadata(file_metadata_or.ValueOrDie());
+  auto file_metadata(file_metadata_or.value());
   EXPECT_EQ(file_metadata->filename(), filename);
   std::set<std::string> unique_id;
   EXPECT_EQ(file_metadata->chunk_handles_size(), numOfThreads);
@@ -143,8 +146,7 @@ TEST_F(MetadataManagerUnitTest, ConcurrentChunkCreationOverlap) {
         auto create_chunk_handle_or(
             metadata_manager_->CreateChunkHandle(filename, chunk_id));
         if (!create_chunk_handle_or.ok()) {
-          EXPECT_EQ(create_chunk_handle_or.status().error_code(),
-                    google::protobuf::util::error::ALREADY_EXISTS);
+          EXPECT_TRUE(IsAlreadyExists(create_chunk_handle_or.status()));
           cnt_fail++;
         }
       }
@@ -162,7 +164,7 @@ TEST_F(MetadataManagerUnitTest, ConcurrentChunkCreationOverlap) {
   // Verify that the the expected number of chunks are created for the file
   auto file_metadata_or(metadata_manager_->GetFileMetadata(filename));
   EXPECT_TRUE(file_metadata_or.ok());
-  auto file_metadata(file_metadata_or.ValueOrDie());
+  auto file_metadata(file_metadata_or.value());
   EXPECT_EQ(file_metadata->chunk_handles_size(), num_of_chunk_per_file);
 }
 
@@ -175,27 +177,23 @@ TEST_F(MetadataManagerUnitTest, CheckErrorCases) {
   auto new_filename("/newFile");
   auto create_metadata(metadata_manager_->CreateFileMetadata(new_filename));
   EXPECT_TRUE(create_metadata.ok());
-  auto duplicate_create_metadata_or(
+  auto duplicate_create_metadata_status(
       metadata_manager_->CreateFileMetadata(new_filename));
-  EXPECT_EQ(duplicate_create_metadata_or.error_code(),
-            google::protobuf::util::error::ALREADY_EXISTS);
+  EXPECT_TRUE(IsAlreadyExists(duplicate_create_metadata_status));
 
   auto non_exist_file("/nonExist");
   auto non_exist_metadata_or(
       metadata_manager_->GetFileMetadata(non_exist_file));
-  EXPECT_EQ(non_exist_metadata_or.status().error_code(),
-            google::protobuf::util::error::NOT_FOUND);
+  EXPECT_TRUE(IsNotFound(non_exist_metadata_or.status()));
 
-  auto non_exist_chunk_handle(
+  auto non_exist_chunk_handle_or(
       metadata_manager_->CreateChunkHandle(non_exist_file, 0));
-  EXPECT_EQ(non_exist_chunk_handle.status().error_code(),
-            google::protobuf::util::error::NOT_FOUND);
+  EXPECT_TRUE(IsNotFound(non_exist_chunk_handle_or.status()));
 
   auto non_exist_file2("/newFile/foo");
-  auto non_exist_chunk_handle2(
+  auto non_exist_chunk_handle2_or(
       metadata_manager_->CreateChunkHandle(non_exist_file2, 0));
-  EXPECT_EQ(non_exist_chunk_handle2.status().error_code(),
-            google::protobuf::util::error::NOT_FOUND);
+  EXPECT_TRUE(IsNotFound(non_exist_chunk_handle2_or.status()));
 }
 
 // Stress test for contentious creation of file metadata. We spawn
@@ -272,7 +270,7 @@ TEST_F(MetadataManagerUnitTest, ConcurrentFileChunkCreationStressTest) {
         auto create_chunk_handle_or(
             metadata_manager_->CreateChunkHandle(filename, chunk_id));
         EXPECT_TRUE(create_chunk_handle_or.ok());
-        std::string chunk_handle(create_chunk_handle_or.ValueOrDie());
+        std::string chunk_handle(create_chunk_handle_or.value());
         assigned_chunk_handles.insert(chunk_handle);
       }
     }));
@@ -292,7 +290,7 @@ TEST_F(MetadataManagerUnitTest, ConcurrentFileChunkCreationStressTest) {
               metadata_manager_->GetChunkHandle(filename, chunk_id);
         }
 
-        std::string chunk_handle(get_chunk_handle_or.ValueOrDie());
+        std::string chunk_handle(get_chunk_handle_or.value());
         observed_chunk_handles.insert(chunk_handle);
       }
     }));
@@ -314,7 +312,7 @@ TEST_F(MetadataManagerUnitTest, ConcurrentFileChunkCreationStressTest) {
 
     auto file_metadata_or(metadata_manager_->GetFileMetadata(filename));
     EXPECT_TRUE(file_metadata_or.ok());
-    auto file_metadata(file_metadata_or.ValueOrDie());
+    auto file_metadata(file_metadata_or.value());
     EXPECT_EQ(file_metadata->chunk_handles_size(), num_of_chunk_per_file);
   }
 }
@@ -326,7 +324,7 @@ TEST_F(MetadataManagerUnitTest, SingleSetAndGetFileChunkMetadata) {
   auto create_chunk_handle_or(
       metadata_manager_->CreateChunkHandle(filename, 0));
   EXPECT_TRUE(create_chunk_handle_or.ok());
-  auto chunk_handle(create_chunk_handle_or.ValueOrDie());
+  auto chunk_handle(create_chunk_handle_or.value());
   // Set a chunk metadata entry with the following:
   // chunk_handle : value assigned above
   // version : default (0)
@@ -341,7 +339,7 @@ TEST_F(MetadataManagerUnitTest, SingleSetAndGetFileChunkMetadata) {
 
   auto chunk_data2_or(metadata_manager_->GetFileChunkMetadata(chunk_handle));
   EXPECT_TRUE(chunk_data2_or.ok());
-  auto chunk_data2(chunk_data2_or.ValueOrDie());
+  auto chunk_data2(chunk_data2_or.value());
 
   EXPECT_EQ(chunk_data2.chunk_handle(), chunk_data.chunk_handle());
   EXPECT_EQ(chunk_data2.version(), 0);
@@ -359,7 +357,7 @@ TEST_F(MetadataManagerUnitTest, AdvanceChunkVersionAndSetPrimaryLocationTest) {
   auto create_chunk_handle_or(
       metadata_manager_->CreateChunkHandle(filename, 0));
   EXPECT_TRUE(create_chunk_handle_or.ok());
-  auto chunk_handle(create_chunk_handle_or.ValueOrDie());
+  auto chunk_handle(create_chunk_handle_or.value());
   // Set a chunk metadata entry with the following:
   // chunk_handle : value assigned above
   // version : default (0)
@@ -382,7 +380,7 @@ TEST_F(MetadataManagerUnitTest, AdvanceChunkVersionAndSetPrimaryLocationTest) {
   auto chunk_data_read_or(
       metadata_manager_->GetFileChunkMetadata(chunk_handle));
   EXPECT_TRUE(chunk_data_read_or.ok());
-  auto chunk_data_read(chunk_data_read_or.ValueOrDie());
+  auto chunk_data_read(chunk_data_read_or.value());
   EXPECT_EQ(chunk_data_read.version(), num_of_version_advancement);
 
   // // Test set / remove primary location works as intended
@@ -392,7 +390,7 @@ TEST_F(MetadataManagerUnitTest, AdvanceChunkVersionAndSetPrimaryLocationTest) {
   // metadata_manager_->SetPrimaryChunkServerLocation(
   //     chunk_handle, new_primary_location);
   // chunk_data_read_or = metadata_manager_->GetFileChunkMetadata(chunk_handle);
-  // chunk_data_read = chunk_data_read_or.ValueOrDie();
+  // chunk_data_read = chunk_data_read_or.value();
   // EXPECT_EQ(chunk_data_read.primary_location().server_port(), 5001);
 
   // // Update to another new one
@@ -400,13 +398,13 @@ TEST_F(MetadataManagerUnitTest, AdvanceChunkVersionAndSetPrimaryLocationTest) {
   // metadata_manager_->SetPrimaryChunkServerLocation(
   //     chunk_handle, new_primary_location);
   // chunk_data_read_or = metadata_manager_->GetFileChunkMetadata(chunk_handle);
-  // chunk_data_read = chunk_data_read_or.ValueOrDie();
+  // chunk_data_read = chunk_data_read_or.value();
   // EXPECT_EQ(chunk_data_read.primary_location().server_port(), 5002);
 
   // // Unset a primary location
   // metadata_manager_->RemovePrimaryChunkServerLocation(chunk_handle);
   // chunk_data_read_or = metadata_manager_->GetFileChunkMetadata(chunk_handle);
-  // chunk_data_read = chunk_data_read_or.ValueOrDie();
+  // chunk_data_read = chunk_data_read_or.value();
   // EXPECT_EQ(chunk_data_read.primary_location().server_hostname(),"");
 }
 
@@ -432,7 +430,7 @@ TEST_F(MetadataManagerUnitTest, UpdateChunkMetadataInParallelTest) {
         int chunk_index = i * num_of_chunk_per_file + chunk_id;
         auto chunk_handle(
             metadata_manager_->CreateChunkHandle(filename, chunk_index)
-                .ValueOrDie());
+                .value());
 
         protos::FileChunkMetadata chunk_data;
         InitializeChunkMetadata(chunk_data, chunk_handle, 0,
@@ -450,7 +448,7 @@ TEST_F(MetadataManagerUnitTest, UpdateChunkMetadataInParallelTest) {
           metadata_manager_->AdvanceChunkVersion(chunk_handle);
         }
 
-        //Set the primary location 
+        // Set the primary location
         auto new_primary_location(
             ChunkServerLocationBuilder("localhost", 5002));
         metadata_manager_->SetPrimaryLeaseMetadata(
@@ -465,10 +463,10 @@ TEST_F(MetadataManagerUnitTest, UpdateChunkMetadataInParallelTest) {
   for (int i = 0; i < num_of_threads; i++) {
     for (int chunk_id = 0; chunk_id < num_of_chunk_per_file; chunk_id++) {
       int chunk_index = i * num_of_chunk_per_file + chunk_id;
-      auto chunk_handle(metadata_manager_->GetChunkHandle(filename, chunk_index)
-                            .ValueOrDie());
+      auto chunk_handle(
+          metadata_manager_->GetChunkHandle(filename, chunk_index).value());
       auto chunk_data(
-          metadata_manager_->GetFileChunkMetadata(chunk_handle).ValueOrDie());
+          metadata_manager_->GetFileChunkMetadata(chunk_handle).value());
       EXPECT_EQ(chunk_data.version(), chunk_id);
       // EXPECT_EQ(chunk_data.primary_location().server_port(), 5002);
 
@@ -485,8 +483,8 @@ TEST_F(MetadataManagerUnitTest, UpdateChunkMetadataInParallelTest) {
 }
 
 // Have some simple concurrent creation / deletion, first create file "del0",
-// then create file "del1", and delete "del0" concurrently, then create file 
-// "del2", and delete "del1" concurrently. Make sure that at the end only the 
+// then create file "del1", and delete "del0" concurrently, then create file
+// "del2", and delete "del1" concurrently. Make sure that at the end only the
 // last file is present
 TEST_F(MetadataManagerUnitTest, FileDeletionTest) {
   std::string filename_base("/FileToBeDeleted");
@@ -500,7 +498,7 @@ TEST_F(MetadataManagerUnitTest, FileDeletionTest) {
 
   for (int i = 1; i < num_of_threads; i++) {
     threads.push_back(std::thread([&, i]() {
-      std::string filename_to_be_deleted(filename_base + std::to_string(i-1));
+      std::string filename_to_be_deleted(filename_base + std::to_string(i - 1));
       metadata_manager_->DeleteFileAndChunkMetadata(filename_to_be_deleted);
     }));
 
@@ -508,9 +506,9 @@ TEST_F(MetadataManagerUnitTest, FileDeletionTest) {
       std::string filename_to_be_created(filename_base + std::to_string(i));
       metadata_manager_->CreateFileMetadata(filename_to_be_created);
       for (int j = 0; j < num_of_chunk_per_file; j++) {
-        auto chunk_handle_or = 
+        auto chunk_handle_or =
             metadata_manager_->CreateChunkHandle(filename_to_be_created, j);
-        auto chunk_handle(chunk_handle_or.ValueOrDie());
+        auto chunk_handle(chunk_handle_or.value());
         // If this is not the last batch, it would get deleted so mark them
         if (i < num_of_threads - 1) {
           deleted_chunk_handles.insert(chunk_handle);
@@ -531,7 +529,7 @@ TEST_F(MetadataManagerUnitTest, FileDeletionTest) {
     JoinAndClearThreads(threads);
   }
 
-  // Verify that only the last file exists, and all chunk handles that are 
+  // Verify that only the last file exists, and all chunk handles that are
   // supposed to be deleted were deleted
   for (int i = 0; i < num_of_threads; i++) {
     std::string filename(filename_base + std::to_string(i));
@@ -542,12 +540,11 @@ TEST_F(MetadataManagerUnitTest, FileDeletionTest) {
     }
   }
 
-  for(auto& deleted_chunk_handle : deleted_chunk_handles) {
-    auto get_chunk_data(metadata_manager_->GetFileChunkMetadata(
-                            deleted_chunk_handle));
+  for (auto& deleted_chunk_handle : deleted_chunk_handles) {
+    auto get_chunk_data(
+        metadata_manager_->GetFileChunkMetadata(deleted_chunk_handle));
     EXPECT_FALSE(get_chunk_data.ok());
-    EXPECT_EQ(get_chunk_data.status().error_code(),
-              google::protobuf::util::error::NOT_FOUND);
+    EXPECT_TRUE(IsNotFound(get_chunk_data.status()));
   }
 }
 
@@ -564,7 +561,7 @@ TEST_F(MetadataManagerUnitTest, FileDeletionConcurrentTest) {
     metadata_manager_->CreateFileMetadata(filename);
     for (int j = 0; j < num_of_chunk_per_file; j++) {
       auto chunk_handle(
-          metadata_manager_->CreateChunkHandle(filename, j).ValueOrDie());
+          metadata_manager_->CreateChunkHandle(filename, j).value());
       protos::FileChunkMetadata chunk_data;
       InitializeChunkMetadata(chunk_data, chunk_handle, 0,
                               std::make_pair("localhost", 5000),
@@ -591,11 +588,10 @@ TEST_F(MetadataManagerUnitTest, FileDeletionConcurrentTest) {
     EXPECT_FALSE(metadata_manager_->ExistFileMetadata(filename));
   }
 
-  for(auto& deleted_chunk_handle : deleted_chunk_handles) {
-    auto get_chunk_data(metadata_manager_->GetFileChunkMetadata(
-                            deleted_chunk_handle));
+  for (auto& deleted_chunk_handle : deleted_chunk_handles) {
+    auto get_chunk_data(
+        metadata_manager_->GetFileChunkMetadata(deleted_chunk_handle));
     EXPECT_FALSE(get_chunk_data.ok());
-    EXPECT_EQ(get_chunk_data.status().error_code(),
-              google::protobuf::util::error::NOT_FOUND);
+    EXPECT_TRUE(IsNotFound(get_chunk_data.status()));
   }
 }

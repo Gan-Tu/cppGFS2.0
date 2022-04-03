@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
 
   // Initialize configurations
   LOG(INFO) << "Reading GFS configuration: " << config_path;
-  ConfigManager* config = ConfigManager::GetConfig(config_path).ValueOrDie();
+  ConfigManager* config = ConfigManager::GetConfig(config_path).value();
   if (!config->HasChunkServer(chunk_server_name)) {
     LOG(ERROR) << "No chunk server found in config: " << chunk_server_name;
     return 1;
@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
                << chunk_server_impl_or.status();
     return 1;
   }
-  ChunkServerImpl* chunk_server_impl = chunk_server_impl_or.ValueOrDie();
+  ChunkServerImpl* chunk_server_impl = chunk_server_impl_or.value();
   LOG(INFO) << "Chunk server initialized...";
 
   // Initialize gRPC protocol clients for talking to the master server(s) that

@@ -15,26 +15,27 @@ A [distributed Google File System (GFS)](https://research.google/pubs/pub51), im
 
 In this project, we plan to use [Bazel](http://bazel.build) as our main build tool. You can install Bazel by following their website [instructions](https://docs.bazel.build/versions/master/install.html).
 
-For MacOS, you can use Homebrew:
+As of writing, you will need at least Bazel version 5.1.0 for a proper working demo.
+
+Installation scripts have been provided to install bazel in `scripts` folder.
+
+For example, for Linux, run with desired Bazel version:
 
 ```
-brew tap bazelbuild/tap
-brew install bazelbuild/tap/bazel
+export BAZEL_VERSION=5.1.0
+chmod +x scripts/install_bazel_linux_x86_64.sh
+scripts/install_bazel_linux_x86_64.sh
 ```
 
-For Linux, you can run the `scripts/install_bazel.sh` with desired Bazel version:
+For MacBook (Intel Chip), use `scripts/install_bazel_darwin_x86_64.sh`.
 
-```
-export BAZEL_VERSION=3.1.0
-chmod +x scripts/install_bazel.sh
-scripts/install_bazel.sh
-```
+For MacBook (Apple Chips), use `scripts/install_bazel_darwin_arm64.sh`.
 
 Then, from the root directory, you can run Bazel commands as normal. For example:
 
 ```
-bazel build --features=-supports_dynamic_linker ...
-bazel test --features=-supports_dynamic_linker --test_output=errors ...
+bazel build ...
+bazel test --test_output=errors ...
 ```
 
 To learn more about how to use Bazel, or how to write Bazel build rule for C++, see the [official documentation](https://docs.bazel.build/versions/master/bazel-overview.html).
@@ -50,7 +51,7 @@ You can either write a binary by importing the GFS client at `src/client/gfs_cli
 To build the command line binary, run
 
 ```
-bazel build --features=-supports_dynamic_linker :gfs_client_main
+bazel build :gfs_client_main
 ```
 
 Then, you can run any of these modes:
@@ -64,7 +65,7 @@ bazel-bin/gfs_client_main --mode=read --filename=/test --offset=0 --nbytes=100
 
 # To write a file
 # This will create the file if it doesn't exist; if you don't want this behavior,
-# use the 'mode_no_create' mode instead
+# use the 'write_no_create' mode instead
 bazel-bin/gfs_client_main --mode=write --filename=/test --offset=0 --data='Hello World!'
 ```
 
@@ -77,6 +78,8 @@ To start all servers and expose respective server ports outside of Docker for co
 ```
 docker-compose up --build
 ```
+
+_As of writing, the Dockerfile doesn't support MacBook M1 Max yet. You will need to manually update the file to install/use a ARM64 compatible Bazel image. You can refer to the `scripts` folder for installation instructions._
 
 Then, you can use GFS client to interact with the cluster.
 

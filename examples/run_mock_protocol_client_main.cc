@@ -45,7 +45,7 @@ template <typename T, typename U>
 void LogRequestAndResponse(T request, StatusOr<U> reply_or) {
   LOG(INFO) << "Request sent: \n" << request.DebugString();
   if (reply_or.ok()) {
-    LOG(INFO) << "Response received: \n" << reply_or.ValueOrDie().DebugString();
+    LOG(INFO) << "Response received: \n" << reply_or.value().DebugString();
   } else {
     LOG(ERROR) << "Request failed: \n" << reply_or.status().ToString();
   }
@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
 
   // Initialize configurations
   LOG(INFO) << "Reading GFS configuration: " << config_path;
-  ConfigManager* config = ConfigManager::GetConfig(config_path).ValueOrDie();
+  ConfigManager* config = ConfigManager::GetConfig(config_path).value();
   if (!config->HasMasterServer(master_name)) {
     LOG(ERROR) << "No master server found in config: " << master_name;
     return 1;

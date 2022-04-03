@@ -97,7 +97,7 @@ static void BM_OPEN_WITH_CREATE_MODE_MULTI_THREADED(benchmark::State& state) {
   for (auto _ : state) {
     auto status_or =
         gfs::client::open(absl::StrCat("/open_with_create_t_",
-                                       state.thread_index, "_", rand_string())
+                                       state.thread_index(), "_", rand_string())
                               .c_str(),
                           gfs::OpenFlag::Create);
     state.PauseTiming();

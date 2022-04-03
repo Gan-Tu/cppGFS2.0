@@ -8,6 +8,11 @@ using protos::FileMetadata;
 namespace gfs {
 namespace server {
 
+using google::protobuf::util::AlreadyExistsError;
+using google::protobuf::util::IsAlreadyExists;
+using google::protobuf::util::NotFoundError;
+using google::protobuf::util::OkStatus;
+
 MetadataManager::MetadataManager() {
   lock_manager_ = LockManager::GetInstance();
 }
@@ -33,19 +38,18 @@ google::protobuf::util::Status MetadataManager::CreateFileMetadata(
   // Step 2. Add a new lock for this new file, and writeLock it
   auto path_lock_or(lock_manager_->CreateLock(filename));
   if (!path_lock_or.ok()) {
-    if (path_lock_or.status().error_code() == 
-            google::protobuf::util::error::ALREADY_EXISTS) {
-      // If lock creation fail due to ALREADY_EXISTS, we fetch the lock. 
-      // We do so because we support file metadata deletion and re-creation, 
+    if (IsAlreadyExists(path_lock_or.status())) {
+      // If lock creation fail due to ALREADY_EXISTS, we fetch the lock.
+      // We do so because we support file metadata deletion and re-creation,
       // and since we do not delete locks (doing so would make things even more
-      // complex), the line below would be always be successful. 
+      // complex), the line below would be always be successful.
       path_lock_or = lock_manager_->FetchLock(filename);
     } else {
       return path_lock_or.status();
     }
   }
 
-  absl::WriterMutexLock path_writer_lock_guard(path_lock_or.ValueOrDie());
+  absl::WriterMutexLock path_writer_lock_guard(path_lock_or.value());
 
   // Step 3. Instantiate a FileMetadata object.
   auto new_file_metadata(std::make_shared<FileMetadata>());
@@ -57,11 +61,9 @@ google::protobuf::util::Status MetadataManager::CreateFileMetadata(
       file_metadata_.TryInsert(filename, new_file_metadata));
 
   if (!try_create_file_metadata) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::ALREADY_EXISTS,
-        "File metadata already exists for " + filename);
+    return AlreadyExistsError("File metadata already exists for " + filename);
   }
-  return google::protobuf::util::Status::OK;
+  return OkStatus();
 }
 
 bool MetadataManager::ExistFileMetadata(const std::string& filename) {
@@ -73,9 +75,7 @@ MetadataManager::GetFileMetadata(const std::string& filename) {
   auto try_get_file_metadata(file_metadata_.TryGetValue(filename));
 
   if (!try_get_file_metadata.second) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::NOT_FOUND,
-        "File metadata does not exist: " + filename);
+    return NotFoundError("File metadata does not exist: " + filename);
   }
   return try_get_file_metadata.first;
 }
@@ -109,14 +109,14 @@ MetadataManager::CreateChunkHandle(const std::string& filename,
 
     // This writer lock is to protect the creation of a chunk handle for
     // the given file
-    absl::WriterMutexLock path_writer_lock_guard(path_lock_or.ValueOrDie());
+    absl::WriterMutexLock path_writer_lock_guard(path_lock_or.value());
 
     // Step 3. fetch the file metadata
     auto file_metadata_or(GetFileMetadata(filename));
     if (!file_metadata_or.ok()) {
       return file_metadata_or.status();
     }
-    auto file_metadata(file_metadata_or.ValueOrDie());
+    auto file_metadata(file_metadata_or.value());
 
     // Step 4. compute a new chunk handle, and insert the (chunk_index,
     // chunkHandle)
@@ -126,10 +126,8 @@ MetadataManager::CreateChunkHandle(const std::string& filename,
 
     // Return null UUID if this chunk_index exists
     if (chunk_handle_map.contains(chunk_index)) {
-      return google::protobuf::util::Status(
-          google::protobuf::util::error::ALREADY_EXISTS,
-          "Chunk " + std::to_string(chunk_index) + "already exists in file " +
-              filename);
+      return AlreadyExistsError("Chunk " + std::to_string(chunk_index) +
+                                "already exists in file " + filename);
     }
 
     chunk_handle_map[chunk_index] = new_chunk_handle;
@@ -159,24 +157,22 @@ google::protobuf::util::StatusOr<std::string> MetadataManager::GetChunkHandle(
     return path_lock_or.status();
   }
 
-  absl::ReaderMutexLock path_reader_lock_guard(path_lock_or.ValueOrDie());
+  absl::ReaderMutexLock path_reader_lock_guard(path_lock_or.value());
 
   // Step 3. fetch the file metadata
   auto file_metadata_or(GetFileMetadata(filename));
   if (!file_metadata_or.ok()) {
     return file_metadata_or.status();
   }
-  auto file_metadata(file_metadata_or.ValueOrDie());
+  auto file_metadata(file_metadata_or.value());
 
   // Step 4. fetch the chunk handle
   auto const& chunk_handle_map(file_metadata->chunk_handles());
 
   // If chunk_index does not exist, return error
   if (!chunk_handle_map.contains(chunk_index)) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::NOT_FOUND,
-        "Chunk " + std::to_string(chunk_index) + "not found in file " +
-            filename);
+    return NotFoundError("Chunk " + std::to_string(chunk_index) +
+                         "not found in file " + filename);
   }
 
   return chunk_handle_map.at(chunk_index);
@@ -193,11 +189,11 @@ google::protobuf::util::Status MetadataManager::AdvanceChunkVersion(
   // chunk's version number, as GFS does not support arbitrary concurrent
   // write. Therefore, here we simply increment the chunk's version number
   // and update the FileChunkMetadata
-  protos::FileChunkMetadata chunk_data(chunk_data_or.ValueOrDie());
+  protos::FileChunkMetadata chunk_data(chunk_data_or.value());
   chunk_data.set_version(chunk_data.version() + 1);
   SetFileChunkMetadata(chunk_data);
 
-  return google::protobuf::util::Status::OK;
+  return OkStatus();
 }
 
 bool MetadataManager::ExistFileChunkMetadata(const std::string& chunk_handle) {
@@ -209,9 +205,8 @@ MetadataManager::GetFileChunkMetadata(const std::string& chunk_handle) {
   auto try_get_chunk_data(chunk_metadata_.TryGetValue(chunk_handle));
 
   if (!try_get_chunk_data.second) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::NOT_FOUND,
-        "Chunk handle " + chunk_handle + "'s metadata not found.");
+    return NotFoundError("Chunk handle " + chunk_handle +
+                         "'s metadata not found.");
   }
 
   return try_get_chunk_data.first;
@@ -248,10 +243,10 @@ MetadataManager::GetPrimaryLeaseMetadata(const std::string& chunk_handle) {
 
 // Delete the file metadata, furthermore, delete all chunk handles assocated
 // with that file metadata, this means all the associated chunk metadata
-// are removed from the metadata manager. The chunk server will detect the 
+// are removed from the metadata manager. The chunk server will detect the
 // corresonding chunk handle is no longer existing and therefore garbage collect
 // them when finding them out via heartbeat mechanism.
-// Note that we do not rename upon deletion as described from the paper. 
+// Note that we do not rename upon deletion as described from the paper.
 void MetadataManager::DeleteFileAndChunkMetadata(const std::string& filename) {
   // Step 1. readlock the parent directories
   ParentLocksAnchor parentLockAnchor(lock_manager_, filename);
@@ -268,23 +263,23 @@ void MetadataManager::DeleteFileAndChunkMetadata(const std::string& filename) {
   }
 
   // This writer lock to protect this file, as we are deleting it
-  absl::WriterMutexLock path_writer_lock_guard(path_lock_or.ValueOrDie());
+  absl::WriterMutexLock path_writer_lock_guard(path_lock_or.value());
 
   // Step 3. fetch the file metadata
   auto file_metadata_or(GetFileMetadata(filename));
   if (!file_metadata_or.ok()) {
     return;
   }
-  auto file_metadata(file_metadata_or.ValueOrDie());
+  auto file_metadata(file_metadata_or.value());
 
-  // Now we can remove the smart pointer of the file metadata from the 
+  // Now we can remove the smart pointer of the file metadata from the
   // file_metadata collection
   file_metadata_.Erase(filename);
 
   // We can still access the file metadata as the shared pointer anchored it
   // Delete all the file chunk metadata
   for (auto& chunk_index_and_chunk_handle : file_metadata->chunk_handles()) {
-    DeleteFileChunkMetadata(chunk_index_and_chunk_handle.second);  
+    DeleteFileChunkMetadata(chunk_index_and_chunk_handle.second);
   }
 }
 

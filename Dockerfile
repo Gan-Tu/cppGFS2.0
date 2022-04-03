@@ -1,7 +1,7 @@
 # Use pre-built image of ubuntu with bazel
 FROM tugan0329/bazel-linux:latest
 WORKDIR /app
-RUN apt update --fix-missing && apt upgrade
+RUN apt update --fix-missing
 RUN apt-get install -y python3
 COPY WORKSPACE ./
 COPY data ./data

@@ -58,10 +58,10 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
     return common::utils::ConvertProtobufStatusToGrpcStatus(
         chunk_handle_or.status());
   } else {
-    LOG(INFO) << "Chunk handle created: " << chunk_handle_or.ValueOrDie()
+    LOG(INFO) << "Chunk handle created: " << chunk_handle_or.value()
               << " for file " << filename;
   }
-  const std::string& chunk_handle(chunk_handle_or.ValueOrDie());
+  const std::string& chunk_handle(chunk_handle_or.value());
 
   // Step 2. Allocate chunk servers for this file chunk
   const ushort num_of_chunk_replica(3);
@@ -108,7 +108,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkCreation(
     if (!init_chunk_or.ok()) {
       LOG(WARNING) << "InitFileChunkRequest for " << chunk_handle
                    << " sent to chunk server " << server_address
-                   << " failed: " << init_chunk_or.status().error_message();
+                   << " failed: " << init_chunk_or.status().message();
       // TODO(xi): should undo file creation and file allocations
       return common::utils::ConvertProtobufStatusToGrpcStatus(
           init_chunk_or.status());
@@ -151,7 +151,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileCreation(
   google::protobuf::util::Status status(
       metadata_manager()->CreateFileMetadata(filename));
   if (!status.ok()) {
-    LOG(ERROR) << "File metadata creation failed: " << status.error_message();
+    LOG(ERROR) << "File metadata creation failed: " << status.message();
     return common::utils::ConvertProtobufStatusToGrpcStatus(status);
   } else {
     LOG(INFO) << "File metadata created for " << filename;
@@ -191,13 +191,13 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
 
   if (!chunk_handle_or.ok()) {
     LOG(ERROR) << "Error encountered when accessing chunk handle : "
-               << chunk_handle_or.status().error_message();
+               << chunk_handle_or.status().message();
     return common::utils::ConvertProtobufStatusToGrpcStatus(
         chunk_handle_or.status());
   }
 
   // Step 2. Access the file chunk metadata
-  const std::string& chunk_handle(chunk_handle_or.ValueOrDie());
+  const std::string& chunk_handle(chunk_handle_or.value());
   google::protobuf::util::StatusOr<FileChunkMetadata> file_chunk_metadata_or(
       metadata_manager()->GetFileChunkMetadata(chunk_handle));
 
@@ -208,7 +208,7 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkRead(
   }
 
   // Set the file chunk metadata in reply
-  FileChunkMetadata metadata = file_chunk_metadata_or.ValueOrDie();
+  FileChunkMetadata metadata = file_chunk_metadata_or.value();
   reply->mutable_metadata()->set_chunk_handle(chunk_handle);
   reply->mutable_metadata()->set_version(metadata.version());
   for (auto chunk_server_location :
@@ -268,15 +268,15 @@ grpc::Status MasterMetadataServiceImpl::HandleFileChunkWrite(
   }
 
   google::protobuf::util::StatusOr<FileChunkMetadata> file_chunk_metadata_or(
-      metadata_manager()->GetFileChunkMetadata(chunk_handle_or.ValueOrDie()));
+      metadata_manager()->GetFileChunkMetadata(chunk_handle_or.value()));
   if (!file_chunk_metadata_or.ok()) {
     LOG(ERROR) << "File chunk metadata not accessible for "
-               << chunk_handle_or.ValueOrDie();
+               << chunk_handle_or.value();
     return common::utils::ConvertProtobufStatusToGrpcStatus(
         file_chunk_metadata_or.status());
   }
 
-  FileChunkMetadata metadata = file_chunk_metadata_or.ValueOrDie();
+  FileChunkMetadata metadata = file_chunk_metadata_or.value();
   const std::string& chunk_handle(metadata.chunk_handle());
   uint32_t chunk_version = metadata.version();
   uint32_t new_chunk_version = chunk_version + 1;

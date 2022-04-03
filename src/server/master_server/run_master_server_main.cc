@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
 
   // Initialize configurations
   LOG(INFO) << "Reading GFS configuration: " << config_path;
-  ConfigManager* config = ConfigManager::GetConfig(config_path).ValueOrDie();
+  ConfigManager* config = ConfigManager::GetConfig(config_path).value();
   if (!config->HasMasterServer(master_name)) {
     LOG(ERROR) << "No master server found in config: " << master_name;
     return 1;

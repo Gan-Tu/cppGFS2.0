@@ -8,8 +8,15 @@
 #include "src/common/system_logger.h"
 
 namespace gfs {
-
 namespace server {
+
+using google::protobuf::util::AlreadyExistsError;
+using google::protobuf::util::InternalError;
+using google::protobuf::util::NotFoundError;
+using google::protobuf::util::OkStatus;
+using google::protobuf::util::OutOfRangeError;
+using google::protobuf::util::UnimplementedError;
+using google::protobuf::util::UnknownError;
 
 FileChunkManager::FileChunkManager()
     : chunk_database_(nullptr), max_chunk_size_bytes_(0) {}
@@ -63,11 +70,9 @@ google::protobuf::util::Status FileChunkManager::CreateChunk(
   if (db_read_iterator->Valid() && db_read_iterator->status().ok() &&
       db_read_iterator->key() == chunk_handle) {
     // already exist
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::ALREADY_EXISTS,
-        absl::StrCat(
-            "Chunk already exist with the specified handle. Found handle=",
-            db_read_iterator->key().ToString()));
+    return AlreadyExistsError(absl::StrCat(
+        "Chunk already exist with the specified handle. Found handle=",
+        db_read_iterator->key().ToString()));
   }
 
   // Assuming no concurrent create operation for the same handle. Since it's
@@ -81,12 +86,11 @@ google::protobuf::util::Status FileChunkManager::CreateChunk(
 
   if (!status.ok()) {
     // write failed
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::UNKNOWN,
+    return UnknownError(
         absl::StrCat("Failed creating new chunk. Status: ", status.ToString()));
   }
 
-  return google::protobuf::util::Status::OK;
+  return OkStatus();
 }
 
 google::protobuf::util::StatusOr<std::string> FileChunkManager::ReadFromChunk(
@@ -99,15 +103,13 @@ google::protobuf::util::StatusOr<std::string> FileChunkManager::ReadFromChunk(
     return result.status();
   }
 
-  auto file_chunk = result.ValueOrDie();
+  auto file_chunk = result.value();
 
   // Check that we aren't trying to read data that isn't there
   if (start_offset > file_chunk->data().length()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::OUT_OF_RANGE,
-        absl::StrCat(
-            "Read start offset is after end of chunk. End of chunk (bytes): ",
-            file_chunk->data().length()));
+    return OutOfRangeError(absl::StrCat(
+        "Read start offset is after end of chunk. End of chunk (bytes): ",
+        file_chunk->data().length()));
   }
 
   // This may return less than length, if chunk doesn't have up to that.
@@ -125,17 +127,15 @@ google::protobuf::util::StatusOr<uint32_t> FileChunkManager::WriteToChunk(
     return result.status();
   }
 
-  auto file_chunk = result.ValueOrDie();
+  auto file_chunk = result.value();
 
   // Update the fetched data
 
   // Write must start from an existing offset or current end of chunk.
   if (start_offset > file_chunk->data().length()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::OUT_OF_RANGE,
-        absl::StrCat(
-            "Write start offset is after end of chunk. End of chunk (bytes): ",
-            file_chunk->data().length()));
+    return OutOfRangeError(absl::StrCat(
+        "Write start offset is after end of chunk. End of chunk (bytes): ",
+        file_chunk->data().length()));
   }
 
   // Can write past the current length but not more than max chunk size.
@@ -143,8 +143,7 @@ google::protobuf::util::StatusOr<uint32_t> FileChunkManager::WriteToChunk(
 
   if (remaining_bytes == 0) {
     // Chunk is full, can't write
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::OUT_OF_RANGE,
+    return OutOfRangeError(
         absl::StrCat("Chunk is full. Max chunk size (bytes): ",
                      this->max_chunk_size_bytes_));
   }
@@ -164,8 +163,7 @@ google::protobuf::util::StatusOr<uint32_t> FileChunkManager::WriteToChunk(
 
   if (!status.ok()) {
     // write failed
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::UNKNOWN,
+    return UnknownError(
         absl::StrCat("Failed while writing data. Status: ", status.ToString()));
   }
 
@@ -182,7 +180,7 @@ google::protobuf::util::Status FileChunkManager::UpdateChunkVersion(
     return result.status();
   }
 
-  auto file_chunk = result.ValueOrDie();
+  auto file_chunk = result.value();
 
   // Update the version in memory, since we found the chunk with the
   // from_version
@@ -192,13 +190,11 @@ google::protobuf::util::Status FileChunkManager::UpdateChunkVersion(
 
   if (!status.ok()) {
     // version update failed
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::UNKNOWN,
-        absl::StrCat("Failed while updating version. Status: ",
-                     status.ToString()));
+    return UnknownError(absl::StrCat("Failed while updating version. Status: ",
+                                     status.ToString()));
   }
 
-  return google::protobuf::util::Status::OK;
+  return OkStatus();
 }
 
 google::protobuf::util::StatusOr<uint32_t> FileChunkManager::GetChunkVersion(
@@ -210,15 +206,13 @@ google::protobuf::util::StatusOr<uint32_t> FileChunkManager::GetChunkVersion(
     return result.status();
   }
 
-  return result.ValueOrDie()->version();
+  return result.value()->version();
 }
 
 google::protobuf::util::StatusOr<uint32_t> FileChunkManager::AppendToChunk(
     const std::string& chunk_handle, const uint32_t& append_version,
     const uint32_t& length, const std::string& new_data) {
-  return google::protobuf::util::Status(
-      google::protobuf::util::error::UNIMPLEMENTED,
-      "Append not implemented yet.");
+  return UnimplementedError("Append not implemented yet.");
 }
 
 google::protobuf::util::StatusOr<std::shared_ptr<protos::FileChunk>>
@@ -229,8 +223,7 @@ FileChunkManager::GetFileChunk(const std::string& chunk_handle) {
 
   if (!status.ok()) {
     // chunk handle not found
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::NOT_FOUND,
+    return NotFoundError(
         absl::StrCat("Chunk not found. Handle=", chunk_handle,
                      " Status: ", status.ToString()));
   }
@@ -238,9 +231,7 @@ FileChunkManager::GetFileChunk(const std::string& chunk_handle) {
   std::shared_ptr<protos::FileChunk> file_chunk(new protos::FileChunk());
 
   if (!file_chunk->ParseFromString(existing_data)) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::INTERNAL,
-        "Failed to parse data from disk.");
+    return InternalError("Failed to parse data from disk.");
   }
 
   return file_chunk;
@@ -256,13 +247,12 @@ FileChunkManager::GetFileChunk(const std::string& chunk_handle,
     return result.status();
   }
 
-  auto& file_chunk = result.ValueOrDie();
+  auto& file_chunk = result.value();
 
   // check version
   if (file_chunk->version() != version) {
     // wrong version
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::NOT_FOUND,
+    return NotFoundError(
         absl::StrCat("Specified version for ", chunk_handle,
                      " doesn't match current version. Specified=",
                      std::to_string(version),
@@ -292,12 +282,11 @@ google::protobuf::util::Status FileChunkManager::DeleteChunk(
       this->chunk_database_->Delete(leveldb::WriteOptions(), chunk_handle);
 
   if (!status.ok()) {
-    return google::protobuf::util::Status(
-        google::protobuf::util::error::UNKNOWN,
+    return UnknownError(
         absl::StrCat("Deletion failed. Status: ", status.ToString()));
   }
 
-  return google::protobuf::util::Status::OK;
+  return OkStatus();
 }
 
 std::list<protos::FileChunkMetadata>

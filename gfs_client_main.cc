@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
     StatusOr<gfs::client::Data> read_result =
         gfs::client::read(filename.c_str(), offset, nbytes);
     if (read_result.ok()) {
-      gfs::client::Data data = read_result.ValueOrDie();
+      gfs::client::Data data = read_result.value();
       LOG(INFO) << "Read " << data.bytes_read << " bytes of data from "
                 << filename;
       LOG(INFO) << "Data read: '" << (char*)data.buffer << "'";

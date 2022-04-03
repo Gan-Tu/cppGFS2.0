@@ -66,7 +66,7 @@ void StartTestServer() {
   StatusOr<ChunkServerImpl*> chunk_server_or =
       ChunkServerImpl::ConstructChunkServerImpl(kTestConfigPath,
                                                 kTestServerName);
-  ChunkServerImpl* chunk_server = chunk_server_or.ValueOrDie();
+  ChunkServerImpl* chunk_server = chunk_server_or.value();
   SeedTestData(chunk_server);  // seed test data
   ChunkServerLeaseServiceImpl lease_service(chunk_server);
   builder.RegisterService(&lease_service);
@@ -110,7 +110,7 @@ TEST_F(ChunkServerLeaseImplTest, GrantLeaseValidRequest) {
   grpc::ClientContext client_context;
   auto reply_or = server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(), GrantLeaseReply::ACCEPTED);
+  EXPECT_EQ(reply_or.value().status(), GrantLeaseReply::ACCEPTED);
 }
 
 TEST_F(ChunkServerLeaseImplTest, GrantLeaseNoChunkHandle) {
@@ -120,7 +120,7 @@ TEST_F(ChunkServerLeaseImplTest, GrantLeaseNoChunkHandle) {
   grpc::ClientContext client_context;
   auto reply_or = server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             GrantLeaseReply::REJECTED_NOT_FOUND);
 }
 
@@ -131,7 +131,7 @@ TEST_F(ChunkServerLeaseImplTest, GrantLeaseStaleVersionOnServer) {
   grpc::ClientContext client_context;
   auto reply_or = server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             GrantLeaseReply::REJECTED_STALE_VERSION);
 }
 
@@ -142,7 +142,7 @@ TEST_F(ChunkServerLeaseImplTest, GrantLeaseStaleVersionInRequest) {
   grpc::ClientContext client_context;
   auto reply_or = server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(), GrantLeaseReply::UNKNOWN);
+  EXPECT_EQ(reply_or.value().status(), GrantLeaseReply::UNKNOWN);
 }
 
 TEST_F(ChunkServerLeaseImplTest, GrantLeaseExpiredLease) {
@@ -153,7 +153,7 @@ TEST_F(ChunkServerLeaseImplTest, GrantLeaseExpiredLease) {
   grpc::ClientContext client_context;
   auto reply_or = server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             GrantLeaseReply::IGNORED_EXPIRED_LEASE);
 }
 
@@ -164,7 +164,7 @@ TEST_F(ChunkServerLeaseImplTest, RevokeLeaseValidRequest) {
   grpc::ClientContext client_context;
   auto reply_or = server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(), RevokeLeaseReply::REVOKED);
+  EXPECT_EQ(reply_or.value().status(), RevokeLeaseReply::REVOKED);
 }
 
 TEST_F(ChunkServerLeaseImplTest, RevokeLeaseNewerLeaseAlreadyExists) {
@@ -175,7 +175,7 @@ TEST_F(ChunkServerLeaseImplTest, RevokeLeaseNewerLeaseAlreadyExists) {
   grpc::ClientContext client_context;
   auto reply_or = server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             RevokeLeaseReply::IGNORED_HAS_NEWER_LEASE);
 }
 
@@ -186,7 +186,7 @@ TEST_F(ChunkServerLeaseImplTest, RevokeLeaseNoChunkHandle) {
   grpc::ClientContext client_context;
   auto reply_or = server_client_->SendRequest(req, client_context);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.ValueOrDie().status(),
+  EXPECT_EQ(reply_or.value().status(),
             RevokeLeaseReply::REJECTED_NOT_FOUND);
 }
 

@@ -8,6 +8,9 @@
 using namespace gfs::server;
 using namespace tests;
 
+using google::protobuf::util::IsAlreadyExists;
+using google::protobuf::util::IsNotFound;
+
 class LockManagerUnitTest : public ::testing::Test {
  protected:
   void SetUp() override { lockManager_ = LockManager::GetInstance(); }
@@ -21,11 +24,11 @@ TEST_F(LockManagerUnitTest, AddLock) {
   // Successfully add a lock for /foo
   auto foo_lock_or(lockManager_->CreateLock("/foo"));
   EXPECT_TRUE(foo_lock_or.ok());
-  EXPECT_NE(foo_lock_or.ValueOrDie(), nullptr);
+  EXPECT_NE(foo_lock_or.value(), nullptr);
   // Successfully add a lock for /foo/bar
   auto bar_lock_or(lockManager_->CreateLock("/foo/bar"));
   EXPECT_TRUE(bar_lock_or.ok());
-  EXPECT_NE(bar_lock_or.ValueOrDie(), nullptr);
+  EXPECT_NE(bar_lock_or.value(), nullptr);
 }
 
 // Add locks in parallel for the case that they share nothing
@@ -71,11 +74,11 @@ TEST_F(LockManagerUnitTest, AddSameLockInParallel) {
 // works as expected by checking the stack size
 TEST_F(LockManagerUnitTest, AcquireLockForParentDir) {
   auto a_lock_or(lockManager_->CreateLock("/a"));
-  EXPECT_NE(a_lock_or.ValueOrDie(), nullptr);
+  EXPECT_NE(a_lock_or.value(), nullptr);
   auto b_lock_or(lockManager_->CreateLock("/a/b"));
-  EXPECT_NE(b_lock_or.ValueOrDie(), nullptr);
+  EXPECT_NE(b_lock_or.value(), nullptr);
   auto c_lock_or(lockManager_->CreateLock("/a/b/c"));
-  EXPECT_NE(c_lock_or.ValueOrDie(), nullptr);
+  EXPECT_NE(c_lock_or.value(), nullptr);
 
   ParentLocksAnchor anchor(lockManager_, "/a/b/c");
   EXPECT_TRUE(anchor.ok());
@@ -92,17 +95,14 @@ TEST_F(LockManagerUnitTest, CheckErrorCases) {
   auto create_lock_or(lockManager_->CreateLock("/duplicate"));
   EXPECT_TRUE(create_lock_or.ok());
   auto duplicate_create_lock_or(lockManager_->CreateLock("/duplicate"));
-  EXPECT_EQ(duplicate_create_lock_or.status().error_code(),
-            google::protobuf::util::error::ALREADY_EXISTS);
+  EXPECT_TRUE(IsAlreadyExists(duplicate_create_lock_or.status()));
 
   auto non_exist_lock_or(lockManager_->FetchLock("/nonExist"));
   EXPECT_EQ(non_exist_lock_or.ok(), false);
-  EXPECT_EQ(non_exist_lock_or.status().error_code(),
-            google::protobuf::util::error::NOT_FOUND);
+  EXPECT_TRUE(IsNotFound(non_exist_lock_or.status()));
 
   auto non_exist_path_lock_or("/aa/bb/cc");
   ParentLocksAnchor anchor(lockManager_, non_exist_path_lock_or);
   EXPECT_EQ(anchor.ok(), false);
-  EXPECT_EQ(anchor.status().error_code(),
-            google::protobuf::util::error::NOT_FOUND);
+  EXPECT_TRUE(IsNotFound(anchor.status()));
 }

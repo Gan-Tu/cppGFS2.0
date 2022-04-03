@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
   gfs::common::SystemLogger::GetInstance().Initialize(/*program_name=*/argv[0]);
 
   ConfigManager* config =
-      ConfigManager::GetConfig(absl::GetFlag(FLAGS_config_path)).ValueOrDie();
+      ConfigManager::GetConfig(absl::GetFlag(FLAGS_config_path)).value();
 
   for (std::string& server_name : config->GetAllMasterServers()) {
     LOG(INFO) << "Master server: " << server_name

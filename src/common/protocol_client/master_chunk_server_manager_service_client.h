@@ -34,7 +34,7 @@ namespace service {
 //  StatusOr<ReportChunkServerReply> status_or =
 //    client.SendRequest(request, client_context);
 //  if (status_or.ok()) {
-//    LOG(INFO) << status_or.ValueOrDie().DebugString() << std::endl;
+//    LOG(INFO) << status_or.value().DebugString() << std::endl;
 //  }
 class MasterChunkServerManagerServiceClient {
  public:

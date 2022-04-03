@@ -11,6 +11,7 @@ using gfs::common::ConfigManager;
 using gfs::common::thread_safe_flat_hash_map;
 using gfs::service::ChunkServerServiceChunkServerClient;
 using gfs::service::MasterChunkServerManagerServiceClient;
+using google::protobuf::util::NotFoundError;
 using google::protobuf::util::Status;
 using google::protobuf::util::StatusOr;
 using protos::grpc::ReportChunkServerRequest;
@@ -38,7 +39,7 @@ StatusOr<ChunkServerImpl*> ChunkServerImpl::ConstructChunkServerImpl(
   if (!config_manager_or.ok()) {
     return config_manager_or.status();
   }
-  return new ChunkServerImpl(config_manager_or.ValueOrDie(), chunk_server_name,
+  return new ChunkServerImpl(config_manager_or.value(), chunk_server_name,
                              resolve_hostname);
 }
 
@@ -65,8 +66,7 @@ bool ChunkServerImpl::HasWriteLease(const std::string& file_handle) {
 StatusOr<absl::Time> ChunkServerImpl::GetLeaseExpirationTime(
     const std::string& file_handle) {
   if (!lease_and_expiration_unix_sec_.contains(file_handle)) {
-    return Status(
-        google::protobuf::util::error::NOT_FOUND,
+    return NotFoundError(
         absl::StrCat("Lease is not found for file handle: ", file_handle));
   } else {
     return absl::FromUnixSeconds(lease_and_expiration_unix_sec_[file_handle]);
@@ -161,7 +161,7 @@ bool ChunkServerImpl::ReportToMaster() {
     if (reply.ok()) {
       // Check the reply for stale chunks, if any, for deletion. Call the 
       // FileChunkManager to delete the file chunk
-      auto report_reply(reply.ValueOrDie());
+      auto report_reply(reply.value());
       for (auto& stale_chunk_handle : report_reply.stale_chunk_handles()) {
         LOG(INFO) << "Received stale / deleted chunk handle " 
                   << stale_chunk_handle << ". File chunk server deleting "

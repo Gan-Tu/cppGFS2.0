@@ -3,26 +3,23 @@
 #include "gtest/gtest.h"
 
 using namespace gfs::common::utils;
+using google::protobuf::util::IsInvalidArgument;
 
 class UtilsUnitTest : public ::testing::Test {};
 
 // Test different cases for checking the validity of a filename
 TEST_F(UtilsUnitTest, ValidPathnameTest) {
   auto emptyPathnameRes(CheckFilenameValidity(""));
-  EXPECT_EQ(emptyPathnameRes.error_code(),
-            google::protobuf::util::error::INVALID_ARGUMENT);
+  EXPECT_TRUE(IsInvalidArgument(emptyPathnameRes));
 
   auto relativePathnameRes(CheckFilenameValidity("a/b/c"));
-  EXPECT_EQ(relativePathnameRes.error_code(),
-            google::protobuf::util::error::INVALID_ARGUMENT);
+  EXPECT_TRUE(IsInvalidArgument(relativePathnameRes));
 
   auto trailingSlashPathnameRes(CheckFilenameValidity("/a/b/c/"));
-  EXPECT_EQ(trailingSlashPathnameRes.error_code(),
-            google::protobuf::util::error::INVALID_ARGUMENT);
+  EXPECT_TRUE(IsInvalidArgument(trailingSlashPathnameRes));
 
   auto consecutiveSlashPathnameRes(CheckFilenameValidity("//a/b//c"));
-  EXPECT_EQ(consecutiveSlashPathnameRes.error_code(),
-            google::protobuf::util::error::INVALID_ARGUMENT);
+  EXPECT_TRUE(IsInvalidArgument(consecutiveSlashPathnameRes));
 
   auto validPathnameRes(CheckFilenameValidity("/foo/bar/baz"));
   EXPECT_TRUE(validPathnameRes.ok());

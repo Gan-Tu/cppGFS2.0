@@ -62,7 +62,7 @@ class MasterChunkServerManagerServiceTest : public ::testing::Test {
   void SetUp() override {
     // Create the config manager for the test to read test config.
     config_mgr_ = std::shared_ptr<ConfigManager>(
-        ConfigManager::GetConfig(kTestConfigPath).ValueOrDie());
+        ConfigManager::GetConfig(kTestConfigPath).value());
   }
 
   // Executed after each test method in the suite.
@@ -81,7 +81,7 @@ TEST_F(MasterChunkServerManagerServiceTest, ReportChunkServerTest) {
   StatusOr<ChunkServerImpl*> chunk_server_or =
       ChunkServerImpl::ConstructChunkServerImpl(kTestConfigPath,
                                                 kTestChunkServerName);
-  ChunkServerImpl* chunk_server = chunk_server_or.ValueOrDie();
+  ChunkServerImpl* chunk_server = chunk_server_or.value();
 
   // Get the master server address
   const std::string master_server_address = config_mgr_->GetServerAddress(

@@ -13,11 +13,13 @@
 #include "src/server/chunk_server/file_chunk_manager.h"
 
 using gfs::common::utils::ConvertProtobufStatusToGrpcStatus;
-using google::protobuf::util::Status;
-using google::protobuf::util::StatusOr;
-using StatusCode = google::protobuf::util::error::Code;
 using gfs::server::ChunkDataCacheManager;
 using gfs::service::ChunkServerServiceChunkServerClient;
+using google::protobuf::util::IsAlreadyExists;
+using google::protobuf::util::IsNotFound;
+using google::protobuf::util::IsOutOfRange;
+using google::protobuf::util::Status;
+using google::protobuf::util::StatusOr;
 using grpc::ServerContext;
 using protos::grpc::AdvanceFileChunkVersionReply;
 using protos::grpc::AdvanceFileChunkVersionRequest;
@@ -32,6 +34,7 @@ using protos::grpc::SendChunkDataReply;
 using protos::grpc::SendChunkDataRequest;
 using protos::grpc::WriteFileChunkReply;
 using protos::grpc::WriteFileChunkRequest;
+
 using namespace gfs::common::utils;
 
 namespace gfs {
@@ -58,7 +61,7 @@ grpc::Status ChunkServerFileServiceImpl::InitFileChunk(
               << request->chunk_handle();
     reply->set_status(InitFileChunkReply::CREATED);
     return grpc::Status::OK;
-  } else if (status.error_code() == StatusCode::ALREADY_EXISTS) {
+  } else if (IsAlreadyExists(status)) {
     // ALREADY EXISTS
     LOG(ERROR) << "Cannot initialize file chunk because it already exits: "
                << request->chunk_handle();
@@ -92,24 +95,24 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
   if (data_or.ok()) {
     // SUCCESS
     reply->set_status(ReadFileChunkReply::OK);
-    reply->set_data(data_or.ValueOrDie());
+    reply->set_data(data_or.value());
     reply->set_bytes_read(reply->data().length());
     LOG(INFO) << "Successfully read " << reply->bytes_read() << " bytes of "
               << request->chunk_handle();
     return grpc::Status::OK;
-  } else if (data_or.status().error_code() == StatusCode::OUT_OF_RANGE) {
+  } else if (IsOutOfRange(data_or.status())) {
     // OUT OF RANGE
     LOG(ERROR) << "Cannot read file chunk because the requested offset is out"
                << " of range for " << request->chunk_handle() << ": "
                << data_or.status().ToString();
     reply->set_status(ReadFileChunkReply::FAILED_OUT_OF_RANGE);
     return grpc::Status::OK;
-  } else if (data_or.status().error_code() == StatusCode::NOT_FOUND) {
+  } else if (IsNotFound(data_or.status())) {
     StatusOr<uint32_t> version_or =
         file_manager_->GetChunkVersion(request->chunk_handle());
     if (!version_or.ok()) {
       // NOT FOUND: file handle
-      if (version_or.status().error_code() == StatusCode::NOT_FOUND) {
+      if (IsNotFound(version_or.status())) {
         LOG(ERROR) << "Cannot read file chunk because it is not found: "
                    << request->chunk_handle();
         reply->set_status(ReadFileChunkReply::FAILED_NOT_FOUND);
@@ -125,7 +128,7 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
       // NOT FOUND: stale version
       LOG(ERROR) << "Cannot read file chunk because it is stale: "
                  << request->chunk_handle();
-      LOG(ERROR) << "Chunk server has version " << version_or.ValueOrDie()
+      LOG(ERROR) << "Chunk server has version " << version_or.value()
                  << " but a different version is requested: "
                  << request->chunk_version();
       reply->set_status(ReadFileChunkReply::FAILED_VERSION_OUT_OF_SYNC);
@@ -235,7 +238,7 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
 
     FileChunkMutationStatus apply_mutation_status;
     if (apply_mutation_reply.ok()) {
-      apply_mutation_status = apply_mutation_reply.ValueOrDie().status();
+      apply_mutation_status = apply_mutation_reply.value().status();
 
       LOG(INFO) << "Received apply mutation status: " << apply_mutation_status
                 << " for file chunk: " << request_header.chunk_handle()
@@ -279,12 +282,12 @@ grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
     reply->set_status(AdvanceFileChunkVersionReply::OK);
     reply->set_chunk_version(request->new_chunk_version());
     return grpc::Status::OK;
-  } else if (status.error_code() == StatusCode::NOT_FOUND) {
+  } else if (IsNotFound(status)) {
     StatusOr<uint32_t> version_or =
         file_manager_->GetChunkVersion(request->chunk_handle());
     if (!version_or.ok()) {
       // NOT FOUND: file handle
-      if (version_or.status().error_code() == StatusCode::NOT_FOUND) {
+      if (IsNotFound(version_or.status())) {
         LOG(ERROR)
             << "Cannot advance file chunk version because it is not found: "
             << request->chunk_handle();
@@ -301,7 +304,7 @@ grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
       // NOT FOUND: stale version
       LOG(ERROR) << "Cannot advance file chunk, because version is out of sync "
                  << request->chunk_handle();
-      LOG(ERROR) << "Chunk server has version " << version_or.ValueOrDie()
+      LOG(ERROR) << "Chunk server has version " << version_or.value()
                  << " but the request tries to update version from "
                  << from_version << " to " << request->new_chunk_version();
       reply->set_status(
@@ -361,14 +364,13 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
   // Do the actual disk write
   auto write_result = file_manager_->WriteToChunk(
       request_header.chunk_handle(), request_header.chunk_version(),
-      request_header.offset_start(), request_header.length(),
-      data_or.ValueOrDie());
+      request_header.offset_start(), request_header.length(), data_or.value());
 
   grpc::Status return_status = grpc::Status::OK;
 
   if (write_result.ok()) {
     // Write successful
-    auto num_bytes_written = write_result.ValueOrDie();
+    auto num_bytes_written = write_result.value();
     LOG(INFO) << "Write successful for file chunk: "
               << request_header.chunk_handle()
               << " Bytes written: " << num_bytes_written;
@@ -377,13 +379,13 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
     reply->set_status(FileChunkMutationStatus::OK);
   } else {
     // Write failed, lets see why it failed
-    auto error_code = write_result.status().error_code();
+    auto status = write_result.status();
 
     LOG(ERROR) << "Write failed for file chunk: "
                << request_header.chunk_handle()
-               << ", Error code: " << error_code;
+               << ", Error code: " << status;
 
-    if (error_code == StatusCode::NOT_FOUND) {
+    if (IsNotFound(status)) {
       // See why it wasn't found
       // Get the current chunk version
       StatusOr<uint32_t> version_result =
@@ -395,13 +397,12 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
                    << request_header.chunk_handle()
                    << " because the requested version: "
                    << request_header.chunk_version()
-                   << " is stale. Current version: "
-                   << version_result.ValueOrDie();
+                   << " is stale. Current version: " << version_result.value();
         reply->set_status(FileChunkMutationStatus::FAILED_STALE_VERSION);
       } else {
         // Get version failed, maybe chunk doesn't exist.
         // NOT FOUND: file handle
-        if (version_result.status().error_code() == StatusCode::NOT_FOUND) {
+        if (IsNotFound(version_result.status())) {
           LOG(ERROR) << "Cannot write to file chunk because it is not found: "
                      << request_header.chunk_handle();
           reply->set_status(FileChunkMutationStatus::FAILED_DATA_NOT_FOUND);
@@ -416,7 +417,7 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
               ConvertProtobufStatusToGrpcStatus(version_result.status());
         }
       }
-    } else if (error_code == StatusCode::OUT_OF_RANGE) {
+    } else if (IsOutOfRange(status)) {
       LOG(ERROR) << "Failed to write file chunk because the write offset "
                  << request_header.offset_start()
                  << " is out of the allowed range. Status: "
