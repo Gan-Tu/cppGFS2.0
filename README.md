@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/Gan-Tu/cppGFS2.0.svg?branch=master)](https://travis-ci.com/Gan-Tu/cppGFS2.0)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Gan-Tu/cppGFS2.0)
 ![Docker Image Build](https://github.com/Gan-Tu/cppGFS2.0/workflows/Docker%20Image%20CI/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
