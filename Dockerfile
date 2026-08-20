@@ -14,9 +14,12 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     python3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install bazelisk, which fetches the Bazel version pinned by .bazelversion
-RUN curl -fsSL \
-    "https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-${TARGETARCH}" \
+# Install bazelisk, which fetches the Bazel version pinned by .bazelversion.
+# TARGETARCH is only auto-populated under BuildKit; fall back to the build
+# machine's architecture so legacy builds fail loudly rather than 404
+RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && curl -fsSL \
+    "https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-${arch}" \
     -o /usr/local/bin/bazel \
     && chmod +x /usr/local/bin/bazel
 

@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cppGFS2.0 Playground</title>
+<style>
+  :root {
+    --bg: #f7f7f8; --card: #ffffff; --border: #e7e7ec;
+    --ink: #17171c; --muted: #75757f; --faint: #a5a5b0;
+    --accent: #4f46e5; --accent-soft: #eef2ff;
+    --ok: #10b981; --ok-soft: #ecfdf5;
+    --danger: #ef4444; --danger-soft: #fef2f2;
+    --warn: #f59e0b; --warn-soft: #fffbeb;
+    --repair: #8b5cf6; --repair-soft: #f5f3ff;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 28px; border-bottom: 1px solid var(--border);
+    background: var(--card); position: sticky; top: 0; z-index: 20;
+  }
+  header .logo { width: 34px; height: 34px; flex: none; }
+  header h1 { font-size: 17px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+  header .sub { color: var(--muted); font-size: 13px; margin-top: 1px; }
+  header .spacer { flex: 1; }
+  .uptime { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .uptime b { color: var(--ink); font-weight: 600; }
+
+  .layout {
+    display: grid; grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 22px; padding: 22px 28px; max-width: 1480px; margin: 0 auto;
+  }
+  @media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 22px;
+    box-shadow: 0 1px 2px rgba(20,20,30,.04);
+  }
+  .card + .card { margin-top: 22px; }
+  .card h2 {
+    margin: 0 0 4px; font-size: 13px; font-weight: 650;
+    text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
+  }
+  .card .hint { color: var(--faint); font-size: 12.5px; margin: 0 0 16px; }
+
+  /* ---- cluster ---- */
+  .cluster { position: relative; }
+  .cluster svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  .tier { position: relative; z-index: 1; display: flex; justify-content: center; gap: 18px; }
+  .tier.masters { margin-bottom: 64px; }
+  .node {
+    width: 220px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--card); padding: 13px 15px 12px;
+    transition: transform .25s cubic-bezier(.2,.9,.3,1.4), opacity .3s, border-color .3s, box-shadow .3s;
+  }
+  .node.down { opacity: .62; border-color: #f3d1d1; background: #fffafa; }
+  .node.gone { animation: shake .45s; }
+  @keyframes shake {
+    20% { transform: translateX(-5px) rotate(-.6deg); }
+    50% { transform: translateX(4px) rotate(.5deg); }
+    80% { transform: translateX(-2px); }
+  }
+  .node.arrive { animation: pop .5s cubic-bezier(.2,.9,.3,1.4); }
+  @keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.03); } }
+  .node .top { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--ok); position: relative; }
+  .dot.on::after {
+    content: ""; position: absolute; inset: -4px; border-radius: 50%;
+    border: 2px solid var(--ok); opacity: .5; animation: pulse 2s ease-out infinite;
+  }
+  @keyframes pulse { 0% { transform: scale(.4); opacity: .7; } 100% { transform: scale(1.25); opacity: 0; } }
+  .dot.off { background: var(--danger); }
+  .node .name { font-weight: 640; font-size: 13.5px; cursor: pointer; }
+  .node .name:hover { color: var(--accent); }
+  .node .meta { color: var(--muted); font-size: 11.5px; margin: 5px 0 10px; font-variant-numeric: tabular-nums; }
+  .node .meta .wiped { color: var(--danger); font-weight: 600; }
+  .node .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  button {
+    font: 600 12px/1 inherit; padding: 7px 11px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); color: var(--ink);
+    cursor: pointer; transition: background .15s, transform .1s, border-color .15s;
+  }
+  button:hover:not(:disabled) { background: #f4f4f6; }
+  button:active:not(:disabled) { transform: scale(.97); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.b-danger { color: var(--danger); border-color: #f6caca; background: var(--danger-soft); }
+  button.b-danger:hover:not(:disabled) { background: #fde5e5; }
+  button.b-ok { color: #067a58; border-color: #bfe8d9; background: var(--ok-soft); }
+  button.b-ok:hover:not(:disabled) { background: #dcfaef; }
+  button.b-accent { color: #fff; background: var(--accent); border-color: var(--accent); }
+  button.b-accent:hover:not(:disabled) { background: #4338ca; }
+
+  /* ---- files ---- */
+  .frow { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  input[type=text], input[type=number] {
+    font: 13.5px var(--mono); padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: #fcfcfd; color: var(--ink); outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .out {
+    margin-top: 14px; padding: 12px 14px; border-radius: 10px;
+    background: #fafafb; border: 1px dashed var(--border);
+    font: 12.5px/1.6 var(--mono); white-space: pre-wrap; word-break: break-all;
+    min-height: 20px; color: var(--muted);
+  }
+  .out.good { border-color: #bfe8d9; background: var(--ok-soft); color: #066b4e; }
+  .out.bad { border-color: #f6caca; background: var(--danger-soft); color: #b91c1c; }
+  .chips { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 12px; }
+  .chip {
+    font: 600 12px var(--mono); padding: 5px 11px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); cursor: pointer;
+    border: 1px solid transparent; transition: border-color .15s;
+  }
+  .chip:hover { border-color: var(--accent); }
+
+  /* ---- scenarios ---- */
+  .scenarios { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .scenario { border: 1px solid var(--border); border-radius: 12px; padding: 15px 16px; display: flex; flex-direction: column; }
+  .scenario h3 { margin: 0 0 3px; font-size: 14px; font-weight: 650; }
+  .scenario p { margin: 0 0 12px; color: var(--muted); font-size: 12.5px; }
+  .steps { list-style: none; margin: 0 0 14px; padding: 0; display: none; }
+  .scenario.active .steps, .scenario.finished .steps { display: block; }
+  .steps li {
+    display: flex; gap: 8px; align-items: baseline;
+    font-size: 12.5px; color: var(--faint); padding: 3px 0; transition: color .2s;
+  }
+  .steps li .st { width: 15px; flex: none; text-align: center; font-size: 12px; }
+  .steps li.active { color: var(--ink); }
+  .steps li.active .st::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--accent); border-top-color: transparent; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .steps li.done { color: var(--muted); }
+  .steps li.done .st { color: var(--ok); }
+  .steps li.fail { color: var(--danger); }
+  .scenario .run { margin-top: auto; align-self: flex-start; }
+  .scenario.finished.ok-end { border-color: #bfe8d9; background: linear-gradient(0deg, var(--ok-soft), var(--card) 55%); }
+  .scenario.finished.fail-end { border-color: #f6caca; }
+
+  /* ---- feed ---- */
+  .feed-card { position: sticky; top: 92px; max-height: calc(100vh - 120px); display: flex; flex-direction: column; }
+  .feed { overflow-y: auto; margin: 4px -8px 0; padding: 0 8px; }
+  .ev { display: flex; gap: 10px; padding: 8px 2px; border-bottom: 1px solid #f1f1f4; animation: slidein .3s ease-out; }
+  @keyframes slidein { from { opacity: 0; transform: translateY(-6px); } }
+  .ev .edot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; }
+  .ev .etext { font-size: 12.8px; line-height: 1.45; }
+  .ev .etime { color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .sev-info .edot { background: var(--accent); }
+  .sev-success .edot { background: var(--ok); }
+  .sev-danger .edot { background: var(--danger); }
+  .sev-warn .edot { background: var(--warn); }
+  .sev-repair .edot { background: var(--repair); }
+  .feed-empty { color: var(--faint); font-size: 13px; padding: 18px 4px; }
+
+  /* ---- log modal ---- */
+  .modal-back {
+    position: fixed; inset: 0; background: rgba(20,20,30,.45); z-index: 50;
+    display: none; align-items: center; justify-content: center; padding: 30px;
+    backdrop-filter: blur(2px);
+  }
+  .modal-back.show { display: flex; }
+  .modal {
+    background: var(--card); border-radius: var(--radius); width: min(900px, 100%);
+    max-height: 80vh; display: flex; flex-direction: column; overflow: hidden;
+    animation: pop .35s cubic-bezier(.2,.9,.3,1.3);
+  }
+  .modal .mh { display: flex; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); gap: 10px; }
+  .modal .mh h3 { margin: 0; font-size: 14px; font-family: var(--mono); }
+  .modal pre {
+    margin: 0; padding: 14px 18px; overflow: auto; flex: 1;
+    font: 11.5px/1.55 var(--mono); background: #16161c; color: #d6d6de;
+  }
+  .wire { stroke: #d9d9e0; stroke-width: 1.5; stroke-dasharray: 5 6; }
+  .wire.dead { stroke: #f0caca; }
+</style>
+</head>
+<body>
+
+<header>
+  <svg class="logo" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+    <rect x="9" y="4" width="22" height="8" rx="2.5" fill="#4f46e5"/>
+    <rect x="4" y="16" width="14" height="8" rx="2.5" fill="#8b5cf6"/>
+    <rect x="22" y="16" width="14" height="8" rx="2.5" fill="#8b5cf6"/>
+    <rect x="4" y="28" width="14" height="8" rx="2.5" fill="#c4b5fd"/>
+    <rect x="22" y="28" width="14" height="8" rx="2.5" fill="#c4b5fd"/>
+  </svg>
+  <div>
+    <h1>cppGFS2.0 Playground</h1>
+    <div class="sub">Break the file system. Watch it heal.</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="uptime">cluster up <b id="uptime">–</b></div>
+</header>
+
+<div class="layout">
+  <main>
+    <section class="card cluster-card">
+      <h2>Cluster</h2>
+      <p class="hint">One master, three chunk servers, 3× replication. Kill a server or wipe its disk — reads keep working and the master heals the cluster. Click a server's name for its live log.</p>
+      <div class="cluster" id="cluster">
+        <svg class="wires" id="wires"></svg>
+        <div class="tier masters" id="tier-master"></div>
+        <div class="tier chunks" id="tier-chunk"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Files</h2>
+      <p class="hint">Operations run through the real GFS client against the cluster above.</p>
+      <div class="frow">
+        <div class="field" style="flex:1;min-width:170px">
+          <label for="f-name">filename</label>
+          <input type="text" id="f-name" value="/hello" spellcheck="false">
+        </div>
+        <div class="field" style="flex:2;min-width:220px">
+          <label for="f-data">data (for write)</label>
+          <input type="text" id="f-data" value="Hello, Google File System!" spellcheck="false">
+        </div>
+        <div class="field" style="width:86px">
+          <label for="f-offset">offset</label>
+          <input type="number" id="f-offset" value="0" min="0">
+        </div>
+      </div>
+      <div class="frow" style="margin-top:12px">
+        <button class="b-accent" id="b-write">Write</button>
+        <button id="b-read">Read</button>
+        <button id="b-create">Create</button>
+        <button class="b-danger" id="b-delete">Delete</button>
+      </div>
+      <div class="out" id="f-out">Ready.</div>
+      <div class="chips" id="f-chips"></div>
+    </section>
+
+    <section class="card">
+      <h2>Failure drills</h2>
+      <p class="hint">Guided, one-click scenarios. Each step runs against the live cluster — nothing is faked.</p>
+      <div class="scenarios" id="scenarios"></div>
+    </section>
+  </main>
+
+  <aside>
+    <section class="card feed-card">
+      <h2>Activity</h2>
+      <p class="hint" style="margin-bottom:6px">Live events from the servers' logs.</p>
+      <div class="feed" id="feed"><div class="feed-empty">Waiting for cluster events…</div></div>
+    </section>
+  </aside>
+</div>
+
+<div class="modal-back" id="modal-back">
+  <div class="modal">
+    <div class="mh">
+      <h3 id="modal-title">log</h3>
+      <div class="spacer" style="flex:1"></div>
+      <button id="modal-refresh">Refresh</button>
+      <button id="modal-close">Close</button>
+    </div>
+    <pre id="modal-body">…</pre>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => { const d = document.createElement("span"); d.textContent = s; return d.innerHTML; };
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function api(path, body) {
+  const opts = body ? { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) } : {};
+  const res = await fetch(path, opts);
+  return res.json();
+}
+
+/* ------------------------------------------------ state + polling */
+let servers = [], files = [], lastEventId = 0;
+const eventLog = [];           // all events seen this session
+const nodeEls = new Map();     // name -> element
+
+async function pollStatus() {
+  try {
+    const s = await api("/api/status");
+    servers = s.servers; files = s.files;
+    renderCluster(); renderChips();
+    $("uptime").textContent = fmtDur(s.uptime_s);
+  } catch (e) { /* server restarting */ }
+}
+
+async function pollEvents() {
+  try {
+    const r = await api(`/api/events?after=${lastEventId}`);
+    for (const ev of r.events) {
+      lastEventId = Math.max(lastEventId, ev.id);
+      eventLog.push(ev);
+      renderEvent(ev);
+      animateForEvent(ev);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function fmtDur(s) {
+  if (s < 90) return s + "s";
+  if (s < 5400) return Math.round(s / 60) + "m";
+  return (s / 3600).toFixed(1) + "h";
+}
+function fmtBytes(b) {
+  if (b < 1024) return b + " B";
+  if (b < 1048576) return (b / 1024).toFixed(1) + " KB";
+  return (b / 1048576).toFixed(1) + " MB";
+}
+
+/* ------------------------------------------------ cluster rendering */
+function renderCluster() {
+  for (const srv of servers) {
+    let el = nodeEls.get(srv.name);
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "node";
+      el.dataset.name = srv.name;
+      nodeEls.set(srv.name, el);
+      (srv.role === "master" ? $("tier-master") : $("tier-chunk")).appendChild(el);
+    }
+    const wasDown = el.classList.contains("down");
+    const wiped = !srv.running && !srv.db_present && srv.role === "chunk";
+    el.classList.toggle("down", !srv.running);
+    if (!srv.running && !wasDown) el.classList.add("gone"), setTimeout(() => el.classList.remove("gone"), 500);
+    if (srv.running && wasDown) el.classList.add("arrive"), setTimeout(() => el.classList.remove("arrive"), 600);
+
+    el.innerHTML = `
+      <div class="top">
+        <span class="dot ${srv.running ? "on" : "off"}"></span>
+        <span class="name" title="view log">${esc(srv.name)}</span>
+      </div>
+      <div class="meta">
+        ${srv.role === "master" ? "master" : "chunk server"} · :${srv.port} ·
+        ${srv.running ? "up " + fmtDur(srv.uptime_s) : "down"} ·
+        ${wiped ? '<span class="wiped">disk wiped</span>' : "disk " + fmtBytes(srv.db_size_bytes)}
+      </div>
+      <div class="actions"></div>`;
+    el.querySelector(".name").onclick = () => openLog(srv.name);
+
+    const actions = el.querySelector(".actions");
+    const mkBtn = (label, cls, fn, disabled) => {
+      const b = document.createElement("button");
+      b.textContent = label; if (cls) b.className = cls; b.disabled = !!disabled;
+      b.onclick = async () => { b.disabled = true; await fn(); await pollStatus(); };
+      actions.appendChild(b);
+    };
+    if (srv.running) {
+      mkBtn("Kill", "b-danger", () => api("/api/chaos/kill", { server: srv.name }));
+      if (srv.role === "master") mkBtn("Restart", "", () => api("/api/chaos/restart", { server: srv.name }));
+    } else {
+      mkBtn("Start", "b-ok", () => api("/api/chaos/start", { server: srv.name }));
+      if (srv.role === "chunk" && srv.db_present)
+        mkBtn("Wipe disk", "b-danger", () => api("/api/chaos/wipe", { server: srv.name }));
+    }
+  }
+  drawWires();
+}
+
+function drawWires() {
+  const svg = $("wires"), cluster = $("cluster");
+  const cRect = cluster.getBoundingClientRect();
+  svg.setAttribute("viewBox", `0 0 ${cRect.width} ${cRect.height}`);
+  let html = "";
+  const master = servers.find(s => s.role === "master");
+  if (!master) { svg.innerHTML = ""; return; }
+  const mEl = nodeEls.get(master.name);
+  if (!mEl) return;
+  const mR = mEl.getBoundingClientRect();
+  const mx = mR.left - cRect.left + mR.width / 2, my = mR.bottom - cRect.top;
+  for (const srv of servers) {
+    if (srv.role !== "chunk") continue;
+    const el = nodeEls.get(srv.name); if (!el) continue;
+    const r = el.getBoundingClientRect();
+    const x = r.left - cRect.left + r.width / 2, y = r.top - cRect.top;
+    html += `<path class="wire ${srv.running ? "" : "dead"}" fill="none"
+      d="M ${mx} ${my} C ${mx} ${my + 30}, ${x} ${y - 30}, ${x} ${y}"/>`;
+  }
+  svg.innerHTML = html;
+}
+window.addEventListener("resize", drawWires);
+
+/* particle: a little chunk square flying from one node to another */
+function flyChunk(fromName, toName, color) {
+  const from = nodeEls.get(fromName), to = nodeEls.get(toName), cluster = $("cluster");
+  if (!from || !to) return;
+  const cR = cluster.getBoundingClientRect(), fR = from.getBoundingClientRect(), tR = to.getBoundingClientRect();
+  const el = document.createElement("div");
+  el.style.cssText = `position:absolute;z-index:5;width:13px;height:13px;border-radius:4px;
+    background:${color};box-shadow:0 2px 8px ${color}66;pointer-events:none;
+    left:${fR.left - cR.left + fR.width / 2 - 6}px;top:${fR.top - cR.top + fR.height / 2 - 6}px;`;
+  cluster.appendChild(el);
+  const dx = (tR.left - fR.left), dy = (tR.top - fR.top);
+  el.animate(
+    [{ transform: "translate(0,0) scale(.6)", opacity: .2 },
+     { transform: `translate(${dx / 2}px,${dy / 2 - 34}px) scale(1.15)`, opacity: 1 },
+     { transform: `translate(${dx}px,${dy}px) scale(.7)`, opacity: 0 }],
+    { duration: 1100, easing: "cubic-bezier(.35,0,.25,1)" }
+  ).onfinish = () => el.remove();
+}
+
+function nodeByPort(text) {
+  const m = text.match(/:(\d{4,5})/);
+  if (!m) return null;
+  const srv = servers.find(s => String(s.port) === m[1]);
+  return srv ? srv.name : null;
+}
+function nodeByName(text) {
+  for (const s of servers) if (text.includes(s.name)) return s.name;
+  return null;
+}
+
+function animateForEvent(ev) {
+  if (ev.type === "rereplication") {
+    const src = nodeByName(ev.text.split("cloning from")[1] || "") || nodeByPort(ev.text.split("cloning from")[1] || "");
+    const dst = nodeByPort(ev.text.split("cloning from")[0]) || nodeByName(ev.text.split("cloning from")[0]);
+    if (src && dst) flyChunk(src, dst, "#8b5cf6");
+  } else if (ev.type === "lease") {
+    const dst = nodeByPort(ev.text) || nodeByName(ev.text);
+    const master = servers.find(s => s.role === "master");
+    if (master && dst) flyChunk(master.name, dst, "#4f46e5");
+  } else if (ev.type === "gc-done") {
+    const el = nodeEls.get(ev.server);
+    if (el) el.animate([{ opacity: 1 }, { opacity: .35 }, { opacity: 1 }], { duration: 600 });
+  }
+}
+
+/* ------------------------------------------------ activity feed */
+function renderEvent(ev) {
+  const feed = $("feed");
+  const empty = feed.querySelector(".feed-empty");
+  if (empty) empty.remove();
+  const el = document.createElement("div");
+  el.className = "ev sev-" + ev.severity;
+  el.innerHTML = `<span class="edot"></span>
+    <div><div class="etext">${esc(ev.text)}</div>
+    <div class="etime">${esc(ev.time)} · ${esc(ev.server)}</div></div>`;
+  feed.prepend(el);
+  while (feed.children.length > 120) feed.lastChild.remove();
+}
+
+/* ------------------------------------------------ files panel */
+function opOut(result, verb) {
+  const out = $("f-out");
+  out.className = "out " + (result.ok ? "good" : "bad");
+  if (result.ok && verb === "read")
+    out.textContent = `✓ read ${result.bytes_read} bytes\n${result.data}`;
+  else if (result.ok) out.textContent = `✓ ${verb} succeeded`;
+  else out.textContent = `✗ ${verb} failed — ${result.detail || "see server logs"}`;
+}
+function fileArgs() {
+  return { filename: $("f-name").value.trim(), data: $("f-data").value, offset: parseInt($("f-offset").value || "0", 10) };
+}
+$("b-create").onclick = async () => opOut(await api("/api/files/create", fileArgs()), "create");
+$("b-write").onclick = async () => { opOut(await api("/api/files/write", fileArgs()), "write"); pollStatus(); };
+$("b-delete").onclick = async () => { opOut(await api("/api/files/delete", fileArgs()), "delete"); pollStatus(); };
+$("b-read").onclick = async () => {
+  const a = fileArgs();
+  opOut(await api(`/api/files/read?filename=${encodeURIComponent(a.filename)}&offset=${a.offset}&nbytes=4096`), "read");
+};
+function renderChips() {
+  const box = $("f-chips");
+  box.innerHTML = "";
+  for (const f of files) {
+    const c = document.createElement("span");
+    c.className = "chip"; c.textContent = f.name;
+    c.title = `size ~${f.size ?? "?"} B`;
+    c.onclick = () => { $("f-name").value = f.name; };
+    box.appendChild(c);
+  }
+}
+
+/* ------------------------------------------------ log modal */
+let modalServer = null;
+async function openLog(name) {
+  modalServer = name;
+  $("modal-title").textContent = name + ".log";
+  $("modal-body").textContent = "loading…";
+  $("modal-back").classList.add("show");
+  refreshLog();
+}
+async function refreshLog() {
+  if (!modalServer) return;
+  const r = await api(`/api/logs?server=${encodeURIComponent(modalServer)}&lines=200`);
+  $("modal-body").textContent = (r.lines || []).join("\n") || "(empty)";
+  $("modal-body").scrollTop = $("modal-body").scrollHeight;
+}
+$("modal-refresh").onclick = refreshLog;
+$("modal-close").onclick = () => $("modal-back").classList.remove("show");
+$("modal-back").onclick = (e) => { if (e.target === $("modal-back")) $("modal-back").classList.remove("show"); };
+
+/* ------------------------------------------------ scenarios */
+function waitForEvent(pred, timeoutMs, sinceId) {
+  // Match events newer than the given mark (typically captured when the
+  // scenario started); defaulting to "now" would race events that arrive in
+  // the same poll batch as the step that triggered them
+  const mark = sinceId ?? lastEventId;
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      const hit = eventLog.find(e => e.id > mark && pred(e));
+      if (hit) return resolve(hit);
+      if (Date.now() > deadline) return reject(new Error("timed out waiting for the cluster — check the activity feed"));
+      setTimeout(tick, 600);
+    };
+    tick();
+  });
+}
+async function readVerify(filename, expect, attempts = 6) {
+  for (let i = 0; i < attempts; i++) {
+    const r = await api(`/api/files/read?filename=${encodeURIComponent(filename)}&offset=0&nbytes=4096`);
+    if (r.ok && r.data.startsWith(expect)) return r;
+    await sleep(2500);
+  }
+  throw new Error("read did not return the expected data");
+}
+const chunkName = (i) => servers.filter(s => s.role === "chunk")[i]?.name;
+
+const SCENARIOS = [
+  {
+    id: "crash", title: "Chunk server crash",
+    blurb: "Kill a replica holder mid-flight. Reads keep working off the remaining replicas; the master notices via heartbeats.",
+    steps: [
+      { label: "Write a file (3 replicas)", run: async (ctx) => {
+          ctx.file = "/drill-crash"; ctx.data = "survives-crash-" + Date.now();
+          const r = await api("/api/files/write", { filename: ctx.file, data: ctx.data, offset: 0 });
+          if (!r.ok) throw new Error(r.detail || "write failed"); } },
+      { label: "Kill a chunk server", run: async (ctx) => {
+          ctx.victim = chunkName(1);
+          await api("/api/chaos/kill", { server: ctx.victim }); } },
+      { label: "Master detects the failure (heartbeat)", run: (ctx) =>
+          waitForEvent(e => e.type === "server-lost", 45000,
+                       ctx.sinceEventId) },
+      { label: "Read the file — still served", run: (ctx) => readVerify(ctx.file, ctx.data) },
+      { label: "Bring the server back", run: async (ctx) => {
+          await api("/api/chaos/start", { server: ctx.victim });
+          await waitForEvent(e => e.type === "server-joined", 30000,
+                             ctx.sinceEventId); } },
+    ],
+  },
+  {
+    id: "disk", title: "Disk loss & self-healing",
+    blurb: "Wipe a chunk server's disk entirely. When it rejoins empty, the master re-replicates the missing chunks onto it from a live replica.",
+    steps: [
+      { label: "Write a file (3 replicas)", run: async (ctx) => {
+          ctx.file = "/drill-diskloss"; ctx.data = "heals-itself-" + Date.now();
+          const r = await api("/api/files/write", { filename: ctx.file, data: ctx.data, offset: 0 });
+          if (!r.ok) throw new Error(r.detail || "write failed"); } },
+      { label: "Kill a server and wipe its disk", run: async (ctx) => {
+          ctx.victim = chunkName(2);
+          await api("/api/chaos/kill", { server: ctx.victim });
+          await sleep(400);
+          const r = await api("/api/chaos/wipe", { server: ctx.victim });
+          if (!r.ok) throw new Error(r.detail || "wipe failed"); } },
+      { label: "Master unregisters the dead server", run: (ctx) =>
+          waitForEvent(e => e.type === "server-lost", 45000,
+                       ctx.sinceEventId) },
+      { label: "Restart it with an empty disk", run: async (ctx) => {
+          await api("/api/chaos/start", { server: ctx.victim });
+          await waitForEvent(e => e.type === "server-joined", 30000,
+                             ctx.sinceEventId); } },
+      { label: "Watch re-replication clone the chunk back", run: (ctx) =>
+          waitForEvent(e => e.type === "rereplication-done" || e.type === "clone-done",
+                       60000, ctx.sinceEventId) },
+      { label: "Read the file — intact", run: (ctx) => readVerify(ctx.file, ctx.data) },
+    ],
+  },
+  {
+    id: "master", title: "Master crash & recovery",
+    blurb: "Restart the master. Its namespace and chunk versions come back from the metadata store; chunk locations are re-learned from server reports.",
+    steps: [
+      { label: "Write a file", run: async (ctx) => {
+          ctx.file = "/drill-master"; ctx.data = "remembered-" + Date.now();
+          const r = await api("/api/files/write", { filename: ctx.file, data: ctx.data, offset: 0 });
+          if (!r.ok) throw new Error(r.detail || "write failed"); } },
+      { label: "Kill and restart the master", run: async () => {
+          const m = servers.find(s => s.role === "master");
+          await api("/api/chaos/restart", { server: m.name }); } },
+      { label: "Master recovers its metadata store", run: (ctx) =>
+          waitForEvent(e => e.type === "master-recovered", 30000,
+                       ctx.sinceEventId) },
+      { label: "Chunk servers re-report their chunks", run: (ctx) =>
+          waitForEvent(e => e.type === "server-joined", 30000,
+                       ctx.sinceEventId) },
+      { label: "Read the file — namespace survived", run: (ctx) => readVerify(ctx.file, ctx.data) },
+    ],
+  },
+];
+
+let scenarioRunning = false;
+function renderScenarios() {
+  const box = $("scenarios");
+  for (const sc of SCENARIOS) {
+    const el = document.createElement("div");
+    el.className = "scenario"; el.id = "sc-" + sc.id;
+    el.innerHTML = `<h3>${esc(sc.title)}</h3><p>${esc(sc.blurb)}</p>
+      <ol class="steps">${sc.steps.map(s =>
+        `<li><span class="st">·</span><span>${esc(s.label)}</span></li>`).join("")}</ol>
+      <button class="b-accent run">Run drill</button>`;
+    el.querySelector(".run").onclick = () => runScenario(sc, el);
+    box.appendChild(el);
+  }
+}
+async function runScenario(sc, el) {
+  if (scenarioRunning) return;
+  scenarioRunning = true;
+  document.querySelectorAll(".scenario .run").forEach(b => b.disabled = true);
+  el.classList.remove("finished", "ok-end", "fail-end");
+  el.classList.add("active");
+  const items = el.querySelectorAll(".steps li");
+  items.forEach(li => { li.className = ""; li.querySelector(".st").textContent = "·"; });
+  const ctx = { sinceEventId: lastEventId };
+  let failed = false;
+  for (let i = 0; i < sc.steps.length; i++) {
+    const li = items[i];
+    li.classList.add("active"); li.querySelector(".st").textContent = "";
+    try {
+      await sc.steps[i].run(ctx);
+      li.classList.remove("active"); li.classList.add("done");
+      li.querySelector(".st").textContent = "✓";
+    } catch (err) {
+      li.classList.remove("active"); li.classList.add("fail");
+      li.querySelector(".st").textContent = "✗";
+      li.lastElementChild.textContent += " — " + err.message;
+      failed = true;
+      break;
+    }
+    await pollStatus();
+  }
+  el.classList.remove("active");
+  el.classList.add("finished", failed ? "fail-end" : "ok-end");
+  document.querySelectorAll(".scenario .run").forEach(b => b.disabled = false);
+  el.querySelector(".run").textContent = failed ? "Run again" : "Run again ✓";
+  scenarioRunning = false;
+  pollStatus();
+}
+
+/* ------------------------------------------------ boot */
+renderScenarios();
+pollStatus(); pollEvents();
+setInterval(pollStatus, 2000);
+setInterval(pollEvents, 1500);
+</script>
+</body>
+</html>

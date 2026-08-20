@@ -1,0 +1,18 @@
+# Keep local runtime state, VCS data, and build outputs out of the image:
+# baking local LevelDB stores into the image would seed "fresh" volumes with
+# stale metadata, and DB churn would invalidate build layer caching.
+.git
+.github
+bazel-*
+logs/
+data/dbs/
+data/gfs_db_*
+data/CS244B_Final_Paper.pdf
+docs/
+*.log
+.DS_Store
+.vscode/
+.claude/
+.env
+Dockerfile
+docker-compose.yml
