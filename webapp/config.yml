@@ -1,16 +1,14 @@
+# Cluster configuration used by the GFS Playground web app (webapp/server.py).
+# Identical to data/config.yml except for a faster heartbeat, so failure
+# detection and re-replication are quick enough to watch interactively.
 version: 1.0
 servers:
-  # A list of all servers available in the cluster, at GFS startup time
-  # All server specific metadata in other sections should be key'd using
-  # the server name defined here.
   master_servers:
     - master_server_01
   chunk_servers:
     - chunk_server_01
     - chunk_server_02
     - chunk_server_03
-# Network Information for each server
-# Feel free to change hostname to match Docker config, when applicable
 network:
   master_server_01:
     hostname: master_server_01
@@ -25,10 +23,8 @@ network:
     hostname: chunk_server_03
     port: 50054
   dns_lookup_table: # Hostname -> IP address mapping
-    # These values should only be used, if no DNS server is available
-    # for translating hostname to IP address. If using Docker, docker
-    # provides built-in DNS service for container networking:
-    #  https://docs.docker.com/config/containers/container-networking/
+    # The playground runs every server in one process namespace, so all
+    # hostnames resolve to the loopback wildcard
     master_server_01: 0.0.0.0
     chunk_server_01: 0.0.0.0
     chunk_server_02: 0.0.0.0
@@ -38,12 +34,10 @@ disk:
   block_size_mb: 64
   # The minimum disk space (MB) that a chunk server has to maintain
   min_free_disk_space_mb: 100
-  # The number of chunk servers each chunk is replicated on (GFS default: 3)
+  # The number of chunk servers each chunk is replicated on
   replication_factor: 3
-  # on-disk leveldb databases: chunk storage for chunk servers, and the
-  # persistent metadata store (namespace + chunk versions) for the master.
-  # If a master server has no entry here, it runs without persistence and
-  # loses its namespace on restart.
+  # on-disk leveldb databases; kept under data/ so the docker volume
+  # persists them across container restarts
   leveldb:
     master_server_01: data/dbs/master_server_01
     chunk_server_01: data/dbs/chunk_server_01
@@ -53,5 +47,7 @@ timeout:
   # The valid suffixes are "ns", "us" "ms", "s", "m", and "h".
   grpc: 10s
   lease: 60s
-  heartbeat: 30s
+  # Fast heartbeat: a dead chunk server is detected within seconds, and the
+  # re-replication repair scan runs every pass
+  heartbeat: 5s
   client_cache: 10m

@@ -60,25 +60,34 @@ bazel test --test_output=errors //tests/...
 
 All dependencies (gRPC, Protobuf, Abseil, LevelDB, ...) are pinned in [MODULE.bazel](MODULE.bazel) and downloaded automatically on first build.
 
-## Running a GFS cluster with Docker
+## The Playground: try it in your browser
 
-Make sure you have [Docker](https://docs.docker.com/engine/install/) with the compose plugin installed. To build the image and start a cluster of one master and three chunk servers (works on both x86_64 and Apple Silicon):
+The fastest way to experience the system is the **GFS Playground**, an interactive web app bundled with the repo. Make sure you have [Docker](https://docs.docker.com/engine/install/) with the compose plugin installed (works on both x86_64 and Apple Silicon), then:
 
 ```bash
 docker compose up --build
 ```
 
-The servers store their state (master metadata and chunk data) in the `gfs_data` volume, so files survive container restarts. To stop the cluster, press Ctrl+C, then:
+and open **http://localhost:8080**. You get:
+
+* a live **cluster view** (master + three chunk servers) with per-server *Kill*, *Wipe disk*, and *Restart* controls, animated links, and one-click access to each server's live log;
+* a **files console** that creates, writes, reads, and deletes files through the real GFS client;
+* three guided, one-click **failure drills** — *Chunk server crash*, *Disk loss & self-healing*, and *Master crash & recovery* — each running real operations against the live cluster while narrating every step (heartbeat detection, re-replication cloning, metadata recovery) as it happens;
+* a live **activity feed** of cluster events parsed from the servers' logs: lease grants, version advances, stale-replica deletion, garbage collection, re-replication.
+
+Nothing in the playground is simulated — killing a server is a real `SIGKILL`, wiping a disk really deletes its LevelDB store, and the healing you watch is the master doing its job.
+
+The cluster's databases persist in the `gfs_data` volume across restarts. Stop with Ctrl+C, then `docker compose down` (add `-v` to also wipe all stored files). The playground also runs without Docker: `python3 webapp/server.py` from the repo root after `bazel build //...`.
+
+### Classic multi-container cluster (no web UI)
+
+To run each server in its own container instead — the traditional deployment this project has always supported:
 
 ```bash
-docker compose down
+COMPOSE_PROFILES=cluster docker compose up --build
 ```
 
-To also wipe all stored files:
-
-```bash
-docker compose down -v
-```
+The two modes share host ports (50051–50054), so run one at a time. Note for pre-existing checkouts: server databases now live under `data/dbs/` (previously `data/gfs_db_*`), and the compose volume holds only the databases, so config edits take effect on rebuild.
 
 ## Running the GFS client
 

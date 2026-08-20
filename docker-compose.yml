@@ -1,12 +1,51 @@
 services:
-  # Master server on port 50051
-  master_server_01:
-    container_name: master_server_01
+  # ---------------------------------------------------------------------------
+  # Default: the GFS Playground — one container that supervises a full cluster
+  # (1 master + 3 chunk servers) and serves an interactive web UI at :8080
+  # where you can create/read/write files, kill servers, wipe disks, and watch
+  # the system heal itself. `docker compose up --build` and open
+  # http://localhost:8080  (the .env file selects this profile by default)
+  # ---------------------------------------------------------------------------
+  playground:
+    profiles: [playground]
+    container_name: gfs_playground
     build:
       context: .
       dockerfile: Dockerfile
     image: gfs-image
-    # Run the binary built into the image; no rebuild at container startup
+    command: python3 webapp/server.py
+    working_dir: /app
+    environment:
+      GFS_PLAYGROUND_CONFIG: webapp/config.yml
+    ports:
+      - 8080:8080     # web UI
+      - 50051:50051   # master (also reachable by host-side gfs_client_main)
+      - 50052:50052   # chunk servers
+      - 50053:50053
+      - 50054:50054
+    volumes:
+      # Persist only the databases; config stays baked into the image so
+      # rebuilding after a config edit actually takes effect
+      - gfs_data:/app/data/dbs
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Classic topology: each server in its own container, no web UI.
+  # Start with: COMPOSE_PROFILES=cluster docker compose up --build
+  # (not simultaneously with the playground — they share ports)
+  # ---------------------------------------------------------------------------
+  master_server_01:
+    profiles: [cluster]
+    container_name: master_server_01
+    image: gfs-image
+    build:
+      context: .
+      dockerfile: Dockerfile
     command: bazel-bin/src/server/master_server/run_master_server_main
       --config_path=data/config.yml
       --use_docker_dns_server
@@ -15,9 +54,7 @@ services:
     ports:
       - 50051:50051
     volumes:
-      # Persist the master's metadata store (and share the config); the
-      # volume is initialized from the image contents on first use
-      - gfs_data:/app/data
+      - gfs_data:/app/data/dbs
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/50051"]
       interval: 5s
@@ -25,8 +62,8 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # Chunk server #1 on port 50052
   chunk_server_01:
+    profiles: [cluster]
     container_name: chunk_server_01
     image: gfs-image
     command: bazel-bin/src/server/chunk_server/run_chunk_server_main
@@ -40,11 +77,11 @@ services:
         condition: service_healthy
     working_dir: /app
     volumes:
-      - gfs_data:/app/data
+      - gfs_data:/app/data/dbs
     restart: unless-stopped
 
-  # Chunk server #2 on port 50053
   chunk_server_02:
+    profiles: [cluster]
     container_name: chunk_server_02
     image: gfs-image
     command: bazel-bin/src/server/chunk_server/run_chunk_server_main
@@ -58,11 +95,11 @@ services:
         condition: service_healthy
     working_dir: /app
     volumes:
-      - gfs_data:/app/data
+      - gfs_data:/app/data/dbs
     restart: unless-stopped
 
-  # Chunk server #3 on port 50054
   chunk_server_03:
+    profiles: [cluster]
     container_name: chunk_server_03
     image: gfs-image
     command: bazel-bin/src/server/chunk_server/run_chunk_server_main
@@ -76,7 +113,7 @@ services:
         condition: service_healthy
     working_dir: /app
     volumes:
-      - gfs_data:/app/data
+      - gfs_data:/app/data/dbs
     restart: unless-stopped
 
 volumes:
