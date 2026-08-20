@@ -18,7 +18,7 @@ using gfs::server::FileChunkManager;
 using gfs::service::ChunkServerControlServiceImpl;
 using gfs::service::ChunkServerFileServiceImpl;
 using gfs::service::ChunkServerLeaseServiceImpl;
-using google::protobuf::util::StatusOr;
+using absl::StatusOr;
 using grpc::Server;
 using grpc::ServerBuilder;
 
@@ -96,13 +96,6 @@ int main(int argc, char** argv) {
     chunk_server_impl->RegisterMasterProtocolClient(master_server_address);
   }
 
-  // Start report chunks to the master periodically, this chunkserver should 
-  // report itself to the master server(s). This will enable the master be aware
-  // of this chunkserver, and to start selecting it for chunk allocation. This 
-  // also allows chunk servers to be dynamically added since they just need to 
-  // report themselves to master.
-  chunk_server_impl->StartReportToMaster();
-
   // Register synchronous services for handling clients' metadata requests
   // Note that gRPC only support providing services through via a single port.
   ChunkServerLeaseServiceImpl lease_service(chunk_server_impl);
@@ -117,6 +110,15 @@ int main(int argc, char** argv) {
   // Assemble and start the server
   std::unique_ptr<Server> server(builder.BuildAndStart());
   LOG(INFO) << "Server listening on " << server_address;
+
+  // Start reporting chunks to the master periodically, now that the gRPC
+  // services are up: the master starts heartbeating a chunk server as soon
+  // as it registers, so reporting before the server listens would make the
+  // master consider it dead and unregister it right away. Reporting enables
+  // the master to become aware of this chunkserver and to start selecting it
+  // for chunk allocation; it also allows chunk servers to be dynamically
+  // added, since they just need to report themselves to the master.
+  chunk_server_impl->StartReportToMaster();
 
   // Wait for the server to shutdown. Note that some other thread must be
   // responsible for shutting down the server for this call to ever return.

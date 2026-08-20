@@ -1,13 +1,13 @@
 #include "src/server/chunk_server/chunk_server_impl.h"
 
 #include "absl/time/time.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/statusor.h"
 #include "gtest/gtest.h"
 #include "src/server/chunk_server/file_chunk_manager.h"
 
 using gfs::server::ChunkServerImpl;
 using gfs::server::FileChunkManager;
-using google::protobuf::util::StatusOr;
+using absl::StatusOr;
 
 class ChunkServerImplTest : public ::testing::Test {
  protected:

@@ -1,48 +1,48 @@
 #include "src/common/utils.h"
 
-#include <openssl/md5.h>
-
-#include "google/protobuf/stubs/status.h"
+#include "absl/crc/crc32c.h"
+#include "absl/status/status.h"
+#include "absl/strings/str_format.h"
 #include "grpcpp/grpcpp.h"
 
 namespace gfs {
 namespace common {
 namespace utils {
 
-using google::protobuf::util::AbortedError;
-using google::protobuf::util::AlreadyExistsError;
-using google::protobuf::util::CancelledError;
-using google::protobuf::util::DataLossError;
-using google::protobuf::util::DeadlineExceededError;
-using google::protobuf::util::FailedPreconditionError;
-using google::protobuf::util::InternalError;
-using google::protobuf::util::InvalidArgumentError;
-using google::protobuf::util::IsAborted;
-using google::protobuf::util::IsAlreadyExists;
-using google::protobuf::util::IsCancelled;
-using google::protobuf::util::IsDataLoss;
-using google::protobuf::util::IsDeadlineExceeded;
-using google::protobuf::util::IsFailedPrecondition;
-using google::protobuf::util::IsInternal;
-using google::protobuf::util::IsInvalidArgument;
-using google::protobuf::util::IsNotFound;
-using google::protobuf::util::IsOutOfRange;
-using google::protobuf::util::IsPermissionDenied;
-using google::protobuf::util::IsResourceExhausted;
-using google::protobuf::util::IsUnauthenticated;
-using google::protobuf::util::IsUnavailable;
-using google::protobuf::util::IsUnimplemented;
-using google::protobuf::util::NotFoundError;
-using google::protobuf::util::OkStatus;
-using google::protobuf::util::OutOfRangeError;
-using google::protobuf::util::PermissionDeniedError;
-using google::protobuf::util::ResourceExhaustedError;
-using google::protobuf::util::UnauthenticatedError;
-using google::protobuf::util::UnavailableError;
-using google::protobuf::util::UnimplementedError;
-using google::protobuf::util::UnknownError;
+using absl::AbortedError;
+using absl::AlreadyExistsError;
+using absl::CancelledError;
+using absl::DataLossError;
+using absl::DeadlineExceededError;
+using absl::FailedPreconditionError;
+using absl::InternalError;
+using absl::InvalidArgumentError;
+using absl::IsAborted;
+using absl::IsAlreadyExists;
+using absl::IsCancelled;
+using absl::IsDataLoss;
+using absl::IsDeadlineExceeded;
+using absl::IsFailedPrecondition;
+using absl::IsInternal;
+using absl::IsInvalidArgument;
+using absl::IsNotFound;
+using absl::IsOutOfRange;
+using absl::IsPermissionDenied;
+using absl::IsResourceExhausted;
+using absl::IsUnauthenticated;
+using absl::IsUnavailable;
+using absl::IsUnimplemented;
+using absl::NotFoundError;
+using absl::OkStatus;
+using absl::OutOfRangeError;
+using absl::PermissionDeniedError;
+using absl::ResourceExhaustedError;
+using absl::UnauthenticatedError;
+using absl::UnavailableError;
+using absl::UnimplementedError;
+using absl::UnknownError;
 
-google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
+absl::Status ConvertGrpcStatusToProtobufStatus(
     const grpc::Status& status) {
   const auto msg = status.error_message();
   switch (status.error_code()) {
@@ -83,8 +83,8 @@ google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
 }
 
 grpc::Status ConvertProtobufStatusToGrpcStatus(
-    const google::protobuf::util::Status& status) {
-  const std::string msg = status.message().as_string();
+    const absl::Status& status) {
+  const std::string msg = std::string(status.message());
   if (status.ok()) {
     return grpc::Status(grpc::StatusCode::OK, msg);
   }
@@ -136,7 +136,7 @@ grpc::Status ConvertProtobufStatusToGrpcStatus(
   return grpc::Status(grpc::StatusCode::UNKNOWN, "Unrecognized status code");
 }
 
-google::protobuf::util::Status CheckFilenameValidity(
+absl::Status CheckFilenameValidity(
     const std::string& filename) {
   if (filename.empty()) {
     return InvalidArgumentError("Empty filename is not allowed");
@@ -157,7 +157,7 @@ google::protobuf::util::Status CheckFilenameValidity(
   return OkStatus();
 }
 
-google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node) {
+absl::Status ValidateConfigFile(const YAML::Node& node) {
   if (!node.IsDefined()) {
     return InvalidArgumentError("empty config");
   } else if (!node["servers"].IsDefined()) {
@@ -218,12 +218,16 @@ google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node) {
 }
 
 const std::string calc_checksum(const std::string& data) {
-  std::string checksum_string(MD5_DIGEST_LENGTH, ' ');
-  // The casting below is necessary to fit with openssl's MD5 function
-  // signature, which is a pretty ugly interface
-  MD5((const unsigned char*)&data[0], data.size(),
-      (unsigned char*)&checksum_string[0]);
-  return checksum_string;
+  // Also encode the data length in the identifier to further reduce the
+  // (already small) chance that two distinct in-flight payloads collide in
+  // the chunk servers' data cache.
+  return absl::StrFormat(
+      "%08x-%x", static_cast<uint32_t>(absl::ComputeCrc32c(data)), data.size());
+}
+
+uint32_t calc_crc32c(const char* data, size_t length) {
+  return static_cast<uint32_t>(
+      absl::ComputeCrc32c(absl::string_view(data, length)));
 }
 
 }  // namespace utils

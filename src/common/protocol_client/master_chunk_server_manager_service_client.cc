@@ -2,12 +2,12 @@
 
 #include <memory>
 
-#include "google/protobuf/stubs/status.h"
+#include "absl/status/status.h"
 #include "src/common/utils.h"
 
 using gfs::common::utils::ConvertGrpcStatusToProtobufStatus;
-using google::protobuf::util::Status;
-using google::protobuf::util::StatusOr;
+using absl::Status;
+using absl::StatusOr;
 using grpc::ClientContext;
 using protos::grpc::ReportChunkServerReply;
 using protos::grpc::ReportChunkServerRequest;

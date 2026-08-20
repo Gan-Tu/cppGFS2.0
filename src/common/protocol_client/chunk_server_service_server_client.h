@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
 #include "src/protos/grpc/chunk_server_lease_service.grpc.pb.h"
@@ -36,9 +36,9 @@ class ChunkServerServiceMasterServerClient {
   // server's corresponding reply if successful; otherwise a Status with error
   // message. This method is synchronous and will block until it hears from the
   // chunk server. This gRPC is only sent by master to the chunk server.
-  google::protobuf::util::StatusOr<protos::grpc::GrantLeaseReply> SendRequest(
+  absl::StatusOr<protos::grpc::GrantLeaseReply> SendRequest(
       const protos::grpc::GrantLeaseRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::GrantLeaseReply> SendRequest(
+  absl::StatusOr<protos::grpc::GrantLeaseReply> SendRequest(
       const protos::grpc::GrantLeaseRequest& request,
       grpc::ClientContext& context);
 
@@ -46,9 +46,9 @@ class ChunkServerServiceMasterServerClient {
   // server's corresponding reply if successful; otherwise a Status with error
   // message. This method is synchronous and will block until it hears from the
   // chunk server.
-  google::protobuf::util::StatusOr<protos::grpc::RevokeLeaseReply> SendRequest(
+  absl::StatusOr<protos::grpc::RevokeLeaseReply> SendRequest(
       const protos::grpc::RevokeLeaseRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::RevokeLeaseReply> SendRequest(
+  absl::StatusOr<protos::grpc::RevokeLeaseReply> SendRequest(
       const protos::grpc::RevokeLeaseRequest& request,
       grpc::ClientContext& context);
 
@@ -56,9 +56,9 @@ class ChunkServerServiceMasterServerClient {
   // server's corresponding reply if successful; otherwise a Status with error
   // message. This method is synchronous and will block until it hears from the
   // chunk server. This gRPC is only sent by master to the chunk server.
-  google::protobuf::util::StatusOr<protos::grpc::InitFileChunkReply>
+  absl::StatusOr<protos::grpc::InitFileChunkReply>
   SendRequest(const protos::grpc::InitFileChunkRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::InitFileChunkReply>
+  absl::StatusOr<protos::grpc::InitFileChunkReply>
   SendRequest(const protos::grpc::InitFileChunkRequest& request,
               grpc::ClientContext& context);
 
@@ -67,10 +67,19 @@ class ChunkServerServiceMasterServerClient {
   // with error message. This method is synchronous and will block until it
   // hears from the chunk server. This gRPC is only sent by master to the chunk
   // server.
-  google::protobuf::util::StatusOr<protos::grpc::AdvanceFileChunkVersionReply>
+  absl::StatusOr<protos::grpc::AdvanceFileChunkVersionReply>
   SendRequest(const protos::grpc::AdvanceFileChunkVersionRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::AdvanceFileChunkVersionReply>
+  absl::StatusOr<protos::grpc::AdvanceFileChunkVersionReply>
   SendRequest(const protos::grpc::AdvanceFileChunkVersionRequest& request,
+              grpc::ClientContext& context);
+
+  // Send a CloneFileChunk gRPC |request| to the chunk server, instructing it
+  // to copy a chunk replica from another chunk server (re-replication). This
+  // gRPC is only sent by master to the chunk server.
+  absl::StatusOr<protos::grpc::CloneFileChunkReply>
+  SendRequest(const protos::grpc::CloneFileChunkRequest& request);
+  absl::StatusOr<protos::grpc::CloneFileChunkReply>
+  SendRequest(const protos::grpc::CloneFileChunkRequest& request,
               grpc::ClientContext& context);
 
  private:
@@ -105,10 +114,18 @@ class ChunkServerServiceChunkServerClient {
   // message. This method is synchronous and will block until it hears from the
   // chunk server. This gRPC is only sent by primary chunk server to the other
   // replica chunk servers during write request.
-  google::protobuf::util::StatusOr<protos::grpc::ApplyMutationsReply>
+  absl::StatusOr<protos::grpc::ApplyMutationsReply>
   SendRequest(const protos::grpc::ApplyMutationsRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::ApplyMutationsReply>
+  absl::StatusOr<protos::grpc::ApplyMutationsReply>
   SendRequest(const protos::grpc::ApplyMutationsRequest& request,
+              grpc::ClientContext& context);
+
+  // Send a ReadFileChunk gRPC |request| to a fellow chunk server. Used when
+  // cloning a chunk replica from another chunk server (re-replication).
+  absl::StatusOr<protos::grpc::ReadFileChunkReply>
+  SendRequest(const protos::grpc::ReadFileChunkRequest& request);
+  absl::StatusOr<protos::grpc::ReadFileChunkReply>
+  SendRequest(const protos::grpc::ReadFileChunkRequest& request,
               grpc::ClientContext& context);
 
  private:

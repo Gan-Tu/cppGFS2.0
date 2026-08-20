@@ -2,21 +2,21 @@
 
 #include <thread>
 
-using google::protobuf::util::AlreadyExistsError;
-using google::protobuf::util::NotFoundError;
-using google::protobuf::util::Status;
-using google::protobuf::util::StatusOr;
+using absl::AlreadyExistsError;
+using absl::NotFoundError;
+using absl::Status;
+using absl::StatusOr;
 
 namespace gfs {
 namespace server {
 
-using google::protobuf::util::OkStatus;
+using absl::OkStatus;
 
 bool LockManager::Exist(const std::string& filename) {
   return file_path_locks_.Contains(filename);
 }
 
-google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
+absl::StatusOr<absl::Mutex*> LockManager::CreateLock(
     const std::string& filename) {
   std::shared_ptr<absl::Mutex> new_lock(new absl::Mutex());
 
@@ -41,7 +41,7 @@ google::protobuf::util::StatusOr<absl::Mutex*> LockManager::CreateLock(
   return new_lock.get();
 }
 
-google::protobuf::util::StatusOr<absl::Mutex*> LockManager::FetchLock(
+absl::StatusOr<absl::Mutex*> LockManager::FetchLock(
     const std::string& filename) {
   // The second item of the TryGetValue return indicates whether the item
   // exists in the collection, and the first item corresponds to the item
@@ -86,7 +86,7 @@ ParentLocksAnchor::ParentLocksAnchor(LockManager* lock_manager,
 
 bool ParentLocksAnchor::ok() const { return status_.ok(); }
 
-google::protobuf::util::Status ParentLocksAnchor::status() const {
+absl::Status ParentLocksAnchor::status() const {
   return status_;
 }
 

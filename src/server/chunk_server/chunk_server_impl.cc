@@ -11,9 +11,9 @@ using gfs::common::ConfigManager;
 using gfs::common::thread_safe_flat_hash_map;
 using gfs::service::ChunkServerServiceChunkServerClient;
 using gfs::service::MasterChunkServerManagerServiceClient;
-using google::protobuf::util::NotFoundError;
-using google::protobuf::util::Status;
-using google::protobuf::util::StatusOr;
+using absl::NotFoundError;
+using absl::Status;
+using absl::StatusOr;
 using protos::grpc::ReportChunkServerRequest;
 
 namespace gfs {
@@ -77,7 +77,7 @@ void ChunkServerImpl::RemoveLease(const std::string& file_handle) {
   lease_and_expiration_unix_sec_.erase(file_handle);
 }
 
-google::protobuf::util::StatusOr<uint32_t> ChunkServerImpl::GetChunkVersion(
+absl::StatusOr<uint32_t> ChunkServerImpl::GetChunkVersion(
     const std::string& file_handle) {
   return file_manager_->GetChunkVersion(file_handle);
 }
@@ -113,12 +113,41 @@ ChunkServerImpl::GetChunkServerProtocolClient(
   } else {
     LOG(INFO) << "Estabalishing new connection to chunk server:"
               << server_address;
+    // Raise the max receive size (default 4MB) so a full chunk can be
+    // fetched from a peer replica when cloning; add some headroom for
+    // message metadata on top of the payload
+    grpc::ChannelArguments channel_args;
+    channel_args.SetMaxReceiveMessageSize(
+        config_manager_->GetFileChunkBlockSize() * gfs::common::bytesPerMb +
+        1000);
     chunk_server_clients_[server_address] =
         std::make_shared<ChunkServerServiceChunkServerClient>(
-            grpc::CreateChannel(server_address,
-                                grpc::InsecureChannelCredentials()));
+            grpc::CreateCustomChannel(server_address,
+                                      grpc::InsecureChannelCredentials(),
+                                      channel_args));
     return chunk_server_clients_[server_address];
   }
+}
+
+protos::ChunkServerLocation ChunkServerImpl::GetSelfLocation() const {
+  protos::ChunkServerLocation location;
+  location.set_server_hostname(
+      config_manager_->GetServerHostname(chunk_server_name_));
+  location.set_server_port(config_manager_->GetServerPort(chunk_server_name_));
+  return location;
+}
+
+absl::Mutex* ChunkServerImpl::GetChunkMutationLock(
+    const std::string& chunk_handle) {
+  auto try_get_lock(chunk_mutation_locks_.TryGetValue(chunk_handle));
+  if (try_get_lock.second) {
+    return try_get_lock.first.get();
+  }
+  // Create the lock on first use; TryInsert is atomic so a concurrent
+  // creation for the same handle keeps exactly one lock
+  chunk_mutation_locks_.TryInsert(chunk_handle,
+                                  std::make_shared<absl::Mutex>());
+  return chunk_mutation_locks_.TryGetValue(chunk_handle).first.get();
 }
 
 bool ChunkServerImpl::ReportToMaster() {
@@ -146,9 +175,11 @@ bool ChunkServerImpl::ReportToMaster() {
                    " stored chunks to report to master.";
 
   for (auto& chunk_metadata : all_chunks_metadata) {
-    // TODO(bmokutub): Also include chunk version in request so master can check
-    // if it is stale. Not needed for now.
     chunk_server->add_stored_chunk_handles(chunk_metadata.chunk_handle());
+    // Also report each chunk's version, so the master can detect stale
+    // replicas (chunks that missed mutations while this server was down)
+    // and tell us to delete them (GFS paper section 4.5)
+    *request.add_stored_chunks() = chunk_metadata;
   }
 
   // send the request to the master server(s), if more than one

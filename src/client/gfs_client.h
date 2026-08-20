@@ -1,8 +1,8 @@
 #ifndef GFS_CLIENT_GFS_CLIENT_H_
 #define GFS_CLIENT_GFS_CLIENT_H_
 
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 namespace gfs {
 
@@ -30,7 +30,7 @@ struct Data {
 // name, and an optional bool to indicate whether to resolve host name. 
 // It will initialize the internal units (e.g. cacheManager) according to the 
 // configuration.  
-google::protobuf::util::Status init_client(const std::string& config_filename,
+absl::Status init_client(const std::string& config_filename,
     const std::string& master_name, const bool resolve_hostname = false);
 
 // Reset client as if it was never initialized
@@ -47,17 +47,17 @@ void reset_client();
 //                                   gfs::OpenFlags::Create)
 // You should not use integer literals when setting these flags as they are
 // error prone. Simply use the enum names shown as above. 
-google::protobuf::util::Status open(const char* filename, unsigned int flags);
+absl::Status open(const char* filename, unsigned int flags);
 
-google::protobuf::util::Status close(const char* filename);
+absl::Status close(const char* filename);
 
-google::protobuf::util::StatusOr<Data> read(
+absl::StatusOr<Data> read(
     const char* filename, size_t offset, size_t nbytes);
 
-google::protobuf::util::Status write(const char* path, void* buffer,
+absl::Status write(const char* path, void* buffer,
     size_t offset, size_t nbytes);
 
-google::protobuf::util::Status remove(const char* filename);
+absl::Status remove(const char* filename);
 
 }  // namespace client
 }  // namespace gfs

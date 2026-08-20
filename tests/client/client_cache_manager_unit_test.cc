@@ -6,9 +6,9 @@
 using namespace gfs::client;
 using namespace tests;
 
-using google::protobuf::util::IsDeadlineExceeded;
-using google::protobuf::util::IsInvalidArgument;
-using google::protobuf::util::IsNotFound;
+using absl::IsDeadlineExceeded;
+using absl::IsInvalidArgument;
+using absl::IsNotFound;
 
 class ClientCacheManagerUnitTest : public ::testing::Test {};
 // Note that here although Client's CacheManager is supposed to be a singleton,

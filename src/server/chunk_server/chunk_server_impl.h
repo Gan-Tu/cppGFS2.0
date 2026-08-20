@@ -5,7 +5,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/time/time.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "src/common/config_manager.h"
 #include "src/common/protocol_client/chunk_server_service_server_client.h"
@@ -18,7 +18,7 @@ namespace server {
 
 class ChunkServerImpl {
  public:
-  static google::protobuf::util::StatusOr<ChunkServerImpl*>
+  static absl::StatusOr<ChunkServerImpl*>
   ConstructChunkServerImpl(const std::string& config_filename,
                            const std::string& chunk_server_name,
                            const bool resolve_hostname = false);
@@ -30,14 +30,14 @@ class ChunkServerImpl {
   void RemoveLease(const std::string& file_handle);
   bool HasWriteLease(const std::string& file_handle);
   // Return NOT_FOUND, if no lease exists for file handle
-  google::protobuf::util::StatusOr<absl::Time> GetLeaseExpirationTime(
+  absl::StatusOr<absl::Time> GetLeaseExpirationTime(
       const std::string& file_handle);
 
   // Returns the stored version of the specified chunk handle.
   // If the handle doesn't exist on the chunk server, return NOT_FOUND error.
   // If there are data corruption on the chunk server that it is not able to
   // determine the chunk version, return INTERNAL error.
-  google::protobuf::util::StatusOr<uint32_t> GetChunkVersion(
+  absl::StatusOr<uint32_t> GetChunkVersion(
       const std::string& file_handle);
 
   // Return the protocol client for talking to the master at |server_address|.
@@ -78,6 +78,20 @@ class ChunkServerImpl {
   // Check if resolving hostname is enabled
   bool ResolveHostname() const;
 
+  // The location (hostname and port, as configured) of this chunk server.
+  // Used e.g. by the primary replica to avoid forwarding mutations to itself.
+  protos::ChunkServerLocation GetSelfLocation() const;
+
+  // Return the mutation lock for a chunk handle, creating it on first use.
+  // The file service holds this lock while applying a mutation (and, on the
+  // primary, while forwarding it to the secondary replicas), which serializes
+  // concurrent mutations to the same chunk and guarantees that all replicas
+  // apply them in the same order, as required by section 3.1 of the GFS
+  // paper. (The lock acquisition order at the primary *is* the mutation
+  // serial order; secondaries receive mutations one at a time while the
+  // primary holds the lock.)
+  absl::Mutex* GetChunkMutationLock(const std::string& chunk_handle);
+
  private:
   ChunkServerImpl() = default;
 
@@ -90,7 +104,7 @@ class ChunkServerImpl {
 
   gfs::common::ConfigManager* config_manager_ = nullptr;
   FileChunkManager* file_manager_ = FileChunkManager::GetInstance();
-  std::string chunk_server_name_ = nullptr;
+  std::string chunk_server_name_;
   bool resolve_hostname_ = false;
 
   ~ChunkServerImpl();
@@ -118,6 +132,10 @@ class ChunkServerImpl {
   // Write leases that chunk server holds, and their respective expiration time
   gfs::common::thread_safe_flat_hash_map<std::string, uint64_t>
       lease_and_expiration_unix_sec_;
+
+  // Per-chunk mutation locks; see GetChunkMutationLock
+  gfs::common::parallel_hash_map<std::string, std::shared_ptr<absl::Mutex>>
+      chunk_mutation_locks_;
  
   // A separate thread that executes the ReportToMaster periodically
   std::unique_ptr<std::thread> chunk_reporting_thread_;

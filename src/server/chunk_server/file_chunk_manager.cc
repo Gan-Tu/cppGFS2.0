@@ -1,22 +1,25 @@
 #include "src/server/chunk_server/file_chunk_manager.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 
 #include "absl/strings/str_cat.h"
 #include "leveldb/write_batch.h"
 #include "src/common/system_logger.h"
+#include "src/common/utils.h"
 
 namespace gfs {
 namespace server {
 
-using google::protobuf::util::AlreadyExistsError;
-using google::protobuf::util::InternalError;
-using google::protobuf::util::NotFoundError;
-using google::protobuf::util::OkStatus;
-using google::protobuf::util::OutOfRangeError;
-using google::protobuf::util::UnimplementedError;
-using google::protobuf::util::UnknownError;
+using absl::AlreadyExistsError;
+using absl::DataLossError;
+using absl::InternalError;
+using absl::NotFoundError;
+using absl::OkStatus;
+using absl::OutOfRangeError;
+using absl::UnimplementedError;
+using absl::UnknownError;
 
 FileChunkManager::FileChunkManager()
     : chunk_database_(nullptr), max_chunk_size_bytes_(0) {}
@@ -53,7 +56,7 @@ uint32_t FileChunkManager::GetMaxChunkSizeBytes() const {
   return this->max_chunk_size_bytes_;
 }
 
-google::protobuf::util::Status FileChunkManager::CreateChunk(
+absl::Status FileChunkManager::CreateChunk(
     const std::string& chunk_handle, const uint32_t& create_version) {
   // Allocates new iterator from heap. Using iterator instead of getting to
   // avoid copying because we don't need the data, just needs to see if handle
@@ -93,7 +96,7 @@ google::protobuf::util::Status FileChunkManager::CreateChunk(
   return OkStatus();
 }
 
-google::protobuf::util::StatusOr<std::string> FileChunkManager::ReadFromChunk(
+absl::StatusOr<std::string> FileChunkManager::ReadFromChunk(
     const std::string& chunk_handle, const uint32_t& read_version,
     const uint32_t& start_offset, const uint32_t& length) {
   auto result = GetFileChunk(chunk_handle, read_version);
@@ -112,11 +115,22 @@ google::protobuf::util::StatusOr<std::string> FileChunkManager::ReadFromChunk(
         file_chunk->data().length()));
   }
 
+  // Verify the checksums of all blocks that overlap the read range before
+  // returning any data, so this chunk server never propagates silent disk
+  // corruption to the requester (GFS paper section 5.2)
+  auto verify_status =
+      VerifyBlockChecksums(file_chunk.get(), start_offset, length);
+  if (!verify_status.ok()) {
+    LOG(ERROR) << "Data corruption detected while reading chunk "
+               << chunk_handle << ": " << verify_status.ToString();
+    return verify_status;
+  }
+
   // This may return less than length, if chunk doesn't have up to that.
   return file_chunk->data().substr(start_offset, length);
 }
 
-google::protobuf::util::StatusOr<uint32_t> FileChunkManager::WriteToChunk(
+absl::StatusOr<uint32_t> FileChunkManager::WriteToChunk(
     const std::string& chunk_handle, const uint32_t& write_version,
     const uint32_t& start_offset, const uint32_t& length,
     const std::string& new_data) {
@@ -151,13 +165,31 @@ google::protobuf::util::StatusOr<uint32_t> FileChunkManager::WriteToChunk(
   // Don't want to write more than the bytes left for the chunk to be full.
   uint32_t actual_write_length = std::min(length, remaining_bytes);
 
-  // Writes to the same chunk are serialized (no concurrent writes to the same
-  // chunk), so no race condition here.
+  // Per section 5.2 of the GFS paper, before overwriting an existing range we
+  // must verify the first and last blocks of the range being overwritten:
+  // if a partially-overwritten corrupted block were not detected now, the new
+  // checksum would hide the corruption in the region not being overwritten.
+  auto verify_status = VerifyBlockChecksums(
+      file_chunk.get(), start_offset,
+      std::min<uint64_t>(actual_write_length,
+                         file_chunk->data().length() - start_offset));
+  if (!verify_status.ok()) {
+    LOG(ERROR) << "Data corruption detected while writing chunk "
+               << chunk_handle << ": " << verify_status.ToString();
+    return verify_status;
+  }
+
+  // Writes to the same chunk are serialized by the file service layer using
+  // per-chunk mutation locks (mirroring the mutation order the primary
+  // replica imposes), so the read-modify-write below is race free.
 
   // write to the existing data in memory
   file_chunk->mutable_data()->replace(
       start_offset, actual_write_length, new_data.data(),
       /*start_position_in_new_data=*/0, actual_write_length);
+
+  // Incrementally update the checksums of the blocks the write touched
+  UpdateBlockChecksums(file_chunk.get(), start_offset, actual_write_length);
 
   leveldb::Status status = WriteFileChunk(chunk_handle, file_chunk.get());
 
@@ -170,7 +202,109 @@ google::protobuf::util::StatusOr<uint32_t> FileChunkManager::WriteToChunk(
   return actual_write_length;
 }
 
-google::protobuf::util::Status FileChunkManager::UpdateChunkVersion(
+absl::Status FileChunkManager::VerifyBlockChecksums(
+    const protos::FileChunk* file_chunk, const uint32_t& offset,
+    const uint32_t& length) {
+  // Chunks written before checksums were introduced carry none; skip
+  // verification for them (they become covered on their next write)
+  if (file_chunk->block_checksums_size() == 0 || length == 0 ||
+      offset >= file_chunk->data().length()) {
+    return OkStatus();
+  }
+
+  const std::string& data = file_chunk->data();
+  // Clamp the verified range to the stored data
+  const uint64_t range_end =
+      std::min<uint64_t>((uint64_t)offset + length, data.length());
+  const uint32_t first_block = offset / kChecksumBlockSize;
+  const uint32_t last_block = (range_end - 1) / kChecksumBlockSize;
+
+  for (uint32_t block = first_block; block <= last_block; ++block) {
+    const uint64_t block_start = (uint64_t)block * kChecksumBlockSize;
+    const uint64_t block_length =
+        std::min<uint64_t>(kChecksumBlockSize, data.length() - block_start);
+    if ((int)block >= file_chunk->block_checksums_size()) {
+      // Legacy chunk data beyond the stored checksums; nothing to verify
+      break;
+    }
+    const uint32_t expected_checksum = file_chunk->block_checksums(block);
+    const uint32_t actual_checksum =
+        gfs::common::utils::calc_crc32c(data.data() + block_start,
+                                        block_length);
+    if (expected_checksum != actual_checksum) {
+      return DataLossError(absl::StrCat(
+          "Checksum mismatch in block ", block, ": expected ",
+          expected_checksum, " but computed ", actual_checksum));
+    }
+  }
+
+  return OkStatus();
+}
+
+void FileChunkManager::UpdateBlockChecksums(protos::FileChunk* file_chunk,
+                                            const uint32_t& offset,
+                                            const uint32_t& length) {
+  // A chunk that predates checksums has data but no stored checksums; in
+  // that case recompute every block so the whole chunk becomes covered,
+  // instead of leaving untouched blocks with placeholder values
+  const bool full_recompute = file_chunk->block_checksums_size() == 0;
+
+  const std::string& data = file_chunk->data();
+  const uint32_t block_count =
+      (data.length() + kChecksumBlockSize - 1) / kChecksumBlockSize;
+
+  // Resize the checksum list to match the (possibly grown) data size
+  while ((uint32_t)file_chunk->block_checksums_size() < block_count) {
+    file_chunk->add_block_checksums(0);
+  }
+  while ((uint32_t)file_chunk->block_checksums_size() > block_count) {
+    file_chunk->mutable_block_checksums()->RemoveLast();
+  }
+
+  if (block_count == 0) {
+    return;
+  }
+
+  uint32_t first_block = offset / kChecksumBlockSize;
+  uint32_t last_block = 0;
+  if (length > 0) {
+    last_block = std::min<uint32_t>(
+        ((uint64_t)offset + length - 1) / kChecksumBlockSize, block_count - 1);
+  }
+
+  if (full_recompute) {
+    first_block = 0;
+    last_block = block_count - 1;
+  }
+
+  for (uint32_t block = first_block; block <= last_block; ++block) {
+    const uint64_t block_start = (uint64_t)block * kChecksumBlockSize;
+    const uint64_t block_length =
+        std::min<uint64_t>(kChecksumBlockSize, data.length() - block_start);
+    file_chunk->set_block_checksums(
+        block, gfs::common::utils::calc_crc32c(data.data() + block_start,
+                                               block_length));
+  }
+}
+
+absl::Status FileChunkManager::StoreChunkData(const std::string& chunk_handle,
+                                              const uint32_t& version,
+                                              const std::string& data) {
+  protos::FileChunk file_chunk;
+  file_chunk.set_version(version);
+  *file_chunk.mutable_data() = data;
+  UpdateBlockChecksums(&file_chunk, 0, data.length());
+
+  leveldb::Status status = WriteFileChunk(chunk_handle, &file_chunk);
+  if (!status.ok()) {
+    return UnknownError(absl::StrCat(
+        "Failed while storing cloned chunk data. Status: ", status.ToString()));
+  }
+
+  return OkStatus();
+}
+
+absl::Status FileChunkManager::UpdateChunkVersion(
     const std::string& chunk_handle, const uint32_t& from_version,
     const uint32_t& to_version) {
   auto result = GetFileChunk(chunk_handle, from_version);
@@ -197,7 +331,7 @@ google::protobuf::util::Status FileChunkManager::UpdateChunkVersion(
   return OkStatus();
 }
 
-google::protobuf::util::StatusOr<uint32_t> FileChunkManager::GetChunkVersion(
+absl::StatusOr<uint32_t> FileChunkManager::GetChunkVersion(
     const std::string& chunk_handle) {
   auto result = GetFileChunk(chunk_handle);
 
@@ -209,13 +343,13 @@ google::protobuf::util::StatusOr<uint32_t> FileChunkManager::GetChunkVersion(
   return result.value()->version();
 }
 
-google::protobuf::util::StatusOr<uint32_t> FileChunkManager::AppendToChunk(
+absl::StatusOr<uint32_t> FileChunkManager::AppendToChunk(
     const std::string& chunk_handle, const uint32_t& append_version,
     const uint32_t& length, const std::string& new_data) {
   return UnimplementedError("Append not implemented yet.");
 }
 
-google::protobuf::util::StatusOr<std::shared_ptr<protos::FileChunk>>
+absl::StatusOr<std::shared_ptr<protos::FileChunk>>
 FileChunkManager::GetFileChunk(const std::string& chunk_handle) {
   std::string existing_data;
   leveldb::Status status = this->chunk_database_->Get(
@@ -237,7 +371,7 @@ FileChunkManager::GetFileChunk(const std::string& chunk_handle) {
   return file_chunk;
 }
 
-google::protobuf::util::StatusOr<std::shared_ptr<protos::FileChunk>>
+absl::StatusOr<std::shared_ptr<protos::FileChunk>>
 FileChunkManager::GetFileChunk(const std::string& chunk_handle,
                                const uint32_t& version) {
   auto result = GetFileChunk(chunk_handle);
@@ -275,7 +409,7 @@ leveldb::Status FileChunkManager::WriteFileChunk(
                                     file_chunk->SerializeAsString());
 }
 
-google::protobuf::util::Status FileChunkManager::DeleteChunk(
+absl::Status FileChunkManager::DeleteChunk(
     const std::string& chunk_handle) {
   // Doing delete asynchronously
   leveldb::Status status =

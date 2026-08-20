@@ -3,8 +3,8 @@
 
 #include <memory>
 
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "src/protos/grpc/chunk_server_control_service.grpc.pb.h"
 
@@ -35,9 +35,9 @@ class ChunkServerControlServiceClient {
   // server's corresponding reply if successful; otherwise a Status with error
   // message. This method is synchronous and will block until it hears from the
   // chunk server. This gRPC is only sent by master to the chunk server.
-  google::protobuf::util::StatusOr<protos::grpc::CheckHeartBeatReply>
+  absl::StatusOr<protos::grpc::CheckHeartBeatReply>
   SendRequest(const protos::grpc::CheckHeartBeatRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::CheckHeartBeatReply>
+  absl::StatusOr<protos::grpc::CheckHeartBeatReply>
   SendRequest(const protos::grpc::CheckHeartBeatRequest& request,
               grpc::ClientContext& context);
 
@@ -47,9 +47,9 @@ class ChunkServerControlServiceClient {
   // corresponding reply if successful; otherwise a Status with error message.
   // This method is synchronous and will block until it hears from the chunk
   // server.
-  google::protobuf::util::StatusOr<protos::grpc::TriggerReportChunkServerReply>
+  absl::StatusOr<protos::grpc::TriggerReportChunkServerReply>
   SendRequest(const protos::grpc::TriggerReportChunkServerRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::TriggerReportChunkServerReply>
+  absl::StatusOr<protos::grpc::TriggerReportChunkServerReply>
   SendRequest(const protos::grpc::TriggerReportChunkServerRequest& request,
               grpc::ClientContext& context);
 

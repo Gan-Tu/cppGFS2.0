@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "absl/strings/str_cat.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "gtest/gtest.h"
 #include "src/common/config_manager.h"
@@ -22,7 +22,7 @@ using gfs::server::ChunkServerManager;
 using gfs::server::FileChunkManager;
 using gfs::service::ChunkServerControlServiceImpl;
 using gfs::service::MasterChunkServerManagerServiceImpl;
-using google::protobuf::util::StatusOr;
+using absl::StatusOr;
 using grpc::Server;
 using grpc::ServerBuilder;
 using protos::grpc::CheckHeartBeatReply;
@@ -36,40 +36,60 @@ const std::string kTestMasterServerName = "test_master";
 const std::string kTestMasterServerAddress = "0.0.0.0:10022";
 
 namespace {
-void StartChunkServerControlService(const std::string& server_address,
-                                    ChunkServerImpl* const chunk_server) {
+// A running test gRPC server plus the resources it needs to stay alive.
+// Killing server threads with pthread_cancel (as this test previously did)
+// aborts the whole process with modern gRPC, so servers are stopped with a
+// clean Shutdown() instead; from the master's point of view a shut-down
+// server is just as dead (connections are refused).
+struct TestGrpcServer {
+  std::unique_ptr<ChunkServerControlServiceImpl> control_service;
+  std::unique_ptr<MasterChunkServerManagerServiceImpl> master_service;
+  std::unique_ptr<Server> server;
+  std::thread wait_thread;
+};
+
+std::unique_ptr<TestGrpcServer> StartChunkServerControlService(
+    const std::string& server_address, ChunkServerImpl* const chunk_server) {
+  auto test_server = std::unique_ptr<TestGrpcServer>(new TestGrpcServer());
   ServerBuilder builder;
   auto credentials = grpc::InsecureServerCredentials();
   builder.AddListeningPort(server_address, credentials);
 
   // Register a synchronous service for the chunkserver to respond to heartbeat.
-  ChunkServerControlServiceImpl chunk_server_control_service(chunk_server);
-  builder.RegisterService(&chunk_server_control_service);
+  test_server->control_service =
+      std::unique_ptr<ChunkServerControlServiceImpl>(
+          new ChunkServerControlServiceImpl(chunk_server));
+  builder.RegisterService(test_server->control_service.get());
 
-  // Start the server, and let it run until thread is cancelled
-  std::unique_ptr<Server> server(builder.BuildAndStart());
-
-  server->Wait();
+  // Start the server, and let it run until shut down
+  test_server->server = builder.BuildAndStart();
+  Server* server = test_server->server.get();
+  test_server->wait_thread = std::thread([server]() { server->Wait(); });
+  return test_server;
 }
 
-void StartTestMasterChunkServerManagerService() {
+std::unique_ptr<TestGrpcServer> StartTestMasterChunkServerManagerService() {
+  auto test_server = std::unique_ptr<TestGrpcServer>(new TestGrpcServer());
   ServerBuilder builder;
   auto credentials = grpc::InsecureServerCredentials();
   builder.AddListeningPort(kTestMasterServerAddress, credentials);
 
   // Register a synchronous service for coordinating with chunkservers
-  MasterChunkServerManagerServiceImpl chunk_server_mgr_service;
-  builder.RegisterService(&chunk_server_mgr_service);
+  test_server->master_service =
+      std::unique_ptr<MasterChunkServerManagerServiceImpl>(
+          new MasterChunkServerManagerServiceImpl());
+  builder.RegisterService(test_server->master_service.get());
 
-  // Start the server, and let it run until thread is cancelled
-  std::unique_ptr<Server> server(builder.BuildAndStart());
-
-  server->Wait();
+  // Start the server, and let it run until shut down
+  test_server->server = builder.BuildAndStart();
+  Server* server = test_server->server.get();
+  test_server->wait_thread = std::thread([server]() { server->Wait(); });
+  return test_server;
 }
 
-void AbortThread(std::thread& thread) {
-  pthread_cancel(thread.native_handle());
-  thread.join();
+void ShutdownServer(TestGrpcServer& test_server) {
+  test_server.server->Shutdown();
+  test_server.wait_thread.join();
 }
 }  // namespace
 
@@ -117,7 +137,7 @@ TEST_F(ChunkServerHeartBeatMonitorTaskTest, MonitorHeartBeatTest) {
   std::vector<std::string> chunk_server_names = {"test_chunk_server_01",
                                                  "test_chunk_server_02"};
 
-  std::vector<std::thread> chunk_server_threads;
+  std::vector<std::unique_ptr<TestGrpcServer>> chunk_server_servers;
 
   for (auto& chunk_server_name : chunk_server_names) {
     // Create the chunkserver
@@ -128,11 +148,10 @@ TEST_F(ChunkServerHeartBeatMonitorTaskTest, MonitorHeartBeatTest) {
 
     // Start the chunkserver control service in another thread, that responds to
     // heartbeat messages from master.
-    chunk_server_threads.push_back(
-        std::thread(StartChunkServerControlService,
-                    config_mgr_->GetServerAddress(chunk_server_name,
-                                                  /*resolve_hostname=*/true),
-                    chunk_server));
+    chunk_server_servers.push_back(StartChunkServerControlService(
+        config_mgr_->GetServerAddress(chunk_server_name,
+                                      /*resolve_hostname=*/true),
+        chunk_server));
 
     // Get the master server address
     const std::string master_server_address = config_mgr_->GetServerAddress(
@@ -161,8 +180,8 @@ TEST_F(ChunkServerHeartBeatMonitorTaskTest, MonitorHeartBeatTest) {
 
   EXPECT_EQ(chunk_server_names.size(), allocated_locations.size());
 
-  // Abort the first chunk server
-  AbortThread(chunk_server_threads[0]);
+  // Shut down the first chunk server so it stops answering heartbeats
+  ShutdownServer(*chunk_server_servers[0]);
 
   // Wait for heartbeat task to notice this chunkserver is down
   auto heartbeat_task_sleep_duration =
@@ -189,8 +208,8 @@ TEST_F(ChunkServerHeartBeatMonitorTaskTest, MonitorHeartBeatTest) {
                                           /*resolve_hostname=*/true),
             allocated_server_address);
 
-  // Abort the second chunk server
-  AbortThread(chunk_server_threads[1]);
+  // Shut down the second chunk server
+  ShutdownServer(*chunk_server_servers[1]);
 }
 
 int main(int argc, char** argv) {
@@ -198,15 +217,14 @@ int main(int argc, char** argv) {
 
   // Start the MasterChunkServerManagerService in the background, and wait for
   // some time for the server to be successfully started in the background.
-  std::thread master_server_thread =
-      std::thread(StartTestMasterChunkServerManagerService);
+  auto master_server = StartTestMasterChunkServerManagerService();
   std::this_thread::sleep_for(std::chrono::seconds(3));
 
   // Run tests
   int exit_code = RUN_ALL_TESTS();
 
   // Clean up background server
-  AbortThread(master_server_thread);
+  ShutdownServer(*master_server);
 
   return exit_code;
 }

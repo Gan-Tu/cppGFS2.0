@@ -236,3 +236,11 @@ bazel-cppGFS2.0
 
 # Visual Studio Code
 .vscode/
+# GFS on-disk stores created by local runs (leveldb databases),
+# and leveldb directories created by running tests outside the Bazel sandbox
+data/gfs_db_*
+*_test_db/
+*-test-db/
+
+# Note: MODULE.bazel.lock is intentionally committed (reproducible dependency
+# resolution); .bazelversion and .bazelrc are committed too.

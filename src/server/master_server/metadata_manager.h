@@ -1,8 +1,10 @@
 #ifndef GFS_SERVER_MASTER_SERVER_METADATA_MANAGER_H_
 #define GFS_SERVER_MASTER_SERVER_METADATA_MANAGER_H_
 
-#include "absl/container/flat_hash_set.h"
-#include "google/protobuf/stubs/statusor.h"
+#include <memory>
+
+#include "absl/status/statusor.h"
+#include "leveldb/db.h"
 #include "src/common/utils.h"
 #include "src/protos/metadata.pb.h"
 #include "src/server/master_server/lock_manager.h"
@@ -14,7 +16,7 @@ namespace server {
 // master node in GFS.
 // 1) the assignment of chunk handle, which is a UUID.
 // 2) the mapping between a file name to the chunk handles associated with it.
-// 3) the set of deleted chunk handles.
+// 3) the version and lease state of each chunk.
 //
 // The MetadataManager provides the following thread-safe methods:
 // 1) create a (default) file metadata for a given file. This involves also the
@@ -26,15 +28,21 @@ namespace server {
 // 5) assigning new chunk handle, this provides a unique UUID each time when the
 //    function is called.
 //
-// TODO(Xi): TBD whether to put chunk location and version information in this
-// MetadataManager
+// Following section 2.6.3 of the GFS paper, the namespace (file -> chunk
+// handles) and the chunk versions are the master's only *persistent* state:
+// when persistence is enabled (EnablePersistence), every namespace or version
+// mutation is synchronously written through to an on-disk LevelDB store
+// before the mutation is acknowledged — playing the role of the paper's
+// operation log + checkpoint — and the state is recovered from disk on
+// startup. Chunk *locations* are deliberately not persisted: the master
+// re-learns them from chunk server reports (GFS paper section 2.6.2), and
+// lease state is soft state that is simply re-established after a restart.
 class MetadataManager {
  public:
   // Create the file metadata (and a lock associated with this file) for a
   // given file path. This function returns error if the file path already
   // exists or if any of the intermediate parent directory not found.
-  google::protobuf::util::Status CreateFileMetadata(
-      const std::string& filename);
+  absl::Status CreateFileMetadata(const std::string& filename);
 
   // Check if metadata file a file exists
   bool ExistFileMetadata(const std::string& filename);
@@ -46,30 +54,43 @@ class MetadataManager {
   // Access the file metadata for a given file path. The caller of this
   // function needs to ensure the lock for this file is properly used.
   // return error if fileMetadata not found
-  google::protobuf::util::StatusOr<std::shared_ptr<protos::FileMetadata>>
-  GetFileMetadata(const std::string& filename);
+  absl::StatusOr<std::shared_ptr<protos::FileMetadata>> GetFileMetadata(
+      const std::string& filename);
 
   // Create a file chunk for a given filename and a chunk index.
-  google::protobuf::util::StatusOr<std::string> CreateChunkHandle(
-      const std::string& filename, uint32_t chunk_index);
+  absl::StatusOr<std::string> CreateChunkHandle(const std::string& filename,
+                                                uint32_t chunk_index);
+
+  // Remove the chunk handle mapped at (filename, chunk_index) and its chunk
+  // metadata. Used to roll back a failed chunk creation, when the chunk could
+  // not be initialized on any chunk server.
+  void DeleteChunkHandle(const std::string& filename, uint32_t chunk_index);
 
   // Retrieve a chunk handle for a given filename and chunk index. Return
   // error if filename or chunk not found
-  google::protobuf::util::StatusOr<std::string> GetChunkHandle(
-      const std::string& filename, uint32_t chunk_index);
+  absl::StatusOr<std::string> GetChunkHandle(const std::string& filename,
+                                             uint32_t chunk_index);
 
   // Advance the chunk version number for a chunk handle, return error if
   // chunk handle not found
-  google::protobuf::util::Status AdvanceChunkVersion(
-      const std::string& chunk_handle);
- 
+  absl::Status AdvanceChunkVersion(const std::string& chunk_handle);
+
+  // Set the chunk version for a chunk handle to the given value. Used when
+  // the master learns from a chunk server report that replicas hold a newer
+  // version than recorded, which means the master failed after instructing
+  // replicas to advance but before recording the new version; per section
+  // 4.5 of the GFS paper the master takes the higher version to be
+  // up-to-date.
+  absl::Status SetChunkVersion(const std::string& chunk_handle,
+                               uint32_t version);
+
   // Check whether file chunk metadata exists
   bool ExistFileChunkMetadata(const std::string& chunk_handle);
 
   // Get the chunk metadata for a given chunk handle, return error if
   // chunk handle not found
-  google::protobuf::util::StatusOr<protos::FileChunkMetadata>
-  GetFileChunkMetadata(const std::string& chunk_handle);
+  absl::StatusOr<protos::FileChunkMetadata> GetFileChunkMetadata(
+      const std::string& chunk_handle);
 
   // Set the chunk metadata for a given chunk handle
   void SetFileChunkMetadata(const protos::FileChunkMetadata& chunk_data);
@@ -79,10 +100,9 @@ class MetadataManager {
 
   // Set the primary chunk location that holds the lease for a given chunk
   // handle, and its lease expiration time
-  void SetPrimaryLeaseMetadata(
-      const std::string& chunk_handle,
-      const protos::ChunkServerLocation& server_location,
-      const uint64_t expiration_unix_sec);
+  void SetPrimaryLeaseMetadata(const std::string& chunk_handle,
+                               const protos::ChunkServerLocation& location,
+                               const uint64_t expiration_unix_sec);
 
   // Unset the primary chunk location that holds the lease for a given chunk
   // handle; this happens when a lease expires / gets revoked.
@@ -93,9 +113,21 @@ class MetadataManager {
   std::pair<std::pair<protos::ChunkServerLocation, uint64_t>, bool>
   GetPrimaryLeaseMetadata(const std::string& chunk_handle);
 
+  // Return a per-chunk lock used by the master to serialize the version
+  // advancement / lease grant sequence for a chunk. Without this, two
+  // concurrent write-opens for the same chunk could both advance the chunk
+  // version and hand out conflicting leases.
+  absl::Mutex* GetChunkLeaseLock(const std::string& chunk_handle);
+
   // Assign a new chunk handle. This function returns a unique chunk handle
   // everytime when it gets called
   std::string AllocateNewChunkHandle();
+
+  // Enable write-through persistence of the namespace, chunk versions, and
+  // the chunk handle allocator to an on-disk LevelDB store at |db_path|
+  // (creating it if needed), and recover any previously persisted state into
+  // memory. Should be called once at master startup, before serving.
+  absl::Status EnablePersistence(const std::string& db_path);
 
   // Instance function to access the singleton
   static MetadataManager* GetInstance();
@@ -103,13 +135,17 @@ class MetadataManager {
  private:
   MetadataManager();
 
+  // Persist helpers; no-ops when persistence is not enabled. Failures are
+  // returned so mutations can be refused (the paper's master does not apply a
+  // mutation whose log record cannot be flushed).
+  absl::Status PersistFileMetadata(const std::string& filename);
+  absl::Status PersistChunkMetadata(const std::string& chunk_handle);
+  void ErasePersistedFileMetadata(const std::string& filename);
+  void ErasePersistedChunkMetadata(const std::string& chunk_handle);
+  void PersistChunkHandleAllocator();
+
   // An atomic uint64 used to assign UUID for each chunk
   std::atomic<uint64_t> global_chunk_id_{0};
-
-  // Store all deleted chunk handles in a thread-safe hashset
-  absl::flat_hash_set<std::string> deleted_chunk_handles_;
-  // TODO: add a lock for deleted_chunk_handles_ once starting implementing
-  // the deletion logic
 
   // Parallel hash map for file metadata
   gfs::common::parallel_hash_map<std::string,
@@ -126,6 +162,11 @@ class MetadataManager {
   gfs::common::parallel_hash_map<
       std::string, std::pair<protos::ChunkServerLocation, uint64_t>>
       lease_holders_;
+
+  // Per-chunk locks used to serialize version advancement and lease grants;
+  // see GetChunkLeaseLock
+  gfs::common::parallel_hash_map<std::string, std::shared_ptr<absl::Mutex>>
+      chunk_lease_locks_;
 
   // Note that the file_metadata_ maps to the reference of the actual
   // FileMetadata, but file_chunk_metadata_ maps to actual copy of
@@ -144,6 +185,10 @@ class MetadataManager {
 
   // Lock manager to manager the synchronization of operations
   LockManager* lock_manager_;
+
+  // On-disk store for the persistent metadata; null when persistence is not
+  // enabled (e.g. in unit tests)
+  std::unique_ptr<leveldb::DB> metadata_store_;
 };
 
 }  // namespace server

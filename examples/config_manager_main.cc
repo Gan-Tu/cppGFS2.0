@@ -4,7 +4,7 @@
 #include "src/common/system_logger.h"
 
 using gfs::common::ConfigManager;
-using google::protobuf::util::StatusOr;
+using absl::StatusOr;
 
 ABSL_FLAG(std::string, config_path, "data/config.yml",
           "/absolute/path/to/config.yml");

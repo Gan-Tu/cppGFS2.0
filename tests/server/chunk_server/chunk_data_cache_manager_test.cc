@@ -8,7 +8,7 @@
 using namespace gfs::server;
 using namespace tests;
 
-using google::protobuf::util::IsNotFound;
+using absl::IsNotFound;
 
 class ChunkDataCacheManagerTest : public ::testing::Test {
  protected:

@@ -8,8 +8,8 @@
 using namespace gfs::server;
 using namespace tests;
 
-using google::protobuf::util::IsAlreadyExists;
-using google::protobuf::util::IsNotFound;
+using absl::IsAlreadyExists;
+using absl::IsNotFound;
 
 class LockManagerUnitTest : public ::testing::Test {
  protected:

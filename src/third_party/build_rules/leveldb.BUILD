@@ -29,6 +29,7 @@ cc_library(
             "doc/**",
             "**/*_test.cc",
             "util/env_windows.cc",
+            "util/testutil.cc",
         ],
     ),
     hdrs = glob(
@@ -38,6 +39,7 @@ cc_library(
           "benchmarks/**",
           "util/windows_logger.h",
           "util/env_windows*.h",
+          "util/testutil.h",
         ],
     ),
     includes = ["include"],

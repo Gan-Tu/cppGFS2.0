@@ -1,0 +1,68 @@
+"""cppGFS2.0 — a C++ implementation of the Google File System.
+
+Dependencies are managed with bzlmod (Bazel modules). Most dependencies come
+from the Bazel Central Registry; `repo_name` aliases preserve the historical
+WORKSPACE-era repository names so that BUILD files stay unchanged.
+"""
+
+module(
+    name = "cppgfs",
+    version = "2.0.0",
+)
+
+# Google Abseil C++ library.
+bazel_dep(name = "abseil-cpp", version = "20250127.0", repo_name = "com_google_absl")
+
+# Protocol Buffers.
+bazel_dep(name = "protobuf", version = "29.3", repo_name = "com_google_protobuf")
+
+# gRPC.
+bazel_dep(name = "grpc", version = "1.71.0", repo_name = "com_github_grpc_grpc")
+
+# GoogleTest.
+bazel_dep(name = "googletest", version = "1.15.2", repo_name = "com_google_test")
+
+# Google Benchmark.
+bazel_dep(name = "google_benchmark", version = "1.9.1", repo_name = "com_google_benchmark")
+
+# Google glog logging library (used through src/common/system_logger).
+bazel_dep(name = "glog", version = "0.7.1", repo_name = "com_google_glog")
+
+# gflags (required by glog).
+bazel_dep(name = "gflags", version = "2.2.2", repo_name = "com_github_gflags_gflags")
+
+# YAML parser for config files.
+bazel_dep(name = "yaml-cpp", version = "0.8.0", repo_name = "yaml_cpp")
+
+# Bazel rules.
+bazel_dep(name = "rules_cc", version = "0.0.17")
+bazel_dep(name = "rules_proto", version = "7.1.0")
+bazel_dep(name = "rules_python", version = "1.1.0")
+
+# Newer apple_support is needed on recent macOS versions, whose dyld refuses
+# to run the toolchain's wrapped_clang when it is linked without an LC_UUID
+# load command (older apple_support linked it with -no_uuid).
+bazel_dep(name = "apple_support", version = "1.21.0")
+
+# Dependencies that are not in the Bazel Central Registry are fetched as
+# plain http archives with our own BUILD files (src/third_party/build_rules).
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# LevelDB, the chunk server's on-disk storage engine (also used by the master
+# for metadata persistence).
+http_archive(
+    name = "com_google_leveldb",
+    build_file = "//src/third_party/build_rules:leveldb.BUILD",
+    sha256 = "9a37f8a6174f09bd622bc723b55881dc541cd50747cbd08831c2a82d620f6d76",
+    strip_prefix = "leveldb-1.23",
+    urls = ["https://github.com/google/leveldb/archive/1.23.tar.gz"],
+)
+
+# Parallel Hashmap, used for concurrent in-memory maps.
+http_archive(
+    name = "parallel_hashmap",
+    build_file = "//src/third_party/build_rules:parallel_hashmap.BUILD",
+    sha256 = "4f462f51a3468166ea4cf87c80e001dc1999093264cf55cbda3492ca39a7730b",
+    strip_prefix = "parallel-hashmap-2.0.0",
+    urls = ["https://github.com/greg7mdp/parallel-hashmap/archive/refs/tags/v2.0.0.tar.gz"],
+)

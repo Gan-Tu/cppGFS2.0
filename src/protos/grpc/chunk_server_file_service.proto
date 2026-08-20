@@ -75,13 +75,17 @@ service ChunkServerFileService {
   // replies to the client.
   rpc WriteFileChunk(WriteFileChunkRequest) returns (WriteFileChunkReply) {}
 
-  // The primary chunk server bundles the write mutations and gives a 
+  // The primary chunk server bundles the write mutations and gives a
   // serialization order. After the primary applies the mutations locally, it
   // forwards these ordered mutations to secondary replicas via this gRPC.
   rpc ApplyMutations(ApplyMutationsRequest) returns (ApplyMutationsReply) {}
 
-  // TODO(tugan): add support for the master to ask chunk server to copy file
-  // from other chunk servers for min file replica count maintenance
+  // Ask the receiving chunk server to clone a replica of |chunk_handle| at
+  // |chunk_version| by copying the chunk data directly from an existing valid
+  // replica at |source_location| (GFS paper section 4.3). The master sends
+  // this request when the number of live replicas for a chunk falls below the
+  // replication goal, e.g. after a chunk server goes down.
+  rpc CloneFileChunk(CloneFileChunkRequest) returns (CloneFileChunkReply) {}
 
   // TODO(tugan): add support for snapshot and append operations
 }
@@ -127,12 +131,43 @@ message ReadFileChunkReply {
     FAILED_NOT_FOUND = 2;
     FAILED_VERSION_OUT_OF_SYNC = 3;
     FAILED_OUT_OF_RANGE = 4;
+    // The stored data failed its block checksum verification (GFS paper
+    // section 5.2). The requester should read from another replica.
+    FAILED_DATA_CORRUPTED = 5;
   }
   ReadFileChunkStatus status = 2;
   // The read data, if operation is successful
   bytes data = 3;
   // The number of bytes that was actually read
   uint32 bytes_read = 4;
+}
+
+message CloneFileChunkRequest {
+  // An immutable and globally unique UUID chunk identifier.
+  string chunk_handle = 1;
+  // The chunk version the cloned replica must end up with. The master always
+  // includes the version so the receiving server never copies from (or ends
+  // up with) a stale replica (GFS paper section 4.5).
+  uint32 chunk_version = 2;
+  // An existing up-to-date replica to copy the chunk data from.
+  protos.ChunkServerLocation source_location = 3;
+}
+
+message CloneFileChunkReply {
+  // The original request associated with this reply.
+  CloneFileChunkRequest request = 1;
+  enum CloneFileChunkStatus {
+    UNKNOWN = 0;
+    OK = 1;
+    // The receiving server already has this chunk at (or beyond) the
+    // requested version; no copy was needed.
+    ALREADY_UP_TO_DATE = 2;
+    // The source replica could not provide the chunk at the requested version
+    FAILED_SOURCE_UNAVAILABLE = 3;
+    // Copying succeeded but storing the replica locally failed
+    FAILED_STORE_ERROR = 4;
+  }
+  CloneFileChunkStatus status = 2;
 }
 
 message AdvanceFileChunkVersionRequest {
@@ -218,6 +253,10 @@ enum FileChunkMutationStatus {
   FAILED_NOT_LEASE_HOLDER = 5;
   // Failed because the write start offset is outside the allowed range
   FAILED_OUT_OF_RANGE = 6;
+  // The stored data around the written range failed its block checksum
+  // verification before the overwrite (GFS paper section 5.2), so the write
+  // was refused to avoid hiding existing corruption.
+  FAILED_DATA_CORRUPTED = 7;
 }
 
 

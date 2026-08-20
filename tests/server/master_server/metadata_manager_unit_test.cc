@@ -8,8 +8,8 @@
 using namespace gfs::server;
 using namespace tests;
 
-using google::protobuf::util::IsAlreadyExists;
-using google::protobuf::util::IsNotFound;
+using absl::IsAlreadyExists;
+using absl::IsNotFound;
 
 class MetadataManagerUnitTest : public ::testing::Test {
  protected:

@@ -4,8 +4,8 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/time/time.h"
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "src/protos/chunk_server.pb.h"
 
 namespace gfs {
@@ -80,33 +80,33 @@ class CacheManager {
 
   // Returns the chunk handle for a filename at chunk_index. Returns
   // error if no chunk_handle has been assigned
-  google::protobuf::util::StatusOr<std::string> 
+  absl::StatusOr<std::string> 
       GetChunkHandle(const std::string& filename, uint32_t chunk_index) const;
 
   // Add a (filename, chunk_index) => chunk_handle mapping to the cache
   // Return error if there already exists a different mapping
-  google::protobuf::util::Status
+  absl::Status
       SetChunkHandle(const std::string& filename, uint32_t chunk_index,
                      const std::string& chunk_handle);
 
   // Retrieve the version number for a given chunk handle. Return error 
   // if chunk not found
-  google::protobuf::util::StatusOr<uint32_t>
+  absl::StatusOr<uint32_t>
       GetChunkVersion(const std::string& chunk_handle) const;
 
   // Setting version number for a chunk. Return error if chunk handle
   // is invalid (not known to client)
-  google::protobuf::util::Status 
+  absl::Status 
       SetChunkVersion(const std::string& chunk_handle, uint32_t version);
 
   // Retrieve the Chunk server location entry for a given chunk handle.
   // Return error if this entry has timed-out
-  google::protobuf::util::StatusOr<ChunkServerLocationEntry>
+  absl::StatusOr<ChunkServerLocationEntry>
       GetChunkServerLocation(const std::string& chunk_handle) const;
 
   // Set the chunk server location for a given chunk handle. Return error
   // if chunk handle is invalid
-  google::protobuf::util::Status 
+  absl::Status 
       SetChunkServerLocation(const std::string& chunk_handle,
                              const ChunkServerLocationEntry& entry);
 

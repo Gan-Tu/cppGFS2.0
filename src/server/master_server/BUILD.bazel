@@ -42,11 +42,16 @@ cc_library(
     hdrs = ["metadata_manager.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//src/common:system_logger",
         "//src/protos:cc_metadata_proto",
         "//src/server/master_server:lock_manager",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
+        "@com_google_leveldb//:leveldb",
     ],
 )
 
@@ -71,9 +76,12 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":chunk_server_manager",
+        ":metadata_manager",
         "//src/common:config_manager",
         "//src/common:system_logger",
         "//src/common/protocol_client:chunk_server_control_service_client",
+        "//src/common/protocol_client:chunk_server_service_server_client",
+        "//src/protos:cc_chunk_server_proto",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
     ],
@@ -88,6 +96,7 @@ cc_binary(
         ":chunk_server_heartbeat_monitor_task",
         ":master_chunk_server_manager_service_impl",
         ":master_metadata_service_impl",
+        ":metadata_manager",
         "//src/common:config_manager",
         "//src/common:system_logger",
         "@com_google_absl//absl/flags:flag",

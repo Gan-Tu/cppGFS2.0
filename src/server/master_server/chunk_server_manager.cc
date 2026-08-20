@@ -304,9 +304,14 @@ void ChunkServerManager::UpdateChunkServer(
 
 ChunkServerLocationThreadSafeFlatSet ChunkServerManager::GetChunkLocations(
     const std::string& chunk_handle) {
-  // Returns the set of locations if chunk_handle exist or inserts an empty
-  // set and return it.
-  return this->chunk_locations_map_[chunk_handle];
+  // Returns a copy of the set of locations if chunk_handle exists, or an
+  // empty set otherwise (without polluting the map with empty entries for
+  // arbitrary queried handles)
+  auto result = this->chunk_locations_map_.find(chunk_handle);
+  if (result == this->chunk_locations_map_.end()) {
+    return ChunkServerLocationThreadSafeFlatSet();
+  }
+  return result->second;
 }
 
 std::string ChunkServerManager::CreateChunkServerLocationString(

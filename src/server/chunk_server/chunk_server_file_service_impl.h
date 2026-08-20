@@ -52,6 +52,14 @@ class ChunkServerFileServiceImpl final
       const protos::grpc::AdvanceFileChunkVersionRequest* request,
       protos::grpc::AdvanceFileChunkVersionReply* reply) override;
 
+  // Handle a CloneFileChunkRequest sent by the master: copy the chunk data
+  // for the requested chunk directly from an existing valid replica and store
+  // it locally, so this server becomes a replica for the chunk (GFS paper
+  // section 4.3, re-replication).
+  grpc::Status CloneFileChunk(grpc::ServerContext* context,
+                              const protos::grpc::CloneFileChunkRequest* request,
+                              protos::grpc::CloneFileChunkReply* reply) override;
+
   gfs::server::ChunkServerImpl* chunk_server_impl_;
   gfs::server::FileChunkManager* file_manager_ =
       gfs::server::FileChunkManager::GetInstance();
