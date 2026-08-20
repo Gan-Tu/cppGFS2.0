@@ -6,6 +6,7 @@
 
 #include "grpcpp/grpcpp.h"
 #include "src/common/protocol_client/chunk_server_service_server_client.h"
+#include "src/common/protocol_client/grpc_client_utils.h"
 #include "src/common/system_logger.h"
 #include "src/common/utils.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
@@ -15,16 +16,19 @@
 using gfs::common::utils::ConvertProtobufStatusToGrpcStatus;
 using gfs::server::ChunkDataCacheManager;
 using gfs::service::ChunkServerServiceChunkServerClient;
-using google::protobuf::util::IsAlreadyExists;
-using google::protobuf::util::IsNotFound;
-using google::protobuf::util::IsOutOfRange;
-using google::protobuf::util::Status;
-using google::protobuf::util::StatusOr;
+using absl::IsAlreadyExists;
+using absl::IsDataLoss;
+using absl::IsNotFound;
+using absl::IsOutOfRange;
+using absl::Status;
+using absl::StatusOr;
 using grpc::ServerContext;
 using protos::grpc::AdvanceFileChunkVersionReply;
 using protos::grpc::AdvanceFileChunkVersionRequest;
 using protos::grpc::ApplyMutationsReply;
 using protos::grpc::ApplyMutationsRequest;
+using protos::grpc::CloneFileChunkReply;
+using protos::grpc::CloneFileChunkRequest;
 using protos::grpc::FileChunkMutationStatus;
 using protos::grpc::InitFileChunkReply;
 using protos::grpc::InitFileChunkRequest;
@@ -100,6 +104,14 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
     LOG(INFO) << "Successfully read " << reply->bytes_read() << " bytes of "
               << request->chunk_handle();
     return grpc::Status::OK;
+  } else if (IsDataLoss(data_or.status())) {
+    // DATA CORRUPTION: the stored data failed checksum verification; the
+    // requester should read from another replica (GFS paper section 5.2)
+    LOG(ERROR) << "Cannot read file chunk " << request->chunk_handle()
+               << " because the stored data is corrupted: "
+               << data_or.status().ToString();
+    reply->set_status(ReadFileChunkReply::FAILED_DATA_CORRUPTED);
+    return grpc::Status::OK;
   } else if (IsOutOfRange(data_or.status())) {
     // OUT OF RANGE
     LOG(ERROR) << "Cannot read file chunk because the requested offset is out"
@@ -172,6 +184,15 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
   // if this internal write succeeds. Because it can fail at other replicas, we
   // add the status of each replica apply mutation to the replica_status.
 
+  // The primary replica defines the mutation order for the chunk (GFS paper
+  // section 3.1). We serialize concurrent mutations to the same chunk by
+  // holding the chunk's mutation lock across both the local apply and the
+  // forwarding to the secondary replicas: the order in which concurrent
+  // writers acquire this lock *is* the serial order, and every secondary
+  // receives the mutations one at a time in that same order.
+  absl::MutexLock chunk_mutation_lock_guard(
+      chunk_server_impl_->GetChunkMutationLock(request_header.chunk_handle()));
+
   // Get data from cache and try to make the local write
   grpc_status = WriteFileChunkInternal(request_header, reply);
 
@@ -181,10 +202,24 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
   }
 
   // Write successful
-  // Send to other replicas to apply this write
+  // Send to other replicas to apply this write. The client may include this
+  // (primary) server in the replica list; skip ourselves since the mutation
+  // has already been applied locally.
+  const protos::ChunkServerLocation self_location =
+      chunk_server_impl_->GetSelfLocation();
+  std::vector<protos::ChunkServerLocation> secondary_locations;
+  for (const auto& replica_location : request->replica_locations()) {
+    if (replica_location.server_hostname() ==
+            self_location.server_hostname() &&
+        replica_location.server_port() == self_location.server_port()) {
+      continue;
+    }
+    secondary_locations.push_back(replica_location);
+  }
+
   LOG(INFO) << "Now sending apply mutation requests to "
-            << request->replica_locations_size()
-            << " replica(s) in parallel for file chunk: "
+            << secondary_locations.size()
+            << " secondary replica(s) in parallel for file chunk: "
             << request_header.chunk_handle();
 
   // Send the requests in parallel
@@ -192,11 +227,10 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
       std::future<std::pair<std::string, StatusOr<ApplyMutationsReply>>>>
       apply_mutation_results;
 
-  for (int replica = 0; replica < request->replica_locations_size();
-       ++replica) {
+  for (size_t replica = 0; replica < secondary_locations.size(); ++replica) {
     apply_mutation_results.push_back(
         std::async(std::launch::async, [&, replica]() {
-          auto& replica_location = request->replica_locations(replica);
+          auto& replica_location = secondary_locations[replica];
 
           std::string hostname = replica_location.server_hostname();
           if (chunk_server_impl_->ResolveHostname()) {
@@ -218,8 +252,13 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
               << server_address
               << " for file chunk: " << request_header.chunk_handle();
 
+          // Bound the wait: the chunk's mutation lock is held while
+          // forwarding, so a hung secondary must not stall the chunk forever
+          grpc::ClientContext client_context;
+          common::SetClientContextDeadline(
+              client_context, chunk_server_impl_->GetConfigManager());
           auto apply_mutation_reply =
-              client->SendRequest(apply_mutation_request);
+              client->SendRequest(apply_mutation_request, client_context);
 
           return std::pair<std::string, StatusOr<ApplyMutationsReply>>(
               server_address, apply_mutation_reply);
@@ -227,8 +266,7 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
   }
 
   // Wait for the apply mutation replies
-  for (int replica = 0; replica < request->replica_locations_size();
-       ++replica) {
+  for (size_t replica = 0; replica < secondary_locations.size(); ++replica) {
     LOG(INFO) << "Waiting for apply mutation reply for replica " << replica
               << " for file chunk: " << request_header.chunk_handle();
 
@@ -251,10 +289,11 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
       apply_mutation_status = FileChunkMutationStatus::UNKNOWN;
     }
 
-    // Add the result of this replica mutation to reply
+    // Add the result of this replica mutation to reply, so the client can
+    // detect secondary failures and retry (GFS paper section 3.1 step 7)
     auto replica_status = reply->add_replica_status();
     *replica_status->mutable_chunk_server_location() =
-        request->replica_locations(replica);
+        secondary_locations[replica];
     replica_status->set_status(apply_mutation_status);
   }
 
@@ -330,12 +369,91 @@ grpc::Status ChunkServerFileServiceImpl::ApplyMutations(
   // But we are currently just sending one apply mutation request.
   auto& request_header = request->headers(0);
 
+  // Apply mutations to the same chunk one at a time. The primary forwards
+  // mutations while holding its own mutation lock, so mutations arrive here
+  // (and are applied) in the primary's serial order.
+  absl::MutexLock chunk_mutation_lock_guard(
+      chunk_server_impl_->GetChunkMutationLock(request_header.chunk_handle()));
+
   // Get data from cache and try to make the local write
   WriteFileChunkReply write_reply;
   auto status = WriteFileChunkInternal(request_header, &write_reply);
 
   reply->set_status(write_reply.status());
   return status;
+}
+
+grpc::Status ChunkServerFileServiceImpl::CloneFileChunk(
+    grpc::ServerContext* context,
+    const protos::grpc::CloneFileChunkRequest* request,
+    protos::grpc::CloneFileChunkReply* reply) {
+  LOG(INFO) << "Received CloneFileChunkRequest: " << (*request).DebugString();
+  *reply->mutable_request() = *request;
+
+  const std::string& chunk_handle = request->chunk_handle();
+  const uint32_t chunk_version = request->chunk_version();
+
+  // If we already hold this chunk at (or beyond) the requested version,
+  // there is nothing to do
+  StatusOr<uint32_t> local_version_or =
+      file_manager_->GetChunkVersion(chunk_handle);
+  if (local_version_or.ok() && local_version_or.value() >= chunk_version) {
+    LOG(INFO) << "Chunk " << chunk_handle << " already stored at version "
+              << local_version_or.value() << "; no clone needed";
+    reply->set_status(CloneFileChunkReply::ALREADY_UP_TO_DATE);
+    return grpc::Status::OK;
+  }
+
+  // Fetch the full chunk data from the source replica
+  std::string source_hostname = request->source_location().server_hostname();
+  if (chunk_server_impl_->ResolveHostname()) {
+    source_hostname =
+        chunk_server_impl_->GetConfigManager()->ResolveHostname(
+            source_hostname);
+  }
+  const std::string source_address = absl::StrCat(
+      source_hostname, ":", request->source_location().server_port());
+
+  LOG(INFO) << "Cloning chunk " << chunk_handle << " of version "
+            << chunk_version << " from replica at " << source_address;
+
+  ReadFileChunkRequest read_request;
+  read_request.set_chunk_handle(chunk_handle);
+  read_request.set_chunk_version(chunk_version);
+  read_request.set_offset_start(0);
+  read_request.set_length(file_manager_->GetMaxChunkSizeBytes());
+
+  auto source_client =
+      chunk_server_impl_->GetChunkServerProtocolClient(source_address);
+  StatusOr<ReadFileChunkReply> read_reply_or =
+      source_client->SendRequest(read_request);
+
+  if (!read_reply_or.ok() ||
+      read_reply_or.value().status() != ReadFileChunkReply::OK) {
+    LOG(ERROR) << "Failed to fetch chunk " << chunk_handle
+               << " from source replica " << source_address << " for cloning";
+    reply->set_status(CloneFileChunkReply::FAILED_SOURCE_UNAVAILABLE);
+    return grpc::Status::OK;
+  }
+
+  // Store the cloned replica locally, under the chunk's mutation lock so a
+  // concurrent mutation cannot interleave with the store
+  absl::MutexLock chunk_mutation_lock_guard(
+      chunk_server_impl_->GetChunkMutationLock(chunk_handle));
+  auto store_status = file_manager_->StoreChunkData(
+      chunk_handle, chunk_version, read_reply_or.value().data());
+  if (!store_status.ok()) {
+    LOG(ERROR) << "Failed to store cloned chunk " << chunk_handle << ": "
+               << store_status.ToString();
+    reply->set_status(CloneFileChunkReply::FAILED_STORE_ERROR);
+    return grpc::Status::OK;
+  }
+
+  LOG(INFO) << "Successfully cloned chunk " << chunk_handle << " of version "
+            << chunk_version << " (" << read_reply_or.value().bytes_read()
+            << " bytes) from " << source_address;
+  reply->set_status(CloneFileChunkReply::OK);
+  return grpc::Status::OK;
 }
 
 grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
@@ -423,6 +541,11 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
                  << " is out of the allowed range. Status: "
                  << write_result.status();
       reply->set_status(FileChunkMutationStatus::FAILED_OUT_OF_RANGE);
+    } else if (IsDataLoss(status)) {
+      LOG(ERROR) << "Failed to write file chunk because existing data "
+                 << "around the written range is corrupted. Status: "
+                 << write_result.status();
+      reply->set_status(FileChunkMutationStatus::FAILED_DATA_CORRUPTED);
     } else {
       // INTERNAL ERROR
       LOG(ERROR) << "Unexpected error while writing file chunk: "

@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
 
@@ -33,9 +33,9 @@ class ChunkServerServiceGfsClient {
   // server's corresponding reply if successful; otherwise a Status with error
   // message. This method is synchronous and will block until it hears from the
   // chunk server.
-  google::protobuf::util::StatusOr<protos::grpc::ReadFileChunkReply>
+  absl::StatusOr<protos::grpc::ReadFileChunkReply>
   SendRequest(const protos::grpc::ReadFileChunkRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::ReadFileChunkReply>
+  absl::StatusOr<protos::grpc::ReadFileChunkReply>
   SendRequest(const protos::grpc::ReadFileChunkRequest& request,
               grpc::ClientContext& context);
 
@@ -43,9 +43,9 @@ class ChunkServerServiceGfsClient {
   // return chunk server's corresponding reply if successful; otherwise a Status
   // with error message. This method is synchronous and will block until it
   // hears from the chunk server.
-  google::protobuf::util::StatusOr<protos::grpc::SendChunkDataReply>
+  absl::StatusOr<protos::grpc::SendChunkDataReply>
   SendRequest(const protos::grpc::SendChunkDataRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::SendChunkDataReply>
+  absl::StatusOr<protos::grpc::SendChunkDataReply>
   SendRequest(const protos::grpc::SendChunkDataRequest& request,
               grpc::ClientContext& context);
 
@@ -54,9 +54,9 @@ class ChunkServerServiceGfsClient {
   // with error message, as well as all other statuses from secondary replica.
   // This method is synchronous and will block until it hears from the chunk
   // server.
-  google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
+  absl::StatusOr<protos::grpc::WriteFileChunkReply>
   SendRequest(const protos::grpc::WriteFileChunkRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
+  absl::StatusOr<protos::grpc::WriteFileChunkReply>
   SendRequest(const protos::grpc::WriteFileChunkRequest& request,
               grpc::ClientContext& context);
 

@@ -7,13 +7,13 @@
 #include "src/common/system_logger.h"
 #include "src/common/utils.h"
 
-using google::protobuf::util::InternalError;
-using google::protobuf::util::OkStatus;
-using google::protobuf::util::ResourceExhaustedError;
-using google::protobuf::util::Status;
-using google::protobuf::util::StatusOr;
-using google::protobuf::util::UnavailableError;
-using google::protobuf::util::UnknownError;
+using absl::InternalError;
+using absl::OkStatus;
+using absl::ResourceExhaustedError;
+using absl::Status;
+using absl::StatusOr;
+using absl::UnavailableError;
+using absl::UnknownError;
 using protos::grpc::DeleteFileRequest;
 using protos::grpc::FileChunkMutationStatus;
 using protos::grpc::OpenFileReply;
@@ -44,20 +44,20 @@ void ClientImpl::cache_file_chunk_metadata(
   }
 
   auto chunk_version_or(cache_manager_->GetChunkVersion(chunk_handle));
-  // If this chunk version has not been cached, or the replied version is
-  // higher than the current one, we cache the version
+  // If this chunk version has not been cached, or the replied version is at
+  // least the current one, cache the version and the (possibly changed)
+  // locations. A reply carrying the *same* version is normal: the master
+  // reuses a still-valid lease without advancing the version, and the reply
+  // may still carry fresher locations or a primary the cache doesn't have.
   auto new_version(open_file_reply.metadata().version());
-  if (!chunk_version_or.ok() || new_version > chunk_version_or.value()) {
-    cache_manager_->SetChunkVersion(chunk_handle, new_version);
-  } else {
-    // Falling into this block means chnk_version_or.ok() is true and the
-    // new version is less or equal than the current value
-    auto cur_version(chunk_version_or.value());
+  if (chunk_version_or.ok() && new_version < chunk_version_or.value()) {
+    // A strictly older version means this reply is stale; keep the cache
     LOG(ERROR) << "Skip updating the version number for " << chunk_handle
-               << "because the current version " << cur_version << " >= "
-               << "received " << new_version;
+               << " because the current version " << chunk_version_or.value()
+               << " > received " << new_version;
     return;
   }
+  cache_manager_->SetChunkVersion(chunk_handle, new_version);
 
   // Cache the chunk server location
   CacheManager::ChunkServerLocationEntry cache_entry;
@@ -68,7 +68,7 @@ void ClientImpl::cache_file_chunk_metadata(
   cache_manager_->SetChunkServerLocation(chunk_handle, cache_entry);
 }
 
-google::protobuf::util::Status ClientImpl::CreateFile(
+absl::Status ClientImpl::CreateFile(
     const std::string& filename) {
   OpenFileRequest open_file_request;
   // For create mode, we just set filename and mode and leave other fields
@@ -96,7 +96,7 @@ google::protobuf::util::Status ClientImpl::CreateFile(
   return OkStatus();
 }
 
-google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
+absl::Status ClientImpl::GetMetadataForChunk(
     const char* filename, size_t chunk_index,
     OpenFileRequest::OpenMode file_open_mode, std::string& chunk_handle,
     uint32_t& chunk_version,
@@ -180,93 +180,114 @@ google::protobuf::util::Status ClientImpl::GetMetadataForChunk(
   return OkStatus();
 }
 
-google::protobuf::util::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
+absl::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
     const char* filename, size_t chunk_index, size_t offset, size_t nbytes) {
   std::string chunk_handle;
   uint32_t chunk_version;
   CacheManager::ChunkServerLocationEntry chunk_server_location_entry;
 
-  // Access the metadata first
-  auto get_metadata_status(GetMetadataForChunk(
-      filename, chunk_index, OpenFileRequest::READ, chunk_handle, chunk_version,
-      chunk_server_location_entry));
+  // Two passes: the first uses (possibly cached) metadata; if every replica
+  // fails — typically because the cached version or locations went stale
+  // after another client's write, or a replica went down — the second pass
+  // refreshes the metadata from the master and tries again. This mirrors the
+  // paper's behavior: "When a reader retries and contacts the master, it
+  // will immediately get current chunk locations" (section 2.7.1).
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    const bool refresh_cache = (attempt > 0);
+    auto get_metadata_status(GetMetadataForChunk(
+        filename, chunk_index, OpenFileRequest::READ, chunk_handle,
+        chunk_version, chunk_server_location_entry, refresh_cache));
 
-  if (!get_metadata_status.ok()) {
-    return get_metadata_status;
+    if (!get_metadata_status.ok()) {
+      return get_metadata_status;
+    }
+
+    // Loop over all server locations but return immediately as long as one
+    // read request is successful
+    for (auto& location : chunk_server_location_entry.locations) {
+      // Prepare for the read file chunk request
+      ReadFileChunkRequest read_file_chunk_request;
+      read_file_chunk_request.set_chunk_handle(chunk_handle);
+      read_file_chunk_request.set_chunk_version(chunk_version);
+      read_file_chunk_request.set_offset_start(offset);
+      read_file_chunk_request.set_length(nbytes);
+      // Access the client-end-point for contacting the chunk server
+      std::string chunk_server_hostname = location.server_hostname();
+      if (resolve_hostname_) {
+        chunk_server_hostname =
+            config_manager_->ResolveHostname(chunk_server_hostname);
+      }
+      auto server_address(chunk_server_hostname + ":" +
+                          std::to_string(location.server_port()));
+      // Prepare the client context
+      grpc::ClientContext client_context;
+      common::SetClientContextDeadline(client_context, config_manager_);
+      // Create a client end point if it does not exist, this can happen if
+      // a new chunk server joins
+      auto chunk_server_service_client(
+          GetChunkServerServiceClient(server_address));
+
+      // Issue ReadFileChunkRequest and check status
+      StatusOr<ReadFileChunkReply> read_file_chunk_reply_or(
+          chunk_server_service_client->SendRequest(read_file_chunk_request,
+                                                   client_context));
+
+      // Handle grpc error, log and continue to try the next chunk server
+      if (!read_file_chunk_reply_or.ok()) {
+        LOG(ERROR) << "Read file chunk " << chunk_handle << " from "
+                   << server_address << " failed due to "
+                   << read_file_chunk_reply_or.status().message();
+        continue;
+      }
+
+      // Handle chunk status error, log and continue
+      auto read_file_chunk_reply(read_file_chunk_reply_or.value());
+      switch (read_file_chunk_reply.status()) {
+        case ReadFileChunkReply::UNKNOWN:
+          LOG(ERROR) << "Unknown error while reading " + chunk_handle;
+          continue;
+        case ReadFileChunkReply::FAILED_NOT_FOUND:
+          LOG(ERROR) << "Chunk not found: " + chunk_handle;
+          continue;
+        case ReadFileChunkReply::FAILED_VERSION_OUT_OF_SYNC:
+          LOG(ERROR) << "Version is out of sync "
+                     << std::to_string(chunk_version)
+                     << " for chunk " + chunk_handle;
+          continue;
+        case ReadFileChunkReply::FAILED_OUT_OF_RANGE:
+          LOG(ERROR) << "Trying to read " << chunk_handle
+                     << " out of range:  " << offset;
+          continue;
+        case ReadFileChunkReply::FAILED_DATA_CORRUPTED:
+          // This replica detected corruption in its stored data; try
+          // another replica (GFS paper section 5.2)
+          LOG(ERROR) << "Replica at " << server_address
+                     << " reported corrupted data for " << chunk_handle;
+          continue;
+        default:
+          break;
+      }
+
+      // This read has been successful, return here. We expect the compiler to
+      // execute copy elision here to "move" the read reply. (It is tempting
+      // to explicitly write std::move(read_file_chunk_reply) but that is not
+      // the right approach to do so).
+      return read_file_chunk_reply;
+    }
+
+    LOG(ERROR) << "Failed to read " << chunk_handle
+               << " from all cached replicas"
+               << (attempt == 0
+                       ? "; refreshing metadata from master and retrying"
+                       : "");
   }
 
-  // Loop over all server locations but return immediately as long as one
-  // read request is successful
-  for (auto& location : chunk_server_location_entry.locations) {
-    // Prepare for the read file chunk request
-    ReadFileChunkRequest read_file_chunk_request;
-    read_file_chunk_request.set_chunk_handle(chunk_handle);
-    read_file_chunk_request.set_chunk_version(chunk_version);
-    read_file_chunk_request.set_offset_start(offset);
-    read_file_chunk_request.set_length(nbytes);
-    // Access the client-end-point for contacting the chunk server
-    std::string chunk_server_hostname = location.server_hostname();
-    if (resolve_hostname_) {
-      chunk_server_hostname =
-          config_manager_->ResolveHostname(chunk_server_hostname);
-    }
-    auto server_address(chunk_server_hostname + ":" +
-                        std::to_string(location.server_port()));
-    // Prepare the client context
-    grpc::ClientContext client_context;
-    common::SetClientContextDeadline(client_context, config_manager_);
-    // Create a client end point if it does not exist, this can happen if
-    // a new chunk server joins
-    auto chunk_server_service_client(
-        GetChunkServerServiceClient(server_address));
-
-    // Issue ReadFileChunkRequest and check status
-    StatusOr<ReadFileChunkReply> read_file_chunk_reply_or(
-        chunk_server_service_client->SendRequest(read_file_chunk_request,
-                                                 client_context));
-
-    // Handle grpc error, log and continue to try the next chunk server
-    if (!read_file_chunk_reply_or.ok()) {
-      LOG(ERROR) << "Read file chunk " << chunk_handle << " from "
-                 << server_address << " failed due to "
-                 << read_file_chunk_reply_or.status().message();
-      continue;
-    }
-
-    // Handle chunk status error, log and continue
-    auto read_file_chunk_reply(read_file_chunk_reply_or.value());
-    switch (read_file_chunk_reply.status()) {
-      case ReadFileChunkReply::UNKNOWN:
-        LOG(ERROR) << "Unknown error while reading " + chunk_handle;
-        continue;
-      case ReadFileChunkReply::FAILED_NOT_FOUND:
-        LOG(ERROR) << "Chunk not found: " + chunk_handle;
-        continue;
-      case ReadFileChunkReply::FAILED_VERSION_OUT_OF_SYNC:
-        LOG(ERROR) << "Version is out of sync " << std::to_string(chunk_version)
-                   << " for chunk " + chunk_handle;
-        continue;
-      case ReadFileChunkReply::FAILED_OUT_OF_RANGE:
-        LOG(ERROR) << "Trying to read " << chunk_handle
-                   << " out of range:  " << offset;
-        continue;
-      default:
-        break;
-    }
-
-    // This read has been successful, return here. We expect the compiler to
-    // execute copy elision here to "move" the read reply. (It is tempting
-    // to explicitly write std::move(read_file_chunk_reply) but that is not
-    // the right approach to do so).
-    return read_file_chunk_reply;
-  }
-
-  // Failed to read from all chunk servers
+  // Failed to read from all chunk servers even after a metadata refresh
   return InternalError("Failed to read from all chunk servers for " +
                        chunk_handle);
 }
 
-google::protobuf::util::StatusOr<std::pair<size_t, void*>> ClientImpl::ReadFile(
+absl::StatusOr<std::pair<size_t, void*>> ClientImpl::ReadFile(
     const char* filename, size_t offset, size_t nbytes) {
   const size_t chunk_block_size(config_manager_->GetFileChunkBlockSize() *
                                 common::bytesPerMb);
@@ -326,7 +347,7 @@ google::protobuf::util::StatusOr<std::pair<size_t, void*>> ClientImpl::ReadFile(
   return std::make_pair(bytes_read, buffer);
 }
 
-google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
+absl::StatusOr<protos::grpc::WriteFileChunkReply>
 ClientImpl::WriteFileChunk(const char* filename, void* buffer,
                            size_t chunk_index, size_t offset, size_t nbytes) {
   std::string chunk_handle;
@@ -441,7 +462,16 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
     write_request.mutable_header()->set_offset_start(offset);
     write_request.mutable_header()->set_length(nbytes);
     write_request.mutable_header()->set_data_checksum(data_checksum);
+    // List the secondary replicas that the primary should forward the
+    // mutation to; the primary itself applies the mutation locally, so it is
+    // excluded (the server also guards against forwarding to itself)
     for (auto location : chunk_server_location_entry.locations) {
+      if (location.server_hostname() ==
+              chunk_server_location_entry.primary_location.server_hostname() &&
+          location.server_port() ==
+              chunk_server_location_entry.primary_location.server_port()) {
+        continue;
+      }
       write_request.mutable_replica_locations()->Add(std::move(location));
     }
     // Prepare the client context
@@ -473,17 +503,67 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
     } else {
       auto write_reply(write_reply_or.value());
       switch (write_reply.status()) {
-        case FileChunkMutationStatus::OK:
-          LOG(INFO) << "Write to file " << filename << " at chunk_index "
-                    << chunk_index << " and offset " << offset << " for "
-                    << nbytes << " bytes succeeds";
-          return write_reply_or;
+        case FileChunkMutationStatus::OK: {
+          // The primary applied the mutation, but the write only succeeded
+          // if every secondary replica applied it too; otherwise the region
+          // is inconsistent and the mutation must be retried (GFS paper
+          // section 3.1 step 7: "In case of errors ... The client request
+          // is considered to have failed")
+          bool all_replicas_ok = true;
+          for (const auto& replica_status : write_reply.replica_status()) {
+            if (replica_status.status() != FileChunkMutationStatus::OK) {
+              all_replicas_ok = false;
+              LOG(ERROR) << "Write to file " << filename << " at chunk_index "
+                         << chunk_index << " failed on secondary replica "
+                         << replica_status.chunk_server_location()
+                                .server_hostname()
+                         << " with status " << replica_status.status()
+                         << "; retrying the mutation";
+            }
+          }
+          if (all_replicas_ok) {
+            LOG(INFO) << "Write to file " << filename << " at chunk_index "
+                      << chunk_index << " and offset " << offset << " for "
+                      << nbytes << " bytes succeeds";
+            return write_reply_or;
+          }
+          // Refresh the metadata (replicas that went away get dropped from
+          // the location list; the version may have advanced) and retry the
+          // whole mutation, re-pushing the data
+          get_metadata_status = GetMetadataForChunk(
+              filename, chunk_index, OpenFileRequest::WRITE, chunk_handle,
+              chunk_version, chunk_server_location_entry, true);
+          if (!get_metadata_status.ok()) {
+            LOG(ERROR) << "Refreshing metadata cache failed due to "
+                       << get_metadata_status;
+            return get_metadata_status;
+          }
+          break;
+        }
         case FileChunkMutationStatus::FAILED_NOT_LEASE_HOLDER:
           // Client found out that the primary it though is no longer a lease
           // holder, we need to force to get the chunk metadata and retry
           LOG(INFO) << "Retrying as primary server " << primary_server_address
                     << " is no longer lease holder "
                     << "refetching chunk metadata";
+          get_metadata_status = GetMetadataForChunk(
+              filename, chunk_index, OpenFileRequest::WRITE, chunk_handle,
+              chunk_version, chunk_server_location_entry, true);
+          if (!get_metadata_status.ok()) {
+            LOG(ERROR) << "Refreshing metadata cache failed due to "
+                       << get_metadata_status;
+            return get_metadata_status;
+          }
+          break;
+        case FileChunkMutationStatus::FAILED_STALE_VERSION:
+        case FileChunkMutationStatus::FAILED_DATA_NOT_FOUND:
+          // The primary's view of the chunk (or the pushed data) is out of
+          // date, e.g. another client triggered a version advance or the
+          // data aged out of the cache. Refresh the metadata and retry,
+          // which re-pushes the data.
+          LOG(INFO) << "Retrying write to " << chunk_handle
+                    << " after refreshing metadata, due to status "
+                    << write_reply.status();
           get_metadata_status = GetMetadataForChunk(
               filename, chunk_index, OpenFileRequest::WRITE, chunk_handle,
               chunk_version, chunk_server_location_entry, true);
@@ -515,7 +595,7 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
   return InternalError("Write file chunk failed after 3 retries");
 }
 
-google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
+absl::Status ClientImpl::WriteFile(const char* filename,
                                                      void* buffer,
                                                      size_t offset,
                                                      size_t nbytes) {
@@ -561,7 +641,7 @@ google::protobuf::util::Status ClientImpl::WriteFile(const char* filename,
   return OkStatus();
 }
 
-google::protobuf::util::Status ClientImpl::DeleteFile(
+absl::Status ClientImpl::DeleteFile(
     const std::string& filename) {
   // Prepare the DeleteFileRequest and client context
   DeleteFileRequest delete_file_request;
@@ -624,7 +704,7 @@ ClientImpl::ClientImpl(common::ConfigManager* config_manager,
       std::make_shared<service::MasterMetadataServiceClient>(master_channel);
 }
 
-google::protobuf::util::StatusOr<ClientImpl*> ClientImpl::ConstructClientImpl(
+absl::StatusOr<ClientImpl*> ClientImpl::ConstructClientImpl(
     const std::string& config_filename, const std::string& master_name,
     const bool resolve_hostname) {
   // Instantiate a ConfigManager with the given filename

@@ -38,8 +38,14 @@ disk:
   block_size_mb: 64
   # The minimum disk space (MB) that a chunk server has to maintain
   min_free_disk_space_mb: 100
-  # on-disk leveldb database for chunk servers
+  # The number of chunk servers each chunk is replicated on (GFS default: 3)
+  replication_factor: 3
+  # on-disk leveldb databases: chunk storage for chunk servers, and the
+  # persistent metadata store (namespace + chunk versions) for the master.
+  # If a master server has no entry here, it runs without persistence and
+  # loses its namespace on restart.
   leveldb:
+    master_server_01: data/gfs_db_master_server_01
     chunk_server_01: data/gfs_db_chunk_server_01
     chunk_server_02: data/gfs_db_chunk_server_02
     chunk_server_03: data/gfs_db_chunk_server_03

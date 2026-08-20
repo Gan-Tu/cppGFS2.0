@@ -8,6 +8,8 @@
 #include "absl/container/flat_hash_map.h"
 #include "src/common/config_manager.h"
 #include "src/common/protocol_client/chunk_server_control_service_client.h"
+#include "src/common/protocol_client/chunk_server_service_server_client.h"
+#include "src/protos/chunk_server.pb.h"
 
 namespace gfs {
 
@@ -84,6 +86,28 @@ class ChunkServerHeartBeatMonitorTask {
   std::shared_ptr<gfs::service::ChunkServerControlServiceClient>
   GetOrCreateChunkServerControlClient(const std::string& server_address);
 
+  // Same as above, but for the file service used to issue CloneFileChunk
+  // requests during re-replication.
+  std::shared_ptr<gfs::service::ChunkServerServiceMasterServerClient>
+  GetOrCreateChunkServerFileServiceClient(const std::string& server_address);
+
+  // Scan all chunks the master knows locations for, and restore the
+  // replication level of any chunk that has fallen below the replication
+  // goal: instruct a registered chunk server that doesn't hold the chunk to
+  // clone it directly from one of the remaining valid replicas (GFS paper
+  // section 4.3, re-replication; run as part of the master's regular
+  // background scans per section 2.6.1). Called on every heartbeat pass, so
+  // repairs also happen when a replacement server joins later.
+  void ScanAndRepairChunkReplication();
+
+  // Restore the replication level of a single chunk, if it is below the
+  // replication goal and a candidate server is available.
+  void ReReplicateChunk(const std::string& chunk_handle);
+
+  // Resolve a chunk server location to a "host:port" address string.
+  std::string ResolveServerAddress(
+      const protos::ChunkServerLocation& location);
+
   // The background thread used for running this task.
   std::unique_ptr<std::thread> thread_;
 
@@ -100,6 +124,13 @@ class ChunkServerHeartBeatMonitorTask {
       std::string,
       std::shared_ptr<gfs::service::ChunkServerControlServiceClient>>
       chunk_server_control_clients_;
+
+  // Maps the server_address to the file service client used for issuing
+  // CloneFileChunk requests during re-replication.
+  absl::flat_hash_map<
+      std::string,
+      std::shared_ptr<gfs::service::ChunkServerServiceMasterServerClient>>
+      chunk_server_file_service_clients_;
 
   gfs::common::ConfigManager* config_mgr_;
 

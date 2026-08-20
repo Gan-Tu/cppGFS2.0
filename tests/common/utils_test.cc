@@ -3,7 +3,7 @@
 #include "gtest/gtest.h"
 
 using namespace gfs::common::utils;
-using google::protobuf::util::IsInvalidArgument;
+using absl::IsInvalidArgument;
 
 class UtilsUnitTest : public ::testing::Test {};
 

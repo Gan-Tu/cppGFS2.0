@@ -6,11 +6,11 @@
 namespace gfs {
 namespace client {
 
-using google::protobuf::util::AlreadyExistsError;
-using google::protobuf::util::FailedPreconditionError;
-using google::protobuf::util::InvalidArgumentError;
-using google::protobuf::util::IsAlreadyExists;
-using google::protobuf::util::OkStatus;
+using absl::AlreadyExistsError;
+using absl::FailedPreconditionError;
+using absl::InvalidArgumentError;
+using absl::IsAlreadyExists;
+using absl::OkStatus;
 
 // A per-thread object that serves as the interface for the impl code to access
 // and issue calls to internal units such as cache manager, service clients to
@@ -25,7 +25,7 @@ bool ValidateOpenFlag(unsigned int flags) {
          flags == (OpenFlag::Write | OpenFlag::Create);
 }
 
-google::protobuf::util::Status init_client(const std::string& config_filename,
+absl::Status init_client(const std::string& config_filename,
                                            const std::string& master_name,
                                            const bool resolve_hostname) {
   if (client_impl_) {
@@ -49,7 +49,7 @@ void reset_client() {
   client_impl_ = nullptr;
 }
 
-google::protobuf::util::Status open(const char* filename, unsigned int flags) {
+absl::Status open(const char* filename, unsigned int flags) {
   // Make sure that init_client is called as a pre-condition
   if (!client_impl_) {
     return FailedPreconditionError(
@@ -76,8 +76,10 @@ google::protobuf::util::Status open(const char* filename, unsigned int flags) {
       return create_status;
     }
   } else if (flags == (OpenFlag::Create | OpenFlag::Write)) {
+    // Create-if-not-exists semantics: an already existing file is fine (the
+    // caller proceeds to write to it); any other creation failure is an error
     auto create_status(client_impl_->CreateFile(filename));
-    if (IsAlreadyExists(create_status)) {
+    if (!create_status.ok() && !IsAlreadyExists(create_status)) {
       return create_status;
     }
   }
@@ -88,11 +90,11 @@ google::protobuf::util::Status open(const char* filename, unsigned int flags) {
   return OkStatus();
 }
 
-google::protobuf::util::Status close(const char* filename) {
+absl::Status close(const char* filename) {
   return OkStatus();
 }
 
-google::protobuf::util::StatusOr<Data> read(const char* filename, size_t offset,
+absl::StatusOr<Data> read(const char* filename, size_t offset,
                                             size_t nbytes) {
   // Make sure that init_client is called as a pre-condition
   if (!client_impl_) {
@@ -115,7 +117,7 @@ google::protobuf::util::StatusOr<Data> read(const char* filename, size_t offset,
   return Data(read_data_or.value().first, read_data_or.value().second);
 }
 
-google::protobuf::util::Status write(const char* filename, void* buffer,
+absl::Status write(const char* filename, void* buffer,
                                      size_t offset, size_t nbytes) {
   // Make sure that init_client is called as a pre-condition
   if (!client_impl_) {
@@ -134,7 +136,7 @@ google::protobuf::util::Status write(const char* filename, void* buffer,
   return write_data_status;
 }
 
-google::protobuf::util::Status remove(const char* filename) {
+absl::Status remove(const char* filename) {
   return client_impl_->DeleteFile(filename);
 }
 

@@ -9,6 +9,7 @@
 #include "src/server/master_server/chunk_server_heartbeat_monitor_task.h"
 #include "src/server/master_server/master_chunk_server_manager_service_impl.h"
 #include "src/server/master_server/master_metadata_service_impl.h"
+#include "src/server/master_server/metadata_manager.h"
 
 using gfs::common::ConfigManager;
 using gfs::server::ChunkServerHeartBeatMonitorTask;
@@ -40,6 +41,26 @@ int main(int argc, char** argv) {
   }
 
   LOG(INFO) << "Running as master server: " << master_name;
+
+  // Enable metadata persistence (the operation-log/checkpoint role from the
+  // GFS paper, section 2.6.3) when a database path is configured for this
+  // master, and recover any previously persisted namespace before serving
+  if (config->HasDatabaseName(master_name)) {
+    const std::string metadata_db = config->GetDatabaseName(master_name);
+    LOG(INFO) << "Enabling metadata persistence at: " << metadata_db;
+    auto persistence_status =
+        gfs::server::MetadataManager::GetInstance()->EnablePersistence(
+            metadata_db);
+    if (!persistence_status.ok()) {
+      LOG(ERROR) << "Cannot enable metadata persistence: "
+                 << persistence_status;
+      return 1;
+    }
+  } else {
+    LOG(WARNING) << "No metadata database configured for " << master_name
+                 << "; the namespace will not survive a master restart";
+  }
+
   LOG(INFO) << "Server starting...";
 
   ServerBuilder builder;

@@ -34,6 +34,10 @@ class MasterMetadataServiceImpl final
   // Accessor to the ChunkServerManager instance
   server::ChunkServerManager& chunk_server_manager();
 
+  // Turn a chunk server location into a "host:port" address, resolving the
+  // hostname through the config's DNS lookup table when configured to do so
+  std::string ResolveServerAddress(const protos::ChunkServerLocation& location);
+
   // Handle file creation request. This function is called by OpenFile
   // function to dispatch the task for creating a file
   grpc::Status HandleFileCreation(const protos::grpc::OpenFileRequest* request,

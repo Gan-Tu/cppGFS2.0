@@ -7,8 +7,8 @@
 #include "src/client/gfs_client.h"
 #include "src/common/system_logger.h"
 
-using google::protobuf::util::Status;
-using google::protobuf::util::StatusOr;
+using absl::Status;
+using absl::StatusOr;
 
 // Configurations
 ABSL_FLAG(std::string, config_path, "data/config.yml", "/path/to/config.yml");
@@ -92,7 +92,12 @@ int main(int argc, char** argv) {
       gfs::client::Data data = read_result.value();
       LOG(INFO) << "Read " << data.bytes_read << " bytes of data from "
                 << filename;
-      LOG(INFO) << "Data read: '" << (char*)data.buffer << "'";
+      // The buffer holds raw bytes and is not null-terminated; construct a
+      // string bounded by bytes_read before printing
+      LOG(INFO) << "Data read: '"
+                << std::string((const char*)data.buffer, data.bytes_read)
+                << "'";
+      free(data.buffer);
     } else {
       LOG(ERROR) << "Failed to read: " << read_result.status();
       return 1;

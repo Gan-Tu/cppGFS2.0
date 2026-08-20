@@ -2,7 +2,7 @@
 #include <thread>
 
 #include "absl/time/time.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "gtest/gtest.h"
 #include "src/common/protocol_client/chunk_server_service_server_client.h"
@@ -15,7 +15,7 @@ using gfs::server::ChunkServerImpl;
 using gfs::server::FileChunkManager;
 using gfs::service::ChunkServerLeaseServiceImpl;
 using gfs::service::ChunkServerServiceMasterServerClient;
-using google::protobuf::util::StatusOr;
+using absl::StatusOr;
 using grpc::Server;
 using grpc::ServerBuilder;
 using protos::grpc::GrantLeaseReply;

@@ -7,9 +7,9 @@
 #include "src/protos/grpc/chunk_server_lease_service.grpc.pb.h"
 
 using gfs::common::utils::ConvertProtobufStatusToGrpcStatus;
-using google::protobuf::util::IsNotFound;
-using google::protobuf::util::Status;
-using google::protobuf::util::StatusOr;
+using absl::IsNotFound;
+using absl::Status;
+using absl::StatusOr;
 using grpc::ServerContext;
 using protos::grpc::GrantLeaseReply;
 using protos::grpc::GrantLeaseRequest;

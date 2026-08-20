@@ -5,8 +5,8 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/time/time.h"
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yaml-cpp/yaml.h"
 
 namespace gfs {
@@ -17,7 +17,7 @@ class ConfigManager {
   // Return an initialized configuration manager by reading the YAML
   // configuration |config_filename|; otherwise, return an error status
   // if the parsing failed, or any configuration file validation errors
-  static google::protobuf::util::StatusOr<ConfigManager*> GetConfig(
+  static absl::StatusOr<ConfigManager*> GetConfig(
       const std::string& config_filename);
 
   std::vector<std::string> GetAllMasterServers();
@@ -43,14 +43,23 @@ class ConfigManager {
   // Resovle a hostname to an IP, using provided DNS lookup table in config
   std::string ResolveHostname(const std::string& hostname);
 
-  // Return the leveldb database name for the given chunk server
+  // Return the leveldb database name for the given server
   std::string GetDatabaseName(const std::string& server_name);
+
+  // Return true if a leveldb database name is configured for the given
+  // server. Used by the master to decide whether to enable metadata
+  // persistence.
+  bool HasDatabaseName(const std::string& server_name);
 
   // Return the size of each file chunk/block in MB
   uint64_t GetFileChunkBlockSize();
 
   // Return the minimum disk space each chunk server needs to maintain in MB
   uint64_t GetRequiredDiskSpaceToMaintain();
+
+  // Return the number of chunk servers each chunk should be replicated on.
+  // Defaults to 3 (the GFS paper's default) when not configured.
+  uint32_t GetReplicationFactor();
 
   // Return the deadline, after when a grpc request should timeout
   absl::Duration GetGrpcDeadline();

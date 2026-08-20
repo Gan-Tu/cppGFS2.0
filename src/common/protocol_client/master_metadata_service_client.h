@@ -3,8 +3,8 @@
 
 #include <memory>
 
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "src/protos/grpc/master_metadata_service.grpc.pb.h"
 
@@ -56,9 +56,9 @@ class MasterMetadataServiceClient {
   // Note that you should NOT reuse client context, as they are call-specific.
   //
   // TODO(tugan): support sending asynchronous client requests
-  google::protobuf::util::StatusOr<protos::grpc::OpenFileReply> SendRequest(
+  absl::StatusOr<protos::grpc::OpenFileReply> SendRequest(
       const protos::grpc::OpenFileRequest& request);
-  google::protobuf::util::StatusOr<protos::grpc::OpenFileReply> SendRequest(
+  absl::StatusOr<protos::grpc::OpenFileReply> SendRequest(
       const protos::grpc::OpenFileRequest& request,
       grpc::ClientContext& context);
 
@@ -74,9 +74,9 @@ class MasterMetadataServiceClient {
   // Note that you should NOT reuse client context, as they are call-specific.
   //
   // TODO(tugan): support sending asynchronous client requests
-  google::protobuf::util::Status SendRequest(
+  absl::Status SendRequest(
       const protos::grpc::DeleteFileRequest& request);
-  google::protobuf::util::Status SendRequest(
+  absl::Status SendRequest(
       const protos::grpc::DeleteFileRequest& request,
       grpc::ClientContext& context);
 

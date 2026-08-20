@@ -17,8 +17,8 @@
 template <class K, class V>
 class thread_safe_flat_hash_map
     : public phmap::parallel_flat_hash_map<
-          K, V, phmap::container_internal::hash_default_hash<K>,
-          phmap::container_internal::hash_default_eq<K>,
+          K, V, phmap::priv::hash_default_hash<K>,
+          phmap::priv::hash_default_eq<K>,
           std::allocator<std::pair<const K, V>>, /*submaps=*/4, absl::Mutex> {
 };
 

@@ -2,8 +2,8 @@
 #define GFS_COMMON_UTILS_H_
 
 #include "absl/synchronization/mutex.h"
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "parallel_hashmap/phmap.h"
 #include "yaml-cpp/yaml.h"
@@ -24,10 +24,10 @@ size_t const bytesPerMb = 1024 * 1024;
 // https://greg7mdp.github.io/parallel-hashmap/
 // https://github.com/greg7mdp/parallel-hashmap/blob/master/examples/bench.cc
 template <class K, class V,
-          class Hash = phmap::container_internal::hash_default_hash<K>>
+          class Hash = phmap::priv::hash_default_hash<K>>
 class thread_safe_flat_hash_map
     : public phmap::parallel_flat_hash_map<
-          K, V, Hash, phmap::container_internal::hash_default_eq<K>,
+          K, V, Hash, phmap::priv::hash_default_eq<K>,
           std::allocator<std::pair<const K, V>>, /*submaps=*/4, absl::Mutex> {};
 
 // Define a customized parallel hashmap that builds on a default
@@ -128,17 +128,17 @@ class parallel_hash_map : public phmap::parallel_flat_hash_map<Key, Value> {
 };
 
 // Similar as above, define an intrinsically thread-safe flat hash set
-template <class V, class Hash = phmap::container_internal::hash_default_hash<V>>
+template <class V, class Hash = phmap::priv::hash_default_hash<V>>
 class thread_safe_flat_hash_set
     : public phmap::parallel_flat_hash_set<
-          V, Hash, phmap::container_internal::hash_default_eq<V>,
+          V, Hash, phmap::priv::hash_default_eq<V>,
           std::allocator<V>, /*submaps=*/4, absl::Mutex> {};
 
 namespace utils {
 
 // Convert a grpc::Status to protocol buffer's Status, so it's compatible with
 // protocol buffer's StatusOr.
-google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
+absl::Status ConvertGrpcStatusToProtobufStatus(
     const grpc::Status& status);
 
 // Convert a protocol buffer's Status to grpc::Status. This occurs typically
@@ -146,7 +146,7 @@ google::protobuf::util::Status ConvertGrpcStatusToProtobufStatus(
 // protocol buffer's Status or StatusOr to a grpc::Status would would be 
 // sent to the client
 grpc::Status ConvertProtobufStatusToGrpcStatus(
-    const google::protobuf::util::Status& status);
+    const absl::Status& status);
 
 // Check the validity of a given Filename. By validity we mean that a pathname
 // must follow the format /comp1/comp2/.../compn. Specifically a path should
@@ -158,13 +158,13 @@ grpc::Status ConvertProtobufStatusToGrpcStatus(
 // offer convenience).
 // 4. Cannot have consecutive slash.
 // [TBD] other constraints if applicable
-google::protobuf::util::Status CheckFilenameValidity(
+absl::Status CheckFilenameValidity(
     const std::string& filename);
 
 // Return a StatusOr with |value| if the |status| is OK; otherwise, convert the
 // gRPC |status| to protobuf status, so it can be used in the returned StatusOr.
 template <typename T>
-inline google::protobuf::util::StatusOr<T> ReturnStatusOrFromGrpcStatus(
+inline absl::StatusOr<T> ReturnStatusOrFromGrpcStatus(
     T value, grpc::Status status) {
   if (status.ok()) {
     return value;
@@ -175,11 +175,17 @@ inline google::protobuf::util::StatusOr<T> ReturnStatusOrFromGrpcStatus(
 
 // Validate a parsed configuration YAML node for required fields/schema.
 // Return Status::OK, if successful; otherwise, any validation error.
-google::protobuf::util::Status ValidateConfigFile(const YAML::Node& node);
+absl::Status ValidateConfigFile(const YAML::Node& node);
 
-// Helper function to compute the checksum of a given string. Internally we use
-// MD5 as a scheme to do this
+// Helper function to compute the checksum of a given string, used to verify
+// and identify data pushed from clients to chunk servers. Internally we use
+// CRC32C (the same family of checksums the GFS paper uses for data
+// integrity), returned as a fixed-width hex string.
 const std::string calc_checksum(const std::string& data);
+
+// Compute the CRC32C checksum of a memory range. Used for the per-64KB-block
+// chunk checksums described in section 5.2 of the GFS paper.
+uint32_t calc_crc32c(const char* data, size_t length);
 
 }  // namespace utils
 }  // namespace common

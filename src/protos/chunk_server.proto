@@ -21,7 +21,7 @@ message ChunkServer {
   repeated string stored_chunk_handles = 3;
 }
 
-// The file chunk. Used for serializing/deserializing 
+// The file chunk. Used for serializing/deserializing
 // the data to/from binary for disk storage.
 message FileChunk {
   // The version of the chunk.
@@ -29,4 +29,13 @@ message FileChunk {
 
   // The actual data for the chunk.
   bytes data = 2;
+
+  // CRC32C checksums, one per 64KB block of |data| (the last block may be
+  // shorter). Following the GFS paper (section 5.2), each chunk server
+  // independently verifies the integrity of its own copy: checksums are
+  // updated incrementally on writes and verified on reads, so a chunk server
+  // never propagates silent disk corruption to clients or other servers.
+  // Chunks written by older versions of this software have no checksums;
+  // verification is skipped for them until their next write.
+  repeated fixed32 block_checksums = 3;
 }

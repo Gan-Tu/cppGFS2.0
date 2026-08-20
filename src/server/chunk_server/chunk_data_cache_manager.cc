@@ -3,9 +3,9 @@
 namespace gfs {
 namespace server {
 
-using google::protobuf::util::NotFoundError;
+using absl::NotFoundError;
 
-google::protobuf::util::StatusOr<std::string> ChunkDataCacheManager::GetValue(
+absl::StatusOr<std::string> ChunkDataCacheManager::GetValue(
     const std::string& key) {
   auto try_get_value(data_cache_.TryGetValue(key));
   if (!try_get_value.second) {

@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/statusor.h"
 #include "leveldb/db.h"
 #include "src/protos/chunk_server.pb.h"
 #include "src/protos/metadata.pb.h"
@@ -84,6 +84,11 @@ namespace server {
 //
 class FileChunkManager {
  public:
+  // The size of the blocks that chunk data is checksummed over, following
+  // section 5.2 of the GFS paper: "A chunk is broken up into 64 KB blocks.
+  // Each has a corresponding 32 bit checksum."
+  static constexpr uint32_t kChecksumBlockSize = 64 * 1024;
+
   // The singleton instance of the file chunk manager.
   static FileChunkManager* GetInstance();
 
@@ -119,7 +124,7 @@ class FileChunkManager {
   // the create_version because the file chunk mgr allows versioning to be
   // managed externally. Fails if a chunk with the specified handle already
   // exists.
-  google::protobuf::util::Status CreateChunk(const std::string& chunk_handle,
+  absl::Status CreateChunk(const std::string& chunk_handle,
                                              const uint32_t& create_version);
 
   // Reads data of the specified length from a chunk with the specified handle
@@ -133,7 +138,7 @@ class FileChunkManager {
   // data from disk. Fails
   // (Error: OUT_OF_RANGE), if the start_offset is greater
   // than the offset of the end of the chunk.
-  google::protobuf::util::StatusOr<std::string> ReadFromChunk(
+  absl::StatusOr<std::string> ReadFromChunk(
       const std::string& chunk_handle, const uint32_t& read_version,
       const uint32_t& start_offset, const uint32_t& length);
 
@@ -151,7 +156,7 @@ class FileChunkManager {
   // Fails (Error: OUT_OF_RANGE), if the start_offset is greater than the offset
   // of the end of the chunk.
   // Fails (Error: UNKNOWN), if writing the update to disk failed.
-  google::protobuf::util::StatusOr<uint32_t> WriteToChunk(
+  absl::StatusOr<uint32_t> WriteToChunk(
       const std::string& chunk_handle, const uint32_t& write_version,
       const uint32_t& start_offset, const uint32_t& length,
       const std::string& new_data);
@@ -166,7 +171,7 @@ class FileChunkManager {
   // Fails (Error: INTERNAL), if it is unable to deserialize the binary
   // data from disk for update.
   // Fails (Error: UNKNOWN), if writing the update to disk failed.
-  google::protobuf::util::Status UpdateChunkVersion(
+  absl::Status UpdateChunkVersion(
       const std::string& chunk_handle, const uint32_t& from_version,
       const uint32_t& to_version);
 
@@ -175,7 +180,7 @@ class FileChunkManager {
   // Fails (Error: NOT_FOUND), if a chunk with the specified handle isn't found.
   // Fails (Error: INTERNAL), if it is unable to deserialize the binary
   // data from disk.
-  google::protobuf::util::StatusOr<uint32_t> GetChunkVersion(
+  absl::StatusOr<uint32_t> GetChunkVersion(
       const std::string& chunk_handle);
 
   // Not yet implemented.
@@ -183,7 +188,7 @@ class FileChunkManager {
   // with the specified handle with the specified version. Returns the actual
   // length of data appended if successful. The length of the data appended can
   // be smaller than specified length, if the chunk max size was reached.
-  google::protobuf::util::StatusOr<uint32_t> AppendToChunk(
+  absl::StatusOr<uint32_t> AppendToChunk(
       const std::string& chunk_handle, const uint32_t& append_version,
       const uint32_t& length, const std::string& new_data);
 
@@ -191,7 +196,15 @@ class FileChunkManager {
   // database. Returns successfully, if chunk has been deleted.
   // Fails (Error: UNKNOWN), if deletion, failed. Could be the chunk with
   // specified handle doesn't exist.
-  google::protobuf::util::Status DeleteChunk(const std::string& chunk_handle);
+  absl::Status DeleteChunk(const std::string& chunk_handle);
+
+  // Store a complete chunk replica (data plus version), creating the chunk if
+  // it doesn't exist and replacing it otherwise. Block checksums are
+  // recomputed for the stored data. This is used when this chunk server is
+  // asked to clone a replica from another chunk server (GFS paper section
+  // 4.3), where the incoming copy is authoritative.
+  absl::Status StoreChunkData(const std::string& chunk_handle,
+                              const uint32_t& version, const std::string& data);
 
  private:
   // Helper to get a file chunk from database. Returns the file chunk if
@@ -200,7 +213,7 @@ class FileChunkManager {
   // isn't found.
   // Fails (Error: INTERNAL), if it is unable to deserialize the
   // binary data from disk.
-  google::protobuf::util::StatusOr<std::shared_ptr<protos::FileChunk>>
+  absl::StatusOr<std::shared_ptr<protos::FileChunk>>
   GetFileChunk(const std::string& chunk_handle);
 
   // Helper used by couple of the public interfaces to get a file chunk from
@@ -210,7 +223,7 @@ class FileChunkManager {
   // chunk.
   // Fails (Error: INTERNAL), if it is unable to deserialize the binary
   // data from disk.
-  google::protobuf::util::StatusOr<std::shared_ptr<protos::FileChunk>>
+  absl::StatusOr<std::shared_ptr<protos::FileChunk>>
   GetFileChunk(const std::string& chunk_handle, const uint32_t& version);
 
   // Serialize the file chunk to binary and write to disk.
@@ -220,6 +233,23 @@ class FileChunkManager {
   // successful writes to be on disk even if machine crashes/restart.
   leveldb::Status WriteFileChunk(const std::string& chunk_handle,
                                  const protos::FileChunk* file_chunk);
+
+  // Verify the stored block checksums of |file_chunk| for all 64KB blocks
+  // that overlap the byte range [offset, offset + length). Returns
+  // DATA_LOSS if any block's checksum doesn't match its data. Chunks
+  // written before checksums were introduced (no stored checksums) are
+  // not verified.
+  absl::Status VerifyBlockChecksums(const protos::FileChunk* file_chunk,
+                                    const uint32_t& offset,
+                                    const uint32_t& length);
+
+  // Recompute and store checksums for all 64KB blocks of |file_chunk| that
+  // overlap the byte range [offset, offset + length), resizing the checksum
+  // list to match the data size. If the chunk predates checksums (data
+  // present but no checksums), all blocks are (re)computed so the chunk
+  // becomes fully covered.
+  void UpdateBlockChecksums(protos::FileChunk* file_chunk,
+                            const uint32_t& offset, const uint32_t& length);
 
   // The leveldb database used internally for chunk storage.
   // Since the underlying database is abstracted, we can change it while still

@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "src/client/client_cache_manager.h"
 #include "src/common/config_manager.h"
 #include "src/common/protocol_client/chunk_server_service_gfs_client.h"
@@ -21,27 +21,27 @@ namespace client {
 class ClientImpl {
  public:
   // Internal impl call that issues an OpenFileRequest to the master. 
-  google::protobuf::util::Status CreateFile(const std::string& filename);
+  absl::Status CreateFile(const std::string& filename);
   
   // Internal impl call that reads data from a file, the first return field
   // is the bytes that actual got read and the second field is a pointer 
   // to the actual data buffer
-  google::protobuf::util::StatusOr<std::pair<size_t, void*>> ReadFile(
+  absl::StatusOr<std::pair<size_t, void*>> ReadFile(
       const char* filename, size_t offset, size_t nbytes);
 
   // Internal impl call that writes buffer to a file, and the return is 
   // the status which indicates if this write succeeds
-  google::protobuf::util::Status WriteFile(const char* filename, void* buffer,
+  absl::Status WriteFile(const char* filename, void* buffer,
       size_t offset, size_t nbytes);
 
   // Internal impl call that issues a DeleteFileRequest to the master
-  google::protobuf::util::Status DeleteFile(const std::string& filename); 
+  absl::Status DeleteFile(const std::string& filename); 
 
   // Construct and return a ClientImpl objects with proper configurations 
   // using the given config file. The ClientImpl object uses the config 
   // file to initialize the cache manager and two clients objects used to 
   // issue rpcs to the master and chunk server nodes, respectively.
-  static google::protobuf::util::StatusOr<ClientImpl*> ConstructClientImpl(
+  static absl::StatusOr<ClientImpl*> ConstructClientImpl(
       const std::string& config_filename, const std::string& master_name,
       const bool resolve_hostname = false);
 
@@ -58,12 +58,12 @@ class ClientImpl {
       const protos::grpc::OpenFileReply& open_file_reply);
 
   // Internal function to read a file chunk
-  google::protobuf::util::StatusOr<protos::grpc::ReadFileChunkReply>
+  absl::StatusOr<protos::grpc::ReadFileChunkReply>
       ReadFileChunk(const char* filename, size_t chunk_index, size_t offset, 
                     size_t nbytes); 
 
   // Internal function to write a file chunk
-  google::protobuf::util::StatusOr<protos::grpc::WriteFileChunkReply>
+  absl::StatusOr<protos::grpc::WriteFileChunkReply>
       WriteFileChunk(const char* filename, void* buffer, size_t chunk_index,
                      size_t offset, size_t nbytes);
 
@@ -78,7 +78,7 @@ class ClientImpl {
   // and WriteFileChunk. The last param forces an OpenFileRequest to get sent.
   // This is used when client finds its no primary no longer holds the lease. 
   // The returned status indicates if this operation is successful. 
-  google::protobuf::util::Status 
+  absl::Status 
       GetMetadataForChunk(
           const char* filename, size_t chunk_index,
           protos::grpc::OpenFileRequest::OpenMode file_open_mode,

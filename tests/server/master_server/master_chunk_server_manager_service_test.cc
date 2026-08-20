@@ -1,7 +1,7 @@
 #include <chrono>
 #include <thread>
 
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "gtest/gtest.h"
 #include "src/common/config_manager.h"
@@ -15,7 +15,7 @@ using gfs::server::ChunkServerImpl;
 using gfs::server::ChunkServerManager;
 using gfs::server::FileChunkManager;
 using gfs::service::MasterChunkServerManagerServiceImpl;
-using google::protobuf::util::StatusOr;
+using absl::StatusOr;
 using grpc::Server;
 using grpc::ServerBuilder;
 using protos::grpc::ReportChunkServerReply;

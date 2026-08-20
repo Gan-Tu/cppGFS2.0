@@ -3,8 +3,8 @@
 
 #include <memory>
 
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "src/protos/grpc/master_chunk_server_manager_service.grpc.pb.h"
 
@@ -63,10 +63,10 @@ class MasterChunkServerManagerServiceClient {
   // Note that you should NOT reuse client context, as they are call-specific.
   //
   // TODO(bmokutub): support sending asynchronous client requests
-  google::protobuf::util::StatusOr<protos::grpc::ReportChunkServerReply>
+  absl::StatusOr<protos::grpc::ReportChunkServerReply>
   SendRequest(const protos::grpc::ReportChunkServerRequest& request);
 
-  google::protobuf::util::StatusOr<protos::grpc::ReportChunkServerReply>
+  absl::StatusOr<protos::grpc::ReportChunkServerReply>
   SendRequest(const protos::grpc::ReportChunkServerRequest& request,
               grpc::ClientContext& context);
 

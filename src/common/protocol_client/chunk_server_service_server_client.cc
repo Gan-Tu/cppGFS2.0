@@ -2,21 +2,25 @@
 
 #include <memory>
 
-#include "google/protobuf/stubs/status.h"
+#include "absl/status/status.h"
 #include "src/common/utils.h"
 
 using gfs::common::utils::ReturnStatusOrFromGrpcStatus;
-using google::protobuf::util::Status;
-using google::protobuf::util::StatusOr;
+using absl::Status;
+using absl::StatusOr;
 using grpc::ClientContext;
 using protos::grpc::AdvanceFileChunkVersionReply;
 using protos::grpc::AdvanceFileChunkVersionRequest;
 using protos::grpc::ApplyMutationsReply;
 using protos::grpc::ApplyMutationsRequest;
+using protos::grpc::CloneFileChunkReply;
+using protos::grpc::CloneFileChunkRequest;
 using protos::grpc::GrantLeaseReply;
 using protos::grpc::GrantLeaseRequest;
 using protos::grpc::InitFileChunkReply;
 using protos::grpc::InitFileChunkRequest;
+using protos::grpc::ReadFileChunkReply;
+using protos::grpc::ReadFileChunkRequest;
 using protos::grpc::RevokeLeaseReply;
 using protos::grpc::RevokeLeaseRequest;
 
@@ -53,10 +57,24 @@ ChunkServerServiceMasterServerClient::SendRequest(
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
+StatusOr<CloneFileChunkReply> ChunkServerServiceMasterServerClient::SendRequest(
+    const CloneFileChunkRequest& request, ClientContext& context) {
+  CloneFileChunkReply reply;
+  grpc::Status status = file_stub_->CloneFileChunk(&context, request, &reply);
+  return ReturnStatusOrFromGrpcStatus(reply, status);
+}
+
 StatusOr<ApplyMutationsReply> ChunkServerServiceChunkServerClient::SendRequest(
     const ApplyMutationsRequest& request, ClientContext& context) {
   ApplyMutationsReply reply;
   grpc::Status status = file_stub_->ApplyMutations(&context, request, &reply);
+  return ReturnStatusOrFromGrpcStatus(reply, status);
+}
+
+StatusOr<ReadFileChunkReply> ChunkServerServiceChunkServerClient::SendRequest(
+    const ReadFileChunkRequest& request, ClientContext& context) {
+  ReadFileChunkReply reply;
+  grpc::Status status = file_stub_->ReadFileChunk(&context, request, &reply);
   return ReturnStatusOrFromGrpcStatus(reply, status);
 }
 
@@ -89,8 +107,20 @@ ChunkServerServiceMasterServerClient::SendRequest(
   return SendRequest(request, default_context);
 }
 
+StatusOr<CloneFileChunkReply> ChunkServerServiceMasterServerClient::SendRequest(
+    const CloneFileChunkRequest& request) {
+  ClientContext default_context;
+  return SendRequest(request, default_context);
+}
+
 StatusOr<ApplyMutationsReply> ChunkServerServiceChunkServerClient::SendRequest(
     const ApplyMutationsRequest& request) {
+  ClientContext default_context;
+  return SendRequest(request, default_context);
+}
+
+StatusOr<ReadFileChunkReply> ChunkServerServiceChunkServerClient::SendRequest(
+    const ReadFileChunkRequest& request) {
   ClientContext default_context;
   return SendRequest(request, default_context);
 }

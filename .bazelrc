@@ -1,0 +1,8 @@
+# Modern gRPC / protobuf / abseil require C++17.
+build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+
+# Silence noisy warnings from third-party dependencies.
+build --copt=-Wno-deprecated-declarations
+
+# Show test errors by default.
+test --test_output=errors

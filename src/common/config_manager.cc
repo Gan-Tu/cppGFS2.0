@@ -6,9 +6,9 @@
 #include "src/common/utils.h"
 
 using gfs::common::utils::ValidateConfigFile;
-using google::protobuf::util::InvalidArgumentError;
-using google::protobuf::util::Status;
-using google::protobuf::util::StatusOr;
+using absl::InvalidArgumentError;
+using absl::Status;
+using absl::StatusOr;
 
 namespace gfs {
 namespace common {
@@ -86,6 +86,17 @@ std::string ConfigManager::GetServerAddress(const std::string& server_name,
 
 std::string ConfigManager::GetDatabaseName(const std::string& server_name) {
   return config_["disk"]["leveldb"][server_name].as<std::string>();
+}
+
+bool ConfigManager::HasDatabaseName(const std::string& server_name) {
+  return config_["disk"]["leveldb"][server_name].IsDefined();
+}
+
+uint32_t ConfigManager::GetReplicationFactor() {
+  if (config_["disk"]["replication_factor"].IsDefined()) {
+    return config_["disk"]["replication_factor"].as<uint32_t>();
+  }
+  return 3;
 }
 
 uint64_t ConfigManager::GetFileChunkBlockSize() {

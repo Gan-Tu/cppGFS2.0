@@ -2,7 +2,7 @@
 #include <thread>
 
 #include "absl/time/time.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/statusor.h"
 #include "grpcpp/grpcpp.h"
 #include "gtest/gtest.h"
 #include "src/client/gfs_client.h"
@@ -44,8 +44,8 @@ using gfs::server::FileChunkManager;
 using gfs::server::MetadataManager;
 using gfs::service::ChunkServerFileServiceImpl;
 using gfs::service::MasterMetadataServiceImpl;
-using google::protobuf::util::Status;
-using google::protobuf::util::StatusOr;
+using absl::Status;
+using absl::StatusOr;
 using grpc::Server;
 using grpc::ServerBuilder;
 

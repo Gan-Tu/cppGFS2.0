@@ -1,8 +1,8 @@
 #ifndef GFS_SERVER_CHUNK_SERVER_CHUNK_DATA_CACHE_MANAGER_H_
 #define GFS_SERVER_CHUNK_SERVER_CHUNK_DATA_CACHE_MANAGER_H_
 
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/stubs/statusor.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "src/common/utils.h"
 
 // Singleton class responsible for managing the data cache and retrival for
@@ -32,7 +32,7 @@ class ChunkDataCacheManager {
   static ChunkDataCacheManager* GetInstance();   
 
   // Get value for a key, return error if key not found
-  google::protobuf::util::StatusOr<std::string> GetValue(
+  absl::StatusOr<std::string> GetValue(
       const std::string& key);
 
   // Set value for a key

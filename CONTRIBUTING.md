@@ -10,7 +10,7 @@ If you need to define, parse, and read command line flags, please use [Abseil's 
 
 ### Pull Requests & Tests
 
-They are useful, please use them. Travis-CI is built-in for pull requests, so they will tell you if your commit will break the code. Also, common sense, add tests whenever you commit large chunk of code.
+They are useful, please use them. GitHub Actions CI runs on every pull request, so it will tell you if your commit will break the code. Also, common sense, add tests whenever you commit large chunk of code.
 
 ### Clean Git History
 

@@ -1,17 +1,25 @@
 name: Docker Image CI
+
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Build the Docker image
-      uses: mattdavis0351/actions/docker-gpr@v1
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        image-name: cppGFS2.0
-        dockerfile-location: .
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: cppgfs2.0:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
