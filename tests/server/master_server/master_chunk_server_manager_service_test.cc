@@ -27,19 +27,34 @@ const std::string kTestMasterServerAddress = "0.0.0.0:10002";
 const std::string kTestChunkServerName = "test_chunk_server_01";
 
 namespace {
-void StartTestMasterChunkServerManagerService() {
+// A running test gRPC server; stopped with a clean Shutdown() (cancelling
+// the thread with pthread_cancel unwinds into gRPC internals and hangs on
+// Linux).
+struct TestServerHandle {
+  std::unique_ptr<MasterChunkServerManagerServiceImpl> service;
+  std::unique_ptr<Server> server;
+  std::thread wait_thread;
+};
+
+std::unique_ptr<TestServerHandle> StartTestMasterChunkServerManagerService() {
   ServerBuilder builder;
   auto credentials = grpc::InsecureServerCredentials();
   builder.AddListeningPort(kTestMasterServerAddress, credentials);
 
   // Register a synchronous service for coordinating with chunkservers
-  MasterChunkServerManagerServiceImpl chunk_server_mgr_service;
-  builder.RegisterService(&chunk_server_mgr_service);
+  auto handle = std::unique_ptr<TestServerHandle>(new TestServerHandle());
+  handle->service.reset(new MasterChunkServerManagerServiceImpl());
+  builder.RegisterService(handle->service.get());
 
-  // Start the server, and let it run until thread is cancelled
-  std::unique_ptr<Server> server(builder.BuildAndStart());
+  handle->server = builder.BuildAndStart();
+  Server* server = handle->server.get();
+  handle->wait_thread = std::thread([server] { server->Wait(); });
+  return handle;
+}
 
-  server->Wait();
+void ShutdownTestServer(TestServerHandle& handle) {
+  handle.server->Shutdown();
+  handle.wait_thread.join();
 }
 }  // namespace
 
@@ -121,16 +136,14 @@ int main(int argc, char** argv) {
 
   // Start the MasterChunkServerManagerService in the background, and wait for
   // some time for the server to be successfully started in the background.
-  std::thread master_server_thread =
-      std::thread(StartTestMasterChunkServerManagerService);
+  auto master_server_handle = StartTestMasterChunkServerManagerService();
   std::this_thread::sleep_for(std::chrono::seconds(3));
 
   // Run tests
   int exit_code = RUN_ALL_TESTS();
 
   // Clean up background server
-  pthread_cancel(master_server_thread.native_handle());
-  master_server_thread.join();
+  ShutdownTestServer(*master_server_handle);
 
   return exit_code;
 }

@@ -96,8 +96,23 @@ void SeedTestMetadata() {
                   .size() > 0);
 }
 
-// Start a test chunk server, this gets called from a separate thread
-void StartTestChunkServer() {
+// A running test gRPC server; stopped with a clean Shutdown() (cancelling
+// the thread with pthread_cancel unwinds into gRPC internals and hangs on
+// Linux).
+struct TestServerHandle {
+  std::unique_ptr<ChunkServerFileServiceImpl> file_service;
+  std::unique_ptr<MasterMetadataServiceImpl> metadata_service;
+  std::unique_ptr<Server> server;
+  std::thread wait_thread;
+};
+
+void ShutdownTestServer(TestServerHandle& handle) {
+  handle.server->Shutdown();
+  handle.wait_thread.join();
+}
+
+// Start a test chunk server in the background
+std::unique_ptr<TestServerHandle> StartTestChunkServer() {
   ServerBuilder builder;
   auto credentials = grpc::InsecureServerCredentials();
   builder.AddListeningPort(kTestChunkServerAddress, credentials);
@@ -106,30 +121,36 @@ void StartTestChunkServer() {
       ChunkServerImpl::ConstructChunkServerImpl(kTestConfigPath,
                                                 kTestChunkServerName);
   ChunkServerImpl* chunk_server = chunk_server_or.value();
-  ChunkServerFileServiceImpl file_service(chunk_server);
-  builder.RegisterService(&file_service);
+  auto handle = std::unique_ptr<TestServerHandle>(new TestServerHandle());
+  handle->file_service.reset(new ChunkServerFileServiceImpl(chunk_server));
+  builder.RegisterService(handle->file_service.get());
   // Initialize test data on the chunk server
   SeedTestChunkData();
-  // Start the server, and let it run until thread is cancelled
-  std::unique_ptr<Server> server(builder.BuildAndStart());
-  server->Wait();
+  // Start the server, and let it run until shut down
+  handle->server = builder.BuildAndStart();
+  Server* server = handle->server.get();
+  handle->wait_thread = std::thread([server] { server->Wait(); });
+  return handle;
 }
 
-// Start a test master server, this gets called from a separate thread
-void StartTestMasterServer() {
+// Start a test master server in the background
+std::unique_ptr<TestServerHandle> StartTestMasterServer() {
   ServerBuilder builder;
   auto credentials = grpc::InsecureServerCredentials();
   builder.AddListeningPort(kTestMasterServerAddress, credentials);
   // Register the master metadata service impl
   ConfigManager* config =
       ConfigManager::GetConfig(kTestConfigPath).value();
-  MasterMetadataServiceImpl metadata_service(config);
-  builder.RegisterService(&metadata_service);
+  auto handle = std::unique_ptr<TestServerHandle>(new TestServerHandle());
+  handle->metadata_service.reset(new MasterMetadataServiceImpl(config));
+  builder.RegisterService(handle->metadata_service.get());
   // Initialize test data on the master server
   SeedTestMetadata();
-  // Start the server, and let it run until thread is cancelled
-  std::unique_ptr<Server> server(builder.BuildAndStart());
-  server->Wait();
+  // Start the server, and let it run until shut down
+  handle->server = builder.BuildAndStart();
+  Server* server = handle->server.get();
+  handle->wait_thread = std::thread([server] { server->Wait(); });
+  return handle;
 }
 
 // Initialize the client impl and make it ready to call client function
@@ -208,10 +229,10 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
 
   // Start a chunk server for file service handler in the background
-  std::thread chunk_server_thread = std::thread(StartTestChunkServer);
+  auto chunk_server_handle = StartTestChunkServer();
 
   // Start a master server file metadata service handler in the background
-  std::thread master_server_thread = std::thread(StartTestMasterServer);
+  auto master_server_handle = StartTestMasterServer();
 
   // Wait more time for the server to successfully start in background
   std::this_thread::sleep_for(std::chrono::seconds(3));
@@ -219,12 +240,9 @@ int main(int argc, char** argv) {
   // Run tests
   int exit_code = RUN_ALL_TESTS();
 
-  // Clean up background server
-  pthread_cancel(chunk_server_thread.native_handle());
-  pthread_cancel(master_server_thread.native_handle());
-
-  chunk_server_thread.join();
-  master_server_thread.join();
+  // Clean up background servers
+  ShutdownTestServer(*chunk_server_handle);
+  ShutdownTestServer(*master_server_handle);
 
   return exit_code;
 }

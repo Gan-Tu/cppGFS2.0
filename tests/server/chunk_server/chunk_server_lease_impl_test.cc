@@ -55,7 +55,17 @@ void SeedTestData(ChunkServerImpl* chunk_server) {
                                  kTestExpirationUnixSeconds);
 }
 
-void StartTestServer() {
+// A running test gRPC server and the resources it needs to stay alive.
+// Servers are stopped with a clean Shutdown(): cancelling their threads with
+// pthread_cancel (the previous approach) unwinds into gRPC internals and
+// hangs on Linux.
+struct TestServerHandle {
+  std::unique_ptr<ChunkServerLeaseServiceImpl> lease_service;
+  std::unique_ptr<Server> server;
+  std::thread wait_thread;
+};
+
+std::unique_ptr<TestServerHandle> StartTestServer() {
   // Initialize the test chunk server database
   FileChunkManager::GetInstance()->Initialize("chunk_server_lease_impl_test_db",
                                               /*max_chunk_size_bytes=*/1024);
@@ -68,11 +78,18 @@ void StartTestServer() {
                                                 kTestServerName);
   ChunkServerImpl* chunk_server = chunk_server_or.value();
   SeedTestData(chunk_server);  // seed test data
-  ChunkServerLeaseServiceImpl lease_service(chunk_server);
-  builder.RegisterService(&lease_service);
-  // Start the server, and let it run until thread is cancelled
-  std::unique_ptr<Server> server(builder.BuildAndStart());
-  server->Wait();
+  auto handle = std::unique_ptr<TestServerHandle>(new TestServerHandle());
+  handle->lease_service.reset(new ChunkServerLeaseServiceImpl(chunk_server));
+  builder.RegisterService(handle->lease_service.get());
+  handle->server = builder.BuildAndStart();
+  Server* server = handle->server.get();
+  handle->wait_thread = std::thread([server] { server->Wait(); });
+  return handle;
+}
+
+void ShutdownTestServer(TestServerHandle& handle) {
+  handle.server->Shutdown();
+  handle.wait_thread.join();
 }
 }  // namespace
 
@@ -195,15 +212,14 @@ int main(int argc, char** argv) {
 
   // Start a server for lease gRPC handler in the background, and wait some time
   // for the server to successfully start in background
-  std::thread server_thread = std::thread(StartTestServer);
+  auto server_handle = StartTestServer();
   std::this_thread::sleep_for(std::chrono::seconds(3));
 
   // Run tests
   int exit_code = RUN_ALL_TESTS();
 
   // Clean up background server
-  pthread_cancel(server_thread.native_handle());
-  server_thread.join();
+  ShutdownTestServer(*server_handle);
 
   return exit_code;
 }

@@ -79,10 +79,19 @@ void SeedTestData(ChunkServerImpl* chunk_server) {
                                   kTestData);
 }
 
-void StartTestServer(const std::string& server_address,
-                     const std::string& server_name,
-                     const bool initialize_file_chunk_mgr,
-                     const bool seed_data) {
+// A running test gRPC server; stopped with a clean Shutdown() (cancelling
+// the thread with pthread_cancel unwinds into gRPC internals and hangs on
+// Linux).
+struct TestServerHandle {
+  std::unique_ptr<ChunkServerLeaseServiceImpl> lease_service;
+  std::unique_ptr<ChunkServerFileServiceImpl> file_service;
+  std::unique_ptr<Server> server;
+  std::thread wait_thread;
+};
+
+std::unique_ptr<TestServerHandle> StartTestServer(
+    const std::string& server_address, const std::string& server_name,
+    const bool initialize_file_chunk_mgr, const bool seed_data) {
   if (initialize_file_chunk_mgr) {
     // Initialize the test chunk server database
     FileChunkManager::GetInstance()->Initialize(
@@ -103,14 +112,22 @@ void StartTestServer(const std::string& server_address,
     SeedTestData(chunk_server);
   }
 
-  ChunkServerLeaseServiceImpl lease_service(chunk_server);
-  builder.RegisterService(&lease_service);
-  ChunkServerFileServiceImpl file_service(
-      chunk_server, /*clear_cached_data_after_write=*/false);
-  builder.RegisterService(&file_service);
-  // Start the server, and let it run until thread is cancelled
-  std::unique_ptr<Server> server(builder.BuildAndStart());
-  server->Wait();
+  auto handle = std::unique_ptr<TestServerHandle>(new TestServerHandle());
+  handle->lease_service.reset(new ChunkServerLeaseServiceImpl(chunk_server));
+  builder.RegisterService(handle->lease_service.get());
+  handle->file_service.reset(new ChunkServerFileServiceImpl(
+      chunk_server, /*clear_cached_data_after_write=*/false));
+  builder.RegisterService(handle->file_service.get());
+  // Start the server, and let it run until shut down
+  handle->server = builder.BuildAndStart();
+  Server* server = handle->server.get();
+  handle->wait_thread = std::thread([server] { server->Wait(); });
+  return handle;
+}
+
+void ShutdownTestServer(TestServerHandle& handle) {
+  handle.server->Shutdown();
+  handle.wait_thread.join();
 }
 
 StatusOr<SendChunkDataReply> SendDataToChunkServer(
@@ -400,12 +417,11 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
   std::vector<std::string> all_chunk_server_names(replica_chunk_server_names);
   all_chunk_server_names.push_back(primary_chunk_server_name);
 
-  std::vector<std::thread> replica_chunk_server_threads;
+  std::vector<std::unique_ptr<TestServerHandle>> replica_chunk_servers;
 
   // Start replica servers, primary is already running from test main.
   for (auto& server_name : replica_chunk_server_names) {
-    replica_chunk_server_threads.push_back(std::thread(
-        StartTestServer,
+    replica_chunk_servers.push_back(StartTestServer(
         config_mgr_->GetServerAddress(server_name, /*resolve_hostname=*/true),
         server_name,
         /*initialize_file_chunk_mgr=*/false, /*seed_data=*/false));
@@ -559,10 +575,9 @@ TEST_F(ChunkServerFileImplTest, WriteReplicatedFileChunk) {
   // No replica status, since it failed in primary
   EXPECT_EQ(0, write_reply.replica_status_size());
 
-  // kill the replica servers
-  for (std::size_t i = 0; i < replica_chunk_server_threads.size(); ++i) {
-    pthread_cancel(replica_chunk_server_threads[i].native_handle());
-    replica_chunk_server_threads[i].join();
+  // shut down the replica servers
+  for (auto& replica_server : replica_chunk_servers) {
+    ShutdownTestServer(*replica_server);
   }
 }
 
@@ -571,18 +586,17 @@ int main(int argc, char** argv) {
 
   // Start a server for lease gRPC handler in the background, and wait some time
   // for the server to successfully start in background
-  std::thread server_thread =
-      std::thread(StartTestServer, kTestServerAddress, kTestServerName,
-                  /*initialize_file_chunk_mgr=*/true,
-                  /*const bool seed_data =*/true);
+  auto server_handle =
+      StartTestServer(kTestServerAddress, kTestServerName,
+                      /*initialize_file_chunk_mgr=*/true,
+                      /*seed_data=*/true);
   std::this_thread::sleep_for(std::chrono::seconds(3));
 
   // Run tests
   int exit_code = RUN_ALL_TESTS();
 
   // Clean up background server
-  pthread_cancel(server_thread.native_handle());
-  server_thread.join();
+  ShutdownTestServer(*server_handle);
 
   return exit_code;
 }
