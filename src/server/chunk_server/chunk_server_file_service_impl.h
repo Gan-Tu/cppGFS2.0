@@ -77,6 +77,12 @@ class ChunkServerFileServiceImpl final
   grpc::Status WriteFileChunkInternal(
       const protos::grpc::WriteFileChunkRequestHeader& request_header,
       protos::grpc::WriteFileChunkReply* const reply);
+
+  // Delete a replica whose stored data failed checksum verification, taking
+  // the chunk's mutation lock. Deletion makes the corruption self-healing:
+  // the next report drops this replica from the master's location map and
+  // the re-replication scan clones a fresh copy (GFS paper section 5.2).
+  void DeleteCorruptReplica(const std::string& chunk_handle);
 };
 
 // The asynchronous implementation for handling ChunkServerFileService requests

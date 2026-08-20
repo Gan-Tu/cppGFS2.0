@@ -1,8 +1,11 @@
 #include "src/common/utils.h"
 
+#include <openssl/sha.h>
+
 #include "absl/crc/crc32c.h"
 #include "absl/status/status.h"
-#include "absl/strings/str_format.h"
+#include "absl/strings/escaping.h"
+#include "absl/strings/string_view.h"
 #include "grpcpp/grpcpp.h"
 
 namespace gfs {
@@ -218,11 +221,16 @@ absl::Status ValidateConfigFile(const YAML::Node& node) {
 }
 
 const std::string calc_checksum(const std::string& data) {
-  // Also encode the data length in the identifier to further reduce the
-  // (already small) chance that two distinct in-flight payloads collide in
-  // the chunk servers' data cache.
-  return absl::StrFormat(
-      "%08x-%x", static_cast<uint32_t>(absl::ComputeCrc32c(data)), data.size());
+  // This value both verifies the transferred payload and *identifies* it in
+  // the chunk servers' shared data cache, keyed only by this string. The
+  // identity role demands collision resistance: with a weak checksum, two
+  // distinct in-flight payloads could collide and a write would durably
+  // commit the wrong bytes. SHA-256 makes that practically impossible.
+  unsigned char digest[SHA256_DIGEST_LENGTH];
+  SHA256(reinterpret_cast<const unsigned char*>(data.data()), data.size(),
+         digest);
+  return absl::BytesToHexString(absl::string_view(
+      reinterpret_cast<const char*>(digest), SHA256_DIGEST_LENGTH));
 }
 
 uint32_t calc_crc32c(const char* data, size_t length) {

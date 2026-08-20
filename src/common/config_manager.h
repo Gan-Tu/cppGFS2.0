@@ -7,6 +7,7 @@
 #include "absl/time/time.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "src/protos/chunk_server.pb.h"
 #include "yaml-cpp/yaml.h"
 
 namespace gfs {
@@ -38,6 +39,12 @@ class ConfigManager {
   // networking module, which comes with default DNS resolver, you should NOT
   // set |resolve_hostname|: https://docs.docker.com/conf
   std::string GetServerAddress(const std::string& server_name,
+                               const bool resolve_hostname = false);
+
+  // Same, but for a chunk server location proto (hostname + port). This is
+  // the one place address formation from locations lives; client, master,
+  // and chunk servers all use it.
+  std::string GetServerAddress(const protos::ChunkServerLocation& location,
                                const bool resolve_hostname = false);
 
   // Resovle a hostname to an IP, using provided DNS lookup table in config

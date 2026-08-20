@@ -114,6 +114,22 @@ class parallel_hash_map : public phmap::parallel_flat_hash_map<Key, Value> {
     absl::WriterMutexLock lock_guard(lock);
     this->erase(key);
   }
+
+  // Return the value for a key, atomically creating it with |factory| if the
+  // key does not exist yet. Used e.g. for get-or-create of per-chunk locks.
+  template <class Factory>
+  Value GetOrCreate(const Key& key, Factory&& factory) {
+    absl::Mutex* lock(FetchLock(key));
+    absl::WriterMutexLock lock_guard(lock);
+    auto iter = this->find(key);
+    if (iter != this->end()) {
+      return iter->second;
+    }
+    Value value = factory();
+    (*this)[key] = value;
+    return value;
+  }
+
  private:
   std::vector<std::shared_ptr<absl::Mutex>> locks_;
   absl::Mutex* FetchLock(const Key& key) {
@@ -133,6 +149,22 @@ class thread_safe_flat_hash_set
     : public phmap::parallel_flat_hash_set<
           V, Hash, phmap::priv::hash_default_eq<V>,
           std::allocator<V>, /*submaps=*/4, absl::Mutex> {};
+
+// Take a consistent snapshot of the keys of a thread-safe (mutex-guarded)
+// parallel hash map. Plain range-for iteration of these maps is NOT safe
+// against concurrent inserts/erases (the embedded mutex guards individual
+// operations, not iteration); this helper iterates each submap under its
+// lock via phmap's with_submap.
+template <class Map, class KeyOut>
+void SnapshotKeys(const Map& map, std::vector<KeyOut>* out) {
+  for (size_t i = 0; i < map.subcnt(); ++i) {
+    map.with_submap(i, [&](const auto& submap) {
+      for (const auto& item : submap) {
+        out->push_back(item.first);
+      }
+    });
+  }
+}
 
 namespace utils {
 

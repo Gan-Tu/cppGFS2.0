@@ -8,6 +8,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//src/common:config_manager",
+        "//src/common:protos_common",
         "//src/common:system_logger",
         "//src/common:utils",
         "//src/common/protocol_client:chunk_server_service_server_client",
@@ -61,6 +62,7 @@ cc_library(
     hdrs = ["chunk_server_manager.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//src/common:protos_common",
         "//src/common:system_logger",
         "//src/common:utils",
         "//src/protos:cc_chunk_server_proto",
@@ -81,6 +83,7 @@ cc_library(
         "//src/common:system_logger",
         "//src/common/protocol_client:chunk_server_control_service_client",
         "//src/common/protocol_client:chunk_server_service_server_client",
+        "//src/common/protocol_client:grpc_client_utils",
         "//src/protos:cc_chunk_server_proto",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
@@ -113,6 +116,7 @@ cc_library(
         ":chunk_server_manager",
         ":metadata_manager",
         "//src/common:config_manager",
+        "//src/common:protos_common",
         "//src/common:system_logger",
         "//src/protos/grpc:cc_master_chunk_server_manager_service_grpc",
         "@com_github_grpc_grpc//:grpc++",

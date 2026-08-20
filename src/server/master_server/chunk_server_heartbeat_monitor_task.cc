@@ -7,6 +7,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "src/common/protocol_client/chunk_server_control_service_client.h"
+#include "src/common/protocol_client/grpc_client_utils.h"
 #include "src/common/system_logger.h"
 #include "src/server/master_server/chunk_server_manager.h"
 #include "src/server/master_server/metadata_manager.h"
@@ -77,18 +78,13 @@ void ChunkServerHeartBeatMonitorTask::MonitorHeartBeat() {
   const ushort max_attempts = 3;
 
   while (true) {
-    // Snapshot the registered chunk servers first: unregistering a server
-    // inside a loop that iterates the live map would invalidate the
-    // iterator (and race with concurrent registrations).
-    std::vector<std::pair<protos::ChunkServerLocation, protos::ChunkServer>>
-        registered_servers;
-    for (auto& chunk_server :
-         ChunkServerManager::GetInstance().chunk_servers_map_) {
-      registered_servers.emplace_back(chunk_server.first,
-                                      *chunk_server.second);
-    }
+    // Snapshot the registered chunk server locations first: the live map
+    // must not be iterated while report threads may concurrently register
+    // servers (phmap's per-operation mutexes do not protect iteration)
+    std::vector<protos::ChunkServerLocation> registered_servers =
+        ChunkServerManager::GetInstance().GetRegisteredServerLocations();
 
-    for (auto& chunk_server : registered_servers) {
+    for (auto& server_location : registered_servers) {
       // Check if we have been asked to terminate before proceeding.
       if (IsTerminateSignalled()) {
         return;
@@ -96,7 +92,7 @@ void ChunkServerHeartBeatMonitorTask::MonitorHeartBeat() {
 
       CheckHeartBeatRequest request;
 
-      auto server_address = ResolveServerAddress(chunk_server.first);
+      auto server_address = ResolveServerAddress(server_location);
 
       auto client = GetOrCreateChunkServerControlClient(server_address);
 
@@ -126,7 +122,7 @@ void ChunkServerHeartBeatMonitorTask::MonitorHeartBeat() {
       if (!reply.ok()) {
         LOG(INFO) << "Unregistering chunk server: " << server_address;
         ChunkServerManager::GetInstance().UnRegisterChunkServer(
-            /*server_location=*/chunk_server.first);
+            /*server_location=*/server_location);
       }
     }
 
@@ -171,23 +167,15 @@ void ChunkServerHeartBeatMonitorTask::Terminate() {
 
 std::string ChunkServerHeartBeatMonitorTask::ResolveServerAddress(
     const protos::ChunkServerLocation& location) {
-  std::string hostname = location.server_hostname();
-  if (this->resolve_hostname_) {
-    hostname = this->config_mgr_->ResolveHostname(hostname);
-  }
-  return absl::StrCat(hostname, ":", location.server_port());
+  return this->config_mgr_->GetServerAddress(location,
+                                             this->resolve_hostname_);
 }
 
 void ChunkServerHeartBeatMonitorTask::ScanAndRepairChunkReplication() {
-  // Snapshot the chunk handles the master knows locations for, so we don't
-  // iterate the live map while it may be concurrently modified
-  std::vector<std::string> chunk_handles;
-  for (auto& chunk_locations :
-       ChunkServerManager::GetInstance().chunk_locations_map_) {
-    chunk_handles.push_back(chunk_locations.first);
-  }
-
-  for (const auto& chunk_handle : chunk_handles) {
+  // Snapshot the chunk handles the master knows locations for (safe against
+  // concurrent map mutation; see GetAllChunkHandles)
+  for (const auto& chunk_handle :
+       ChunkServerManager::GetInstance().GetAllChunkHandles()) {
     if (IsTerminateSignalled()) {
       return;
     }
@@ -219,15 +207,16 @@ void ChunkServerHeartBeatMonitorTask::ReReplicateChunk(
                << " has no live replicas left; cannot re-replicate it";
     return;
   }
-  const protos::ChunkServerLocation source_location = *live_locations.begin();
+  const std::vector<protos::ChunkServerLocation> source_candidates(
+      live_locations.begin(), live_locations.end());
 
-  // Pick target servers that do not yet hold a replica of this chunk.
-  // Snapshot the registered servers to avoid iterating the live map while
-  // it may be concurrently modified.
+  // Pick target servers that do not yet hold a replica of this chunk
+  // (snapshot; safe against concurrent registration)
   std::vector<protos::ChunkServerLocation> candidate_targets;
-  for (auto& chunk_server : chunk_server_manager.chunk_servers_map_) {
-    if (!live_locations.contains(chunk_server.first)) {
-      candidate_targets.push_back(chunk_server.first);
+  for (auto& server_location :
+       chunk_server_manager.GetRegisteredServerLocations()) {
+    if (!live_locations.contains(server_location)) {
+      candidate_targets.push_back(server_location);
     }
   }
 
@@ -238,34 +227,51 @@ void ChunkServerHeartBeatMonitorTask::ReReplicateChunk(
     }
     const std::string target_address = ResolveServerAddress(target_location);
 
-    LOG(INFO) << "Re-replicating chunk " << chunk_handle << " (version "
-              << chunk_version << "): instructing " << target_address
-              << " to clone it from " << source_location.server_hostname();
+    // Rotate through source replicas on failure: a single bad source (e.g.
+    // one with a corrupted block, whose read will fail checksum
+    // verification) must not block repair forever while healthy sources
+    // exist
+    bool cloned = false;
+    for (const auto& source_location : source_candidates) {
+      LOG(INFO) << "Re-replicating chunk " << chunk_handle << " (version "
+                << chunk_version << "): instructing " << target_address
+                << " to clone it from " << source_location.server_hostname();
 
-    CloneFileChunkRequest clone_request;
-    clone_request.set_chunk_handle(chunk_handle);
-    clone_request.set_chunk_version(chunk_version);
-    *clone_request.mutable_source_location() = source_location;
+      CloneFileChunkRequest clone_request;
+      clone_request.set_chunk_handle(chunk_handle);
+      clone_request.set_chunk_version(chunk_version);
+      *clone_request.mutable_source_location() = source_location;
 
-    auto client = GetOrCreateChunkServerFileServiceClient(target_address);
-    StatusOr<CloneFileChunkReply> clone_reply_or =
-        client->SendRequest(clone_request);
+      // Bound the wait: a hung target must not stall the heartbeat thread
+      // (and with it all failure detection and repair)
+      grpc::ClientContext client_context;
+      gfs::common::SetClientContextDeadline(client_context, config_mgr_);
+      auto client = GetOrCreateChunkServerFileServiceClient(target_address);
+      StatusOr<CloneFileChunkReply> clone_reply_or =
+          client->SendRequest(clone_request, client_context);
 
-    if (!clone_reply_or.ok() ||
-        (clone_reply_or.value().status() != CloneFileChunkReply::OK &&
-         clone_reply_or.value().status() !=
-             CloneFileChunkReply::ALREADY_UP_TO_DATE)) {
+      if (clone_reply_or.ok() &&
+          (clone_reply_or.value().status() == CloneFileChunkReply::OK ||
+           clone_reply_or.value().status() ==
+               CloneFileChunkReply::ALREADY_UP_TO_DATE)) {
+        cloned = true;
+        break;
+      }
       LOG(ERROR) << "Re-replication of chunk " << chunk_handle << " to "
-                 << target_address << " failed; will retry on a later scan";
+                 << target_address << " from "
+                 << source_location.server_hostname()
+                 << " failed; trying another source";
+    }
+    if (!cloned) {
+      LOG(ERROR) << "Re-replication of chunk " << chunk_handle << " to "
+                 << target_address << " failed from every source; will "
+                 << "retry on a later scan";
       continue;
     }
 
     // Record the new replica so clients can use it right away (the chunk
     // server will also confirm it in its next report)
-    auto target_server = chunk_server_manager.GetChunkServer(target_location);
-    chunk_server_manager.UpdateChunkServer(
-        target_location, target_server.available_disk_mb(),
-        /*chunks_to_add=*/{chunk_handle}, /*chunks_to_remove=*/{});
+    chunk_server_manager.AddChunkReplica(target_location, chunk_handle);
     --replicas_needed;
     LOG(INFO) << "Chunk " << chunk_handle << " successfully re-replicated "
               << "to " << target_address;

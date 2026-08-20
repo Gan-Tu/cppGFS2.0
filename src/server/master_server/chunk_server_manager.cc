@@ -3,19 +3,6 @@
 #include "absl/strings/str_cat.h"
 #include "src/common/system_logger.h"
 
-namespace protos {
-bool operator==(const protos::ChunkServerLocation& lhs,
-                const protos::ChunkServerLocation& rhs) {
-  return lhs.server_hostname() == rhs.server_hostname() &&
-         lhs.server_port() == rhs.server_port();
-}
-
-bool operator==(const protos::ChunkServer& lhs,
-                const protos::ChunkServer& rhs) {
-  return lhs.location() == rhs.location();
-}
-}  // namespace protos
-
 namespace gfs {
 
 namespace server {
@@ -300,6 +287,61 @@ void ChunkServerManager::UpdateChunkServer(
   // in order to place chunkserver in the right position
   this->chunk_servers_priority_list_.sort(
       ChunkServerAvailableDiskGreaterCompare());
+}
+
+void ChunkServerManager::AddChunkReplica(
+    const protos::ChunkServerLocation& location,
+    const std::string& chunk_handle) {
+  auto result = this->chunk_servers_map_.find(location);
+  if (result == this->chunk_servers_map_.end()) {
+    return;
+  }
+  auto chunk_server = result->second;
+  absl::WriterMutexLock chunk_server_write_lock_guard(
+      chunk_servers_lock_map_[location].get());
+  for (const auto& stored_handle : chunk_server->stored_chunk_handles()) {
+    if (stored_handle == chunk_handle) {
+      return;  // already recorded
+    }
+  }
+  chunk_server->add_stored_chunk_handles(chunk_handle);
+  this->chunk_locations_map_[chunk_handle].insert(location);
+}
+
+void ChunkServerManager::RemoveChunkReplica(
+    const protos::ChunkServerLocation& location,
+    const std::string& chunk_handle) {
+  auto result = this->chunk_servers_map_.find(location);
+  if (result != this->chunk_servers_map_.end()) {
+    auto chunk_server = result->second;
+    absl::WriterMutexLock chunk_server_write_lock_guard(
+        chunk_servers_lock_map_[location].get());
+    auto* stored_handles = chunk_server->mutable_stored_chunk_handles();
+    for (auto iter = stored_handles->begin(); iter != stored_handles->end();
+         ++iter) {
+      if (*iter == chunk_handle) {
+        stored_handles->erase(iter);
+        break;
+      }
+    }
+  }
+  auto locations = this->chunk_locations_map_.find(chunk_handle);
+  if (locations != this->chunk_locations_map_.end()) {
+    locations->second.erase(location);
+  }
+}
+
+std::vector<protos::ChunkServerLocation>
+ChunkServerManager::GetRegisteredServerLocations() {
+  std::vector<protos::ChunkServerLocation> locations;
+  gfs::common::SnapshotKeys(this->chunk_servers_map_, &locations);
+  return locations;
+}
+
+std::vector<std::string> ChunkServerManager::GetAllChunkHandles() {
+  std::vector<std::string> chunk_handles;
+  gfs::common::SnapshotKeys(this->chunk_locations_map_, &chunk_handles);
+  return chunk_handles;
 }
 
 ChunkServerLocationThreadSafeFlatSet ChunkServerManager::GetChunkLocations(

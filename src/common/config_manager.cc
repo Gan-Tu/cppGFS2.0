@@ -84,6 +84,15 @@ std::string ConfigManager::GetServerAddress(const std::string& server_name,
   }
 }
 
+std::string ConfigManager::GetServerAddress(
+    const protos::ChunkServerLocation& location, const bool resolve_hostname) {
+  std::string hostname = location.server_hostname();
+  if (resolve_hostname) {
+    hostname = ResolveHostname(hostname);
+  }
+  return absl::StrCat(hostname, ":", location.server_port());
+}
+
 std::string ConfigManager::GetDatabaseName(const std::string& server_name) {
   return config_["disk"]["leveldb"][server_name].as<std::string>();
 }

@@ -350,12 +350,15 @@ TEST_F(ChunkServerFileImplTest, AdvanceFileChunkVersionOutOfSyncVersionError) {
   EXPECT_EQ(reply_or.value().status(),
             AdvanceFileChunkVersionReply::FAILED_VERSION_OUT_OF_SYNC);
 
+  // Advancing to the version the chunk already has is an idempotent success:
+  // it happens when the master retries an advance after crashing before it
+  // recorded the new version (GFS paper section 4.5)
   req.set_new_chunk_version(kTestFileVersion);
   grpc::ClientContext client_context2;
   reply_or = master_server_client_->SendRequest(req, client_context2);
   EXPECT_TRUE(reply_or.ok());
-  EXPECT_EQ(reply_or.value().status(),
-            AdvanceFileChunkVersionReply::FAILED_VERSION_OUT_OF_SYNC);
+  EXPECT_EQ(reply_or.value().status(), AdvanceFileChunkVersionReply::OK);
+  EXPECT_EQ(reply_or.value().chunk_version(), kTestFileVersion);
 
   req.set_new_chunk_version(kTestFileVersion - 1);
   grpc::ClientContext client_context3;
@@ -363,6 +366,9 @@ TEST_F(ChunkServerFileImplTest, AdvanceFileChunkVersionOutOfSyncVersionError) {
   EXPECT_TRUE(reply_or.ok());
   EXPECT_EQ(reply_or.value().status(),
             AdvanceFileChunkVersionReply::FAILED_VERSION_OUT_OF_SYNC);
+  // Failure replies carry the replica's actual version, so the master can
+  // distinguish an already-advanced replica from a stale one
+  EXPECT_EQ(reply_or.value().chunk_version(), kTestFileVersion);
 }
 
 //

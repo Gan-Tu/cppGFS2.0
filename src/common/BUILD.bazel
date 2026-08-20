@@ -6,16 +6,23 @@ cc_library(
     hdrs = ["utils.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "@boringssl//:crypto",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_absl//absl/crc:crc32c",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/synchronization",
         "@parallel_hashmap",
         "@yaml_cpp//:yaml-cpp",
     ],
+)
+
+cc_library(
+    name = "protos_common",
+    hdrs = ["protos_common.h"],
+    visibility = ["//visibility:public"],
+    deps = ["//src/protos:cc_chunk_server_proto"],
 )
 
 cc_library(
@@ -33,6 +40,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":utils",
+        "//src/protos:cc_chunk_server_proto",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",

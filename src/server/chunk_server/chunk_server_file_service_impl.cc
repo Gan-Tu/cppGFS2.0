@@ -7,6 +7,7 @@
 #include "grpcpp/grpcpp.h"
 #include "src/common/protocol_client/chunk_server_service_server_client.h"
 #include "src/common/protocol_client/grpc_client_utils.h"
+#include "src/common/protos_common.h"
 #include "src/common/system_logger.h"
 #include "src/common/utils.h"
 #include "src/protos/grpc/chunk_server_file_service.grpc.pb.h"
@@ -106,10 +107,16 @@ grpc::Status ChunkServerFileServiceImpl::ReadFileChunk(
     return grpc::Status::OK;
   } else if (IsDataLoss(data_or.status())) {
     // DATA CORRUPTION: the stored data failed checksum verification; the
-    // requester should read from another replica (GFS paper section 5.2)
+    // requester should read from another replica (GFS paper section 5.2).
+    // Delete the corrupt replica so it stops being served: our next report
+    // will no longer list it, the master drops this location, and the
+    // repair scan clones a fresh replica from a valid one (the paper's
+    // "the master ... instructs the chunkserver that reported the mismatch
+    // to delete its replica")
     LOG(ERROR) << "Cannot read file chunk " << request->chunk_handle()
                << " because the stored data is corrupted: "
                << data_or.status().ToString();
+    DeleteCorruptReplica(request->chunk_handle());
     reply->set_status(ReadFileChunkReply::FAILED_DATA_CORRUPTED);
     return grpc::Status::OK;
   } else if (IsOutOfRange(data_or.status())) {
@@ -209,9 +216,7 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunk(
       chunk_server_impl_->GetSelfLocation();
   std::vector<protos::ChunkServerLocation> secondary_locations;
   for (const auto& replica_location : request->replica_locations()) {
-    if (replica_location.server_hostname() ==
-            self_location.server_hostname() &&
-        replica_location.server_port() == self_location.server_port()) {
+    if (replica_location == self_location) {
       continue;
     }
     secondary_locations.push_back(replica_location);
@@ -306,6 +311,28 @@ grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
   LOG(INFO) << "Received AdvanceFileChunkVersion:" << (*request).DebugString();
   *reply->mutable_request() = *request;
 
+  // Advancing the version rewrites the whole chunk record, so it must be
+  // serialized with in-flight mutations to the same chunk — otherwise an
+  // interleaved read-modify-write could resurrect pre-mutation data under
+  // the new version, silently losing an acknowledged write
+  absl::MutexLock chunk_mutation_lock_guard(
+      chunk_server_impl_->GetChunkMutationLock(request->chunk_handle()));
+
+  // Advancing to a version we already have is a success, not an error: it
+  // happens when the master crashed after instructing replicas to advance
+  // but before recording the new version, and retries the advance after
+  // recovery (GFS paper section 4.5)
+  StatusOr<uint32_t> current_version_or =
+      file_manager_->GetChunkVersion(request->chunk_handle());
+  if (current_version_or.ok() &&
+      current_version_or.value() == request->new_chunk_version()) {
+    LOG(INFO) << "File chunk " << request->chunk_handle()
+              << " is already at version " << request->new_chunk_version();
+    reply->set_status(AdvanceFileChunkVersionReply::OK);
+    reply->set_chunk_version(request->new_chunk_version());
+    return grpc::Status::OK;
+  }
+
   // Per AdvanceFileVersion gRPC definition, we only advance version by one
   const uint32_t from_version = request->new_chunk_version() - 1;
   LOG(INFO) << "Trying to advance the version of file chunk "
@@ -348,6 +375,9 @@ grpc::Status ChunkServerFileServiceImpl::AdvanceFileChunkVersion(
                  << from_version << " to " << request->new_chunk_version();
       reply->set_status(
           AdvanceFileChunkVersionReply::FAILED_VERSION_OUT_OF_SYNC);
+      // Report our actual version (per the proto contract), so the master
+      // can tell a genuinely stale replica from other mismatches
+      reply->set_chunk_version(version_or.value());
       return grpc::Status::OK;
     }
   } else {
@@ -423,10 +453,15 @@ grpc::Status ChunkServerFileServiceImpl::CloneFileChunk(
   read_request.set_offset_start(0);
   read_request.set_length(file_manager_->GetMaxChunkSizeBytes());
 
+  // Bound the fetch: a hung source replica must not pin this gRPC worker
+  // forever (the master retries the clone on a later scan)
+  grpc::ClientContext read_context;
+  common::SetClientContextDeadline(read_context,
+                                   chunk_server_impl_->GetConfigManager());
   auto source_client =
       chunk_server_impl_->GetChunkServerProtocolClient(source_address);
   StatusOr<ReadFileChunkReply> read_reply_or =
-      source_client->SendRequest(read_request);
+      source_client->SendRequest(read_request, read_context);
 
   if (!read_reply_or.ok() ||
       read_reply_or.value().status() != ReadFileChunkReply::OK) {
@@ -440,6 +475,18 @@ grpc::Status ChunkServerFileServiceImpl::CloneFileChunk(
   // concurrent mutation cannot interleave with the store
   absl::MutexLock chunk_mutation_lock_guard(
       chunk_server_impl_->GetChunkMutationLock(chunk_handle));
+  // Re-check under the lock: while this clone was fetching, the chunk may
+  // have been created or advanced here (e.g. a duplicate clone from an
+  // earlier scan, or this server re-registered and received writes) — a
+  // stale store would roll back committed mutations
+  local_version_or = file_manager_->GetChunkVersion(chunk_handle);
+  if (local_version_or.ok() && local_version_or.value() >= chunk_version) {
+    LOG(INFO) << "Chunk " << chunk_handle << " reached version "
+              << local_version_or.value()
+              << " while cloning; discarding the fetched copy";
+    reply->set_status(CloneFileChunkReply::ALREADY_UP_TO_DATE);
+    return grpc::Status::OK;
+  }
   auto store_status = file_manager_->StoreChunkData(
       chunk_handle, chunk_version, read_reply_or.value().data());
   if (!store_status.ok()) {
@@ -454,6 +501,15 @@ grpc::Status ChunkServerFileServiceImpl::CloneFileChunk(
             << " bytes) from " << source_address;
   reply->set_status(CloneFileChunkReply::OK);
   return grpc::Status::OK;
+}
+
+void ChunkServerFileServiceImpl::DeleteCorruptReplica(
+    const std::string& chunk_handle) {
+  absl::MutexLock chunk_mutation_lock_guard(
+      chunk_server_impl_->GetChunkMutationLock(chunk_handle));
+  auto delete_status = file_manager_->DeleteChunk(chunk_handle);
+  LOG(ERROR) << "Deleted corrupt replica of " << chunk_handle
+             << " for later re-clone: " << delete_status.ToString();
 }
 
 grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
@@ -542,9 +598,17 @@ grpc::Status ChunkServerFileServiceImpl::WriteFileChunkInternal(
                  << write_result.status();
       reply->set_status(FileChunkMutationStatus::FAILED_OUT_OF_RANGE);
     } else if (IsDataLoss(status)) {
+      // Callers of WriteFileChunkInternal hold this chunk's mutation lock,
+      // so the corrupt replica can be deleted directly; see ReadFileChunk's
+      // corruption branch for how deletion leads to repair
       LOG(ERROR) << "Failed to write file chunk because existing data "
                  << "around the written range is corrupted. Status: "
                  << write_result.status();
+      auto delete_status =
+          file_manager_->DeleteChunk(request_header.chunk_handle());
+      LOG(ERROR) << "Deleted corrupt replica of "
+                 << request_header.chunk_handle() << " for later re-clone: "
+                 << delete_status.ToString();
       reply->set_status(FileChunkMutationStatus::FAILED_DATA_CORRUPTED);
     } else {
       // INTERNAL ERROR
@@ -578,7 +642,9 @@ grpc::Status ChunkServerFileServiceImpl::SendChunkData(
                << " and size "
                << request->data().size() / gfs::common::bytesPerMb
                << "MB is bigger than the max allowed size "
-               << 64 /*fix*/ << "MB";
+               << chunk_server_impl_->GetConfigManager()
+                      ->GetFileChunkBlockSize()
+               << "MB";
 
     reply->set_status(SendChunkDataReply::DATA_TOO_BIG);
     return grpc::Status::OK;
