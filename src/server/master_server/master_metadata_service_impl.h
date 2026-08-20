@@ -38,6 +38,13 @@ class MasterMetadataServiceImpl final
   // hostname through the config's DNS lookup table when configured to do so
   std::string ResolveServerAddress(const protos::ChunkServerLocation& location);
 
+  // Allocate chunk servers for |chunk_handle| (idempotent) and initialize
+  // the chunk on them; returns the locations that succeeded and removes
+  // failed ones from the chunk's location record. Used during chunk
+  // creation, and to re-initialize an empty chunk that lost all replicas.
+  std::vector<protos::ChunkServerLocation> InitializeChunkReplicas(
+      const std::string& chunk_handle);
+
   // Handle file creation request. This function is called by OpenFile
   // function to dispatch the task for creating a file
   grpc::Status HandleFileCreation(const protos::grpc::OpenFileRequest* request,

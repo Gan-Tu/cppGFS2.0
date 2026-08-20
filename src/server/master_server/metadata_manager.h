@@ -104,6 +104,18 @@ class MetadataManager {
                                const protos::ChunkServerLocation& location,
                                const uint64_t expiration_unix_sec);
 
+  // Record which replicas confirmed the version advance when the current
+  // lease was granted. While the lease is reused, only these replicas (the
+  // up-to-date ones) may be returned to writing clients.
+  void SetPrimaryLeaseReplicas(
+      const std::string& chunk_handle,
+      const std::vector<protos::ChunkServerLocation>& replicas);
+
+  // Return the replicas recorded by SetPrimaryLeaseReplicas for the current
+  // lease (empty if none recorded).
+  std::vector<protos::ChunkServerLocation> GetPrimaryLeaseReplicas(
+      const std::string& chunk_handle);
+
   // Unset the primary chunk location that holds the lease for a given chunk
   // handle; this happens when a lease expires / gets revoked.
   void RemovePrimaryLeaseMetadata(const std::string& chunk_handle);
@@ -128,6 +140,13 @@ class MetadataManager {
   // (creating it if needed), and recover any previously persisted state into
   // memory. Should be called once at master startup, before serving.
   absl::Status EnablePersistence(const std::string& db_path);
+
+  // Whether persistence is enabled. Among other things this decides whether
+  // a chunk unknown to the master can be assumed deleted (with persistence,
+  // the master's recovered state is authoritative) or must be trusted when a
+  // chunk server first registers (without persistence, an unknown chunk
+  // after a master restart is expected, not garbage).
+  bool HasPersistence() const { return metadata_store_ != nullptr; }
 
   // Instance function to access the singleton
   static MetadataManager* GetInstance();
@@ -162,6 +181,17 @@ class MetadataManager {
   gfs::common::parallel_hash_map<
       std::string, std::pair<protos::ChunkServerLocation, uint64_t>>
       lease_holders_;
+
+  // chunk handle to the replicas that confirmed the version advance when the
+  // current lease was granted; see SetPrimaryLeaseReplicas
+  gfs::common::parallel_hash_map<std::string,
+                                 std::vector<protos::ChunkServerLocation>>
+      lease_replicas_;
+
+  // Serializes chunk handle allocation with its persistence, so the
+  // persisted allocator watermark can never go backwards relative to a
+  // handle that has already been handed out
+  absl::Mutex chunk_handle_allocator_mutex_;
 
   // Per-chunk locks used to serialize version advancement and lease grants;
   // see GetChunkLeaseLock

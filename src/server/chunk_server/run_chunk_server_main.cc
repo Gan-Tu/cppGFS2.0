@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <limits>
 #include <memory>
 #include <string>
 
@@ -66,8 +68,11 @@ int main(int argc, char** argv) {
   // Chunkserver needs to accept large data and needs to set max message size
   // as the default is 4MB. We all an additional 1000 bytes as the message may
   // contain metadata on top of payload
-  builder.SetMaxReceiveMessageSize(config->GetFileChunkBlockSize() * 
-                                       gfs::common::bytesPerMb + 1000);
+  builder.SetMaxReceiveMessageSize(static_cast<int>(
+      std::min<uint64_t>(config->GetFileChunkBlockSize() *
+                                 gfs::common::bytesPerMb +
+                             1000,
+                         std::numeric_limits<int>::max())));
 
   // Chunk Server implementation
   LOG(INFO) << "Initializing main chunk server...";

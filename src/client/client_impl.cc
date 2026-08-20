@@ -1,9 +1,12 @@
 #include "src/client/client_impl.h"
 
+#include <algorithm>
+#include <limits>
 #include <thread>
 #include <vector>
 
 #include "src/common/protocol_client/grpc_client_utils.h"
+#include "src/common/protos_common.h"
 #include "src/common/system_logger.h"
 #include "src/common/utils.h"
 
@@ -13,7 +16,6 @@ using absl::ResourceExhaustedError;
 using absl::Status;
 using absl::StatusOr;
 using absl::UnavailableError;
-using absl::UnknownError;
 using protos::grpc::DeleteFileRequest;
 using protos::grpc::FileChunkMutationStatus;
 using protos::grpc::OpenFileReply;
@@ -212,13 +214,8 @@ absl::StatusOr<ReadFileChunkReply> ClientImpl::ReadFileChunk(
       read_file_chunk_request.set_offset_start(offset);
       read_file_chunk_request.set_length(nbytes);
       // Access the client-end-point for contacting the chunk server
-      std::string chunk_server_hostname = location.server_hostname();
-      if (resolve_hostname_) {
-        chunk_server_hostname =
-            config_manager_->ResolveHostname(chunk_server_hostname);
-      }
-      auto server_address(chunk_server_hostname + ":" +
-                          std::to_string(location.server_port()));
+      auto server_address(
+          config_manager_->GetServerAddress(location, resolve_hostname_));
       // Prepare the client context
       grpc::ClientContext client_context;
       common::SetClientContextDeadline(client_context, config_manager_);
@@ -312,9 +309,12 @@ absl::StatusOr<std::pair<size_t, void*>> ClientImpl::ReadFile(
 
   for (size_t chunk_index = offset / chunk_block_size; remain_bytes > 0 && !eof;
        chunk_index++) {
-    // Calculate the bytes to be read, which is the min value of the remaining
-    // bytes and the chunk size
-    size_t bytes_to_read(std::min(remain_bytes, chunk_block_size));
+    // Calculate the bytes to be read: the remaining bytes, capped by how
+    // much of this chunk lies at/after the start offset (only relevant for
+    // the first chunk, where the read may start mid-chunk — asking for more
+    // would make the short reply below look like EOF)
+    size_t bytes_to_read(
+        std::min(remain_bytes, chunk_block_size - chunk_start_offset));
     auto file_chunk_data_or(ReadFileChunk(filename, chunk_index,
                                           chunk_start_offset, bytes_to_read));
     // If one of the chunk's read fails, free the buffer and return
@@ -382,12 +382,8 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
         send_data_irrecoverable_error{false};
     std::vector<std::thread> send_data_threads;
     for (auto& location : chunk_server_location_entry.locations) {
-      std::string server_hostname = location.server_hostname();
-      if (resolve_hostname_) {
-        server_hostname = config_manager_->ResolveHostname(server_hostname);
-      }
-      auto server_address(server_hostname + ":" +
-                          std::to_string(location.server_port()));
+      auto server_address(
+          config_manager_->GetServerAddress(location, resolve_hostname_));
       send_data_threads.push_back(std::thread([&, server_address]() {
         // Prepare the SendChunkDataRequest
         SendChunkDataRequest send_chunk_data_request;
@@ -466,10 +462,7 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
     // mutation to; the primary itself applies the mutation locally, so it is
     // excluded (the server also guards against forwarding to itself)
     for (auto location : chunk_server_location_entry.locations) {
-      if (location.server_hostname() ==
-              chunk_server_location_entry.primary_location.server_hostname() &&
-          location.server_port() ==
-              chunk_server_location_entry.primary_location.server_port()) {
+      if (location == chunk_server_location_entry.primary_location) {
         continue;
       }
       write_request.mutable_replica_locations()->Add(std::move(location));
@@ -479,14 +472,8 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
     common::SetClientContextDeadline(client_context, config_manager_);
 
     // We send this WriteFileChunkRequest to the primary
-    auto primary_location(chunk_server_location_entry.primary_location);
-    std::string primary_hostname = primary_location.server_hostname();
-    if (resolve_hostname_) {
-      primary_hostname = config_manager_->ResolveHostname(primary_hostname);
-    }
-    const std::string primary_server_address(
-        primary_hostname + ":" +
-        std::to_string(primary_location.server_port()));
+    const std::string primary_server_address(config_manager_->GetServerAddress(
+        chunk_server_location_entry.primary_location, resolve_hostname_));
 
     auto primary_server_service_client(
         GetChunkServerServiceClient(primary_server_address));
@@ -495,11 +482,16 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
         primary_server_service_client->SendRequest(write_request,
                                                    client_context));
 
-    // Handle grpc error, and retry if possible
+    // Decide whether this attempt succeeded, failed for good, or should be
+    // retried after a metadata refresh
+    bool refresh_and_retry = false;
     if (!write_reply_or.ok()) {
+      // Transport-level failure (e.g. the primary just died): refresh — the
+      // master will grant a new lease elsewhere
       LOG(ERROR) << "Send write chunk data request to "
-                 << primary_server_address << "failed due to "
+                 << primary_server_address << " failed due to "
                  << write_reply_or.status();
+      refresh_and_retry = true;
     } else {
       auto write_reply(write_reply_or.value());
       switch (write_reply.status()) {
@@ -527,51 +519,22 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
                       << nbytes << " bytes succeeds";
             return write_reply_or;
           }
-          // Refresh the metadata (replicas that went away get dropped from
-          // the location list; the version may have advanced) and retry the
-          // whole mutation, re-pushing the data
-          get_metadata_status = GetMetadataForChunk(
-              filename, chunk_index, OpenFileRequest::WRITE, chunk_handle,
-              chunk_version, chunk_server_location_entry, true);
-          if (!get_metadata_status.ok()) {
-            LOG(ERROR) << "Refreshing metadata cache failed due to "
-                       << get_metadata_status;
-            return get_metadata_status;
-          }
+          refresh_and_retry = true;
           break;
         }
         case FileChunkMutationStatus::FAILED_NOT_LEASE_HOLDER:
-          // Client found out that the primary it though is no longer a lease
-          // holder, we need to force to get the chunk metadata and retry
-          LOG(INFO) << "Retrying as primary server " << primary_server_address
-                    << " is no longer lease holder "
-                    << "refetching chunk metadata";
-          get_metadata_status = GetMetadataForChunk(
-              filename, chunk_index, OpenFileRequest::WRITE, chunk_handle,
-              chunk_version, chunk_server_location_entry, true);
-          if (!get_metadata_status.ok()) {
-            LOG(ERROR) << "Refreshing metadata cache failed due to "
-                       << get_metadata_status;
-            return get_metadata_status;
-          }
-          break;
         case FileChunkMutationStatus::FAILED_STALE_VERSION:
         case FileChunkMutationStatus::FAILED_DATA_NOT_FOUND:
-          // The primary's view of the chunk (or the pushed data) is out of
-          // date, e.g. another client triggered a version advance or the
-          // data aged out of the cache. Refresh the metadata and retry,
-          // which re-pushes the data.
+        case FileChunkMutationStatus::FAILED_DATA_CORRUPTED:
+          // The primary's view of the chunk is out of date (lost lease,
+          // version advanced by another client, pushed data aged out of the
+          // cache) or its replica just self-invalidated on corruption; all
+          // of these are cured by refreshing metadata and re-issuing the
+          // mutation (which re-pushes the data)
           LOG(INFO) << "Retrying write to " << chunk_handle
                     << " after refreshing metadata, due to status "
                     << write_reply.status();
-          get_metadata_status = GetMetadataForChunk(
-              filename, chunk_index, OpenFileRequest::WRITE, chunk_handle,
-              chunk_version, chunk_server_location_entry, true);
-          if (!get_metadata_status.ok()) {
-            LOG(ERROR) << "Refreshing metadata cache failed due to "
-                       << get_metadata_status;
-            return get_metadata_status;
-          }
+          refresh_and_retry = true;
           break;
         default:
           // For other cases, we consider them to be irrecoverable and return
@@ -585,6 +548,20 @@ ClientImpl::WriteFileChunk(const char* filename, void* buffer,
               std::to_string(chunk_index) + " and offset " +
               std::to_string(offset) + "for " + std::to_string(nbytes) +
               " failed due to internal error");
+      }
+    }
+
+    if (refresh_and_retry) {
+      // Refresh the metadata (replicas that went away get dropped from the
+      // location list; the version may have advanced; the primary may have
+      // changed) before the next attempt re-pushes the data
+      get_metadata_status = GetMetadataForChunk(
+          filename, chunk_index, OpenFileRequest::WRITE, chunk_handle,
+          chunk_version, chunk_server_location_entry, /*refresh_cache=*/true);
+      if (!get_metadata_status.ok()) {
+        LOG(ERROR) << "Refreshing metadata cache failed due to "
+                   << get_metadata_status;
+        return get_metadata_status;
       }
     }
 
@@ -659,9 +636,11 @@ void ClientImpl::RegisterChunkServerServiceClient(
   // Specify max message size as the default is only 4MB, add some additional
   // bytes as the message size is larger than the payload
   grpc::ChannelArguments channel_args;
-  channel_args.SetMaxReceiveMessageSize(
-      config_manager_->GetFileChunkBlockSize() * gfs::common::bytesPerMb +
-      1000);
+  channel_args.SetMaxReceiveMessageSize(static_cast<int>(
+      std::min<uint64_t>(config_manager_->GetFileChunkBlockSize() *
+                                 gfs::common::bytesPerMb +
+                             1000,
+                         std::numeric_limits<int>::max())));
 
   chunk_server_service_client_.TryInsert(
       server_address,

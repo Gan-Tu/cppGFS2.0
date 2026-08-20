@@ -1,7 +1,10 @@
 #include "src/server/chunk_server/chunk_server_impl.h"
 
+#include <algorithm>
 #include <chrono>
+#include <limits>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "src/common/system_logger.h"
@@ -115,11 +118,15 @@ ChunkServerImpl::GetChunkServerProtocolClient(
               << server_address;
     // Raise the max receive size (default 4MB) so a full chunk can be
     // fetched from a peer replica when cloning; add some headroom for
-    // message metadata on top of the payload
+    // message metadata on top of the payload. Clamp to INT_MAX since the
+    // gRPC setter takes an int and a huge configured block size would
+    // otherwise wrap negative.
     grpc::ChannelArguments channel_args;
-    channel_args.SetMaxReceiveMessageSize(
-        config_manager_->GetFileChunkBlockSize() * gfs::common::bytesPerMb +
-        1000);
+    channel_args.SetMaxReceiveMessageSize(static_cast<int>(
+        std::min<uint64_t>(config_manager_->GetFileChunkBlockSize() *
+                                   gfs::common::bytesPerMb +
+                               1000,
+                           std::numeric_limits<int>::max())));
     chunk_server_clients_[server_address] =
         std::make_shared<ChunkServerServiceChunkServerClient>(
             grpc::CreateCustomChannel(server_address,
@@ -139,15 +146,9 @@ protos::ChunkServerLocation ChunkServerImpl::GetSelfLocation() const {
 
 absl::Mutex* ChunkServerImpl::GetChunkMutationLock(
     const std::string& chunk_handle) {
-  auto try_get_lock(chunk_mutation_locks_.TryGetValue(chunk_handle));
-  if (try_get_lock.second) {
-    return try_get_lock.first.get();
-  }
-  // Create the lock on first use; TryInsert is atomic so a concurrent
-  // creation for the same handle keeps exactly one lock
-  chunk_mutation_locks_.TryInsert(chunk_handle,
-                                  std::make_shared<absl::Mutex>());
-  return chunk_mutation_locks_.TryGetValue(chunk_handle).first.get();
+  return chunk_mutation_locks_
+      .GetOrCreate(chunk_handle, [] { return std::make_shared<absl::Mutex>(); })
+      .get();
 }
 
 bool ChunkServerImpl::ReportToMaster() {
@@ -174,12 +175,20 @@ bool ChunkServerImpl::ReportToMaster() {
   LOG(INFO) << "Found " + std::to_string(all_chunks_metadata.size()) +
                    " stored chunks to report to master.";
 
+  // Remember the version each chunk was reported at: if the master replies
+  // that a chunk is stale, deletion is only safe if our replica still *is*
+  // the one we reported. A mutation that lands while the report is in
+  // flight (e.g. a lease grant advancing the version) makes the master's
+  // verdict apply to a replica that no longer exists.
+  absl::flat_hash_map<std::string, uint32_t> reported_versions;
   for (auto& chunk_metadata : all_chunks_metadata) {
     chunk_server->add_stored_chunk_handles(chunk_metadata.chunk_handle());
     // Also report each chunk's version, so the master can detect stale
     // replicas (chunks that missed mutations while this server was down)
     // and tell us to delete them (GFS paper section 4.5)
     *request.add_stored_chunks() = chunk_metadata;
+    reported_versions[chunk_metadata.chunk_handle()] =
+        chunk_metadata.version();
   }
 
   // send the request to the master server(s), if more than one
@@ -190,17 +199,39 @@ bool ChunkServerImpl::ReportToMaster() {
 
     auto reply = master_chunk_server_mgr_client.second->SendRequest(request);
     if (reply.ok()) {
-      // Check the reply for stale chunks, if any, for deletion. Call the 
+      // Check the reply for stale chunks, if any, for deletion. Call the
       // FileChunkManager to delete the file chunk
       auto report_reply(reply.value());
       for (auto& stale_chunk_handle : report_reply.stale_chunk_handles()) {
-        LOG(INFO) << "Received stale / deleted chunk handle " 
+        // Delete under the chunk's mutation lock, and only if the replica
+        // is still exactly what we reported: if its version changed while
+        // the report was in flight (a concurrent lease grant advanced it),
+        // the master's staleness verdict is about a replica that no longer
+        // exists — deleting now would destroy an up-to-date copy. The next
+        // report re-reconciles it.
+        absl::MutexLock chunk_mutation_lock_guard(
+            GetChunkMutationLock(stale_chunk_handle));
+        auto current_version_or(
+            FileChunkManager::GetInstance()->GetChunkVersion(
+                stale_chunk_handle));
+        if (current_version_or.ok() &&
+            reported_versions.contains(stale_chunk_handle) &&
+            current_version_or.value() !=
+                reported_versions.at(stale_chunk_handle)) {
+          LOG(WARNING) << "Skipping deletion of chunk " << stale_chunk_handle
+                       << ": its version changed from "
+                       << reported_versions.at(stale_chunk_handle) << " to "
+                       << current_version_or.value()
+                       << " while the report was in flight";
+          continue;
+        }
+        LOG(INFO) << "Received stale / deleted chunk handle "
                   << stale_chunk_handle << ". File chunk server deleting "
                   << "the actual file chunk";
         auto delete_chunk_status(
             FileChunkManager::GetInstance()->DeleteChunk(stale_chunk_handle));
         if (!delete_chunk_status.ok()) {
-          LOG(ERROR) << "Error encountered when deleting file chunk " 
+          LOG(ERROR) << "Error encountered when deleting file chunk "
                      << stale_chunk_handle << " due to " << delete_chunk_status;
         }
       }

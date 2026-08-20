@@ -34,6 +34,11 @@ bazel_dep(name = "gflags", version = "2.2.2", repo_name = "com_github_gflags_gfl
 # YAML parser for config files.
 bazel_dep(name = "yaml-cpp", version = "0.8.0", repo_name = "yaml_cpp")
 
+# BoringSSL (already in the dependency graph via gRPC); used for SHA-256,
+# which identifies client-pushed write payloads in the chunk servers' data
+# cache. That key needs collision resistance, which CRC32C cannot provide.
+bazel_dep(name = "boringssl", version = "0.20240913.0")
+
 # Bazel rules.
 bazel_dep(name = "rules_cc", version = "0.0.17")
 bazel_dep(name = "rules_proto", version = "7.1.0")

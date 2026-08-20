@@ -6,39 +6,22 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
+#include "src/common/protos_common.h"
 #include "src/common/utils.h"
 #include "src/protos/chunk_server.pb.h"
-
-// Define how we do equality check for the ChunkServerLocation and ChunkServer
-// injected into the proto namespace where ChunkServerLocation and ChunkServer
-// are defined.
-// TODO(bmokutub): Can move to a separate header file e.g. chunk_server.h
-namespace protos {
-bool operator==(const protos::ChunkServerLocation& lhs,
-                const protos::ChunkServerLocation& rhs);
-
-bool operator==(const protos::ChunkServer& lhs, const protos::ChunkServer& rhs);
-}  // namespace protos
 
 namespace gfs {
 
 namespace server {
 
-// For generating the hash value of a ChunkServerLocation. This is for use in
-// hashset and maps and the ChunkServerLocation is used as the key/unique
-// identifier for the ChunkServer. A simple implementation.
-class ChunkServerLocationHash {
- public:
-  std::size_t operator()(const protos::ChunkServerLocation& location) const
-      noexcept {
-    std::size_t h1 = std::hash<std::string>{}(location.server_hostname());
-    std::size_t h2 = std::hash<uint32_t>{}(location.server_port());
-    return h1 ^ (h2 << 1);
-  }
-};
+// Location equality and hashing live in src/common/protos_common.h so every
+// component (client, chunk server, master) shares one definition of chunk
+// server identity.
+using ChunkServerLocationHash = gfs::common::ChunkServerLocationHash;
 
 // A flat hash set of ChunkServerLocation.
 using ChunkServerLocationFlatSet =
@@ -209,6 +192,28 @@ class ChunkServerManager {
       const uint32_t& available_disk_mb,
       const absl::flat_hash_set<std::string>& chunks_to_add,
       const absl::flat_hash_set<std::string>& chunks_to_remove);
+
+  // Record that |location| now holds a replica of |chunk_handle| (e.g. after
+  // a successful re-replication clone), updating only the chunk-to-locations
+  // map and the server's stored-chunk list. Disk accounting is left to the
+  // server's own reports. No-op if the server is not registered.
+  void AddChunkReplica(const protos::ChunkServerLocation& location,
+                       const std::string& chunk_handle);
+
+  // Remove |location| as a replica holder of |chunk_handle| (e.g. when the
+  // replica could not be initialized during chunk creation). No-op if the
+  // server is not registered.
+  void RemoveChunkReplica(const protos::ChunkServerLocation& location,
+                          const std::string& chunk_handle);
+
+  // Return a snapshot of the locations of all currently registered chunk
+  // servers. Safe against concurrent registration (unlike iterating
+  // chunk_servers_map_ directly, which phmap does not allow concurrently
+  // with inserts).
+  std::vector<protos::ChunkServerLocation> GetRegisteredServerLocations();
+
+  // Return a snapshot of all chunk handles the manager knows locations for.
+  std::vector<std::string> GetAllChunkHandles();
 
   // Returns the ChunkServerLocations for a given chunk handle.
   // This returns all the chunk server locations where this chunk is stored.

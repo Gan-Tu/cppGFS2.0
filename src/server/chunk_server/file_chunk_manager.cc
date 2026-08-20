@@ -1,9 +1,12 @@
 #include "src/server/chunk_server/file_chunk_manager.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
 #include "leveldb/write_batch.h"
 #include "src/common/system_logger.h"
@@ -21,6 +24,19 @@ using absl::OutOfRangeError;
 using absl::UnimplementedError;
 using absl::UnknownError;
 
+namespace {
+// Alongside every chunk record (keyed by its handle — a decimal string), a
+// small metadata record is stored under this prefixed key carrying just the
+// handle and version. Reports then read versions without parsing whole
+// chunks. The '/' cannot appear in a chunk handle, so the keyspaces are
+// disjoint.
+const char kChunkMetadataKeyPrefix[] = "meta/";
+
+std::string ChunkMetadataKey(const std::string& chunk_handle) {
+  return kChunkMetadataKeyPrefix + chunk_handle;
+}
+}  // namespace
+
 FileChunkManager::FileChunkManager()
     : chunk_database_(nullptr), max_chunk_size_bytes_(0) {}
 
@@ -36,6 +52,14 @@ void FileChunkManager::Initialize(const std::string& chunk_database_name,
   // if we see that it isn't efficient enough to meet our needs. By default 4kb
   // (uncompressed bytes) blocks and compression is enabled. Check_sum
   // verification isn't enabled by default. Can add more configs here later.
+
+  // LevelDB creates the database directory itself but not its parents
+  std::error_code error_code;
+  const auto parent_dir =
+      std::filesystem::path(chunk_database_name).parent_path();
+  if (!parent_dir.empty()) {
+    std::filesystem::create_directories(parent_dir, error_code);
+  }
 
   leveldb::DB* database;
 
@@ -162,31 +186,52 @@ absl::StatusOr<uint32_t> FileChunkManager::WriteToChunk(
                      this->max_chunk_size_bytes_));
   }
 
-  // Don't want to write more than the bytes left for the chunk to be full.
-  uint32_t actual_write_length = std::min(length, remaining_bytes);
+  // Don't want to write more than the bytes left for the chunk to be full,
+  // nor more bytes than the caller's buffer actually holds (per the API
+  // contract, a |length| larger than |new_data| writes only |new_data|)
+  uint32_t actual_write_length = std::min<uint64_t>(
+      std::min(length, remaining_bytes), new_data.size());
 
   // Per section 5.2 of the GFS paper, before overwriting an existing range we
-  // must verify the first and last blocks of the range being overwritten:
-  // if a partially-overwritten corrupted block were not detected now, the new
-  // checksum would hide the corruption in the region not being overwritten.
-  auto verify_status = VerifyBlockChecksums(
-      file_chunk.get(), start_offset,
-      std::min<uint64_t>(actual_write_length,
-                         file_chunk->data().length() - start_offset));
-  if (!verify_status.ok()) {
-    LOG(ERROR) << "Data corruption detected while writing chunk "
-               << chunk_handle << ": " << verify_status.ToString();
-    return verify_status;
+  // must verify the first and last blocks of the range being overwritten *if
+  // they are only partially covered by the write*: a corrupted block that is
+  // partially overwritten would otherwise get a fresh checksum that hides
+  // the corruption in its untouched region. Fully-overwritten blocks need no
+  // verification — their entire content is replaced.
+  const uint64_t existing_length = file_chunk->data().length();
+  const uint64_t write_end =
+      std::min<uint64_t>((uint64_t)start_offset + actual_write_length,
+                         existing_length);
+  if (start_offset % kChecksumBlockSize != 0 && start_offset < existing_length) {
+    auto verify_status =
+        VerifyBlockChecksums(file_chunk.get(), start_offset, 1);
+    if (!verify_status.ok()) {
+      LOG(ERROR) << "Data corruption detected while writing chunk "
+                 << chunk_handle << ": " << verify_status.ToString();
+      return verify_status;
+    }
+  }
+  if (write_end > start_offset && write_end < existing_length &&
+      write_end % kChecksumBlockSize != 0) {
+    auto verify_status =
+        VerifyBlockChecksums(file_chunk.get(), write_end - 1, 1);
+    if (!verify_status.ok()) {
+      LOG(ERROR) << "Data corruption detected while writing chunk "
+                 << chunk_handle << ": " << verify_status.ToString();
+      return verify_status;
+    }
   }
 
   // Writes to the same chunk are serialized by the file service layer using
   // per-chunk mutation locks (mirroring the mutation order the primary
   // replica imposes), so the read-modify-write below is race free.
 
-  // write to the existing data in memory
-  file_chunk->mutable_data()->replace(
-      start_offset, actual_write_length, new_data.data(),
-      /*start_position_in_new_data=*/0, actual_write_length);
+  // Write to the existing data in memory. Note: the (pos, count, cstr,
+  // count2) overload must be used here — an overload taking a std::string
+  // would construct it from the raw pointer and truncate binary payloads at
+  // their first NUL byte.
+  file_chunk->mutable_data()->replace(start_offset, actual_write_length,
+                                      new_data.data(), actual_write_length);
 
   // Incrementally update the checksums of the blocks the write touched
   UpdateBlockChecksums(file_chunk.get(), start_offset, actual_write_length);
@@ -405,15 +450,26 @@ leveldb::Status FileChunkManager::WriteFileChunk(
   // using a Write Ahead Log (WAL) to maintain durability.
   write_options.sync = true;
 
-  return this->chunk_database_->Put(write_options, chunk_handle,
-                                    file_chunk->SerializeAsString());
+  // Atomically write the chunk and its small metadata record, so version
+  // reports never require parsing full chunk data
+  protos::FileChunkMetadata metadata;
+  metadata.set_chunk_handle(chunk_handle);
+  metadata.set_version(file_chunk->version());
+
+  leveldb::WriteBatch batch;
+  batch.Put(chunk_handle, file_chunk->SerializeAsString());
+  batch.Put(ChunkMetadataKey(chunk_handle), metadata.SerializeAsString());
+  return this->chunk_database_->Write(write_options, &batch);
 }
 
 absl::Status FileChunkManager::DeleteChunk(
     const std::string& chunk_handle) {
-  // Doing delete asynchronously
+  // Delete the chunk and its metadata record atomically
+  leveldb::WriteBatch batch;
+  batch.Delete(chunk_handle);
+  batch.Delete(ChunkMetadataKey(chunk_handle));
   leveldb::Status status =
-      this->chunk_database_->Delete(leveldb::WriteOptions(), chunk_handle);
+      this->chunk_database_->Write(leveldb::WriteOptions(), &batch);
 
   if (!status.ok()) {
     return UnknownError(
@@ -429,16 +485,33 @@ FileChunkManager::GetAllFileChunkMetadata() {
       this->chunk_database_->NewIterator(leveldb::ReadOptions()));
 
   std::list<protos::FileChunkMetadata> metadatas;
+  absl::flat_hash_set<std::string> handles_with_metadata;
+  std::vector<std::string> legacy_handles;
 
-  // Iterate the entire database for chunks
+  // Prefer the small metadata records; chunks written before those existed
+  // (legacy databases) fall back to parsing the full chunk record below
   for (iterator->SeekToFirst(); iterator->Valid(); iterator->Next()) {
-    protos::FileChunk file_chunk;
-
-    if (file_chunk.ParseFromString(iterator->value().ToString())) {
+    const std::string key = iterator->key().ToString();
+    if (key.rfind(kChunkMetadataKeyPrefix, 0) == 0) {
       protos::FileChunkMetadata metadata;
-      metadata.set_chunk_handle(iterator->key().ToString());
-      metadata.set_version(file_chunk.version());
+      if (metadata.ParseFromString(iterator->value().ToString())) {
+        handles_with_metadata.insert(metadata.chunk_handle());
+        metadatas.push_back(metadata);
+      }
+    } else {
+      legacy_handles.push_back(key);
+    }
+  }
 
+  for (const auto& chunk_handle : legacy_handles) {
+    if (handles_with_metadata.contains(chunk_handle)) {
+      continue;
+    }
+    auto file_chunk_or = GetFileChunk(chunk_handle);
+    if (file_chunk_or.ok()) {
+      protos::FileChunkMetadata metadata;
+      metadata.set_chunk_handle(chunk_handle);
+      metadata.set_version(file_chunk_or.value()->version());
       metadatas.push_back(metadata);
     }
   }

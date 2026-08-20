@@ -1,5 +1,6 @@
 #include "metadata_manager.h"
 
+#include <filesystem>
 #include <stack>
 #include <thread>
 
@@ -40,6 +41,13 @@ MetadataManager::MetadataManager() {
 }
 
 absl::Status MetadataManager::EnablePersistence(const std::string& db_path) {
+  // LevelDB creates the database directory itself but not its parents
+  std::error_code error_code;
+  const auto parent_dir = std::filesystem::path(db_path).parent_path();
+  if (!parent_dir.empty()) {
+    std::filesystem::create_directories(parent_dir, error_code);
+  }
+
   leveldb::DB* database;
   leveldb::Options options;
   options.create_if_missing = true;
@@ -390,29 +398,15 @@ absl::StatusOr<std::string> MetadataManager::GetChunkHandle(
 
 absl::Status MetadataManager::AdvanceChunkVersion(
     const std::string& chunk_handle) {
-  auto chunk_data_or(GetFileChunkMetadata(chunk_handle));
-  if (!chunk_data_or.ok()) {
-    return chunk_data_or.status();
-  }
-
   // Concurrent advancement of the same chunk's version is serialized by the
   // per-chunk lease lock held by the caller (see GetChunkLeaseLock); the
   // version only advances when a new lease is granted, per section 4.5 of
   // the GFS paper
-  protos::FileChunkMetadata chunk_data(chunk_data_or.value());
-  chunk_data.set_version(chunk_data.version() + 1);
-  SetFileChunkMetadata(chunk_data);
-
-  // Persist the new version before any client is notified, per section 4.5
-  // of the GFS paper: "The master and these replicas all record the new
-  // version number in their persistent state ... before any client is
-  // notified"
-  auto persist_status(PersistChunkMetadata(chunk_handle));
-  if (!persist_status.ok()) {
-    return persist_status;
+  auto chunk_data_or(GetFileChunkMetadata(chunk_handle));
+  if (!chunk_data_or.ok()) {
+    return chunk_data_or.status();
   }
-
-  return OkStatus();
+  return SetChunkVersion(chunk_handle, chunk_data_or.value().version() + 1);
 }
 
 absl::Status MetadataManager::SetChunkVersion(const std::string& chunk_handle,
@@ -424,8 +418,12 @@ absl::Status MetadataManager::SetChunkVersion(const std::string& chunk_handle,
 
   protos::FileChunkMetadata chunk_data(chunk_data_or.value());
   chunk_data.set_version(version);
-  SetFileChunkMetadata(chunk_data);
-
+  // Update the in-memory record and persist exactly once, before any client
+  // is notified, per section 4.5 of the GFS paper: "The master and these
+  // replicas all record the new version number in their persistent state
+  // ... before any client is notified". (SetFileChunkMetadata is not used
+  // here because it would issue a second, redundant synchronous persist.)
+  chunk_metadata_.SetValue(chunk_handle, chunk_data);
   return PersistChunkMetadata(chunk_handle);
 }
 
@@ -474,6 +472,7 @@ void MetadataManager::SetPrimaryLeaseMetadata(
 void MetadataManager::RemovePrimaryLeaseMetadata(
     const std::string& chunk_handle) {
   lease_holders_.Erase(chunk_handle);
+  lease_replicas_.Erase(chunk_handle);
 }
 
 std::pair<std::pair<protos::ChunkServerLocation, uint64_t>, bool>
@@ -483,14 +482,20 @@ MetadataManager::GetPrimaryLeaseMetadata(const std::string& chunk_handle) {
 
 absl::Mutex* MetadataManager::GetChunkLeaseLock(
     const std::string& chunk_handle) {
-  auto try_get_lock(chunk_lease_locks_.TryGetValue(chunk_handle));
-  if (try_get_lock.second) {
-    return try_get_lock.first.get();
-  }
-  // Create the lock on first use; TryInsert is atomic so a concurrent
-  // creation for the same handle keeps exactly one lock
-  chunk_lease_locks_.TryInsert(chunk_handle, std::make_shared<absl::Mutex>());
-  return chunk_lease_locks_.TryGetValue(chunk_handle).first.get();
+  return chunk_lease_locks_
+      .GetOrCreate(chunk_handle, [] { return std::make_shared<absl::Mutex>(); })
+      .get();
+}
+
+void MetadataManager::SetPrimaryLeaseReplicas(
+    const std::string& chunk_handle,
+    const std::vector<protos::ChunkServerLocation>& replicas) {
+  lease_replicas_.SetValue(chunk_handle, replicas);
+}
+
+std::vector<protos::ChunkServerLocation>
+MetadataManager::GetPrimaryLeaseReplicas(const std::string& chunk_handle) {
+  return lease_replicas_.TryGetValue(chunk_handle).first;
 }
 
 // Delete the file metadata, furthermore, delete all chunk handles assocated
@@ -541,10 +546,13 @@ void MetadataManager::DeleteFileAndChunkMetadata(const std::string& filename) {
 }
 
 std::string MetadataManager::AllocateNewChunkHandle() {
+  // Allocation and persistence happen under one mutex so the persisted
+  // watermark can never be overwritten by a smaller value from a concurrent
+  // allocation — otherwise a crash could recover a counter below an
+  // already-issued handle and re-issue it, violating "chunks are uniquely
+  // and eternally identified" (GFS paper section 2.6.3)
+  absl::MutexLock allocator_lock(&chunk_handle_allocator_mutex_);
   auto ret(global_chunk_id_.fetch_add(1));
-  // Persist the allocator so chunk handles stay unique across master
-  // restarts ("chunks are uniquely and eternally identified", GFS paper
-  // section 2.6.3)
   PersistChunkHandleAllocator();
   return std::to_string(ret);
 }

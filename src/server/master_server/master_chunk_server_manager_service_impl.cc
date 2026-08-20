@@ -6,6 +6,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
 #include "grpcpp/grpcpp.h"
+#include "src/common/protos_common.h"
 #include "src/common/system_logger.h"
 #include "src/protos/grpc/master_chunk_server_manager_service.grpc.pb.h"
 #include "src/server/master_server/chunk_server_manager.h"
@@ -25,6 +26,20 @@ grpc::Status MasterChunkServerManagerServiceImpl::ReportChunkServer(
   LOG(INFO) << "Master handling report from " << new_server_info.DebugString();
 
   auto* metadata_manager = gfs::server::MetadataManager::GetInstance();
+
+  auto existing_server_info =
+      gfs::server::ChunkServerManager::GetInstance().GetChunkServer(
+          new_server_info.location());
+
+  // Whether a chunk the master doesn't know can be assumed deleted. With
+  // persistence enabled, the master's (recovered) metadata is authoritative,
+  // so an unknown chunk is garbage from a deleted file or a failed creation
+  // (GFS paper section 4.4). WITHOUT persistence, a master restart forgets
+  // every chunk, so on a chunk server's (re-)registration the report must be
+  // trusted instead — otherwise a restarted master would order the whole
+  // cluster's data deleted.
+  const bool unknown_chunk_means_deleted =
+      metadata_manager->HasPersistence() || existing_server_info.has_location();
 
   // The versions the chunk server reported for its stored chunks. Reports
   // from chunk servers always carry versions; if a report doesn't (e.g. an
@@ -47,26 +62,59 @@ grpc::Status MasterChunkServerManagerServiceImpl::ReportChunkServer(
   absl::flat_hash_set<std::string> valid_reported_chunks;
   for (const auto& stored_chunk_handle :
        new_server_info.stored_chunk_handles()) {
-    if (!metadata_manager->ExistFileChunkMetadata(stored_chunk_handle)) {
-      LOG(INFO) << "Chunk handle " << stored_chunk_handle
-                << " no longer exists in the master's metadata; telling chunk "
-                << "server to garbage collect it";
-      *reply->add_stale_chunk_handles() = stored_chunk_handle;
+    // Serialize against the write path's version-advance/lease-grant
+    // sequence for this chunk, so the comparison below cannot interleave
+    // with a concurrent advance and clobber (or misjudge) the version
+    absl::MutexLock lease_lock_guard(
+        metadata_manager->GetChunkLeaseLock(stored_chunk_handle));
+
+    auto chunk_metadata_or =
+        metadata_manager->GetFileChunkMetadata(stored_chunk_handle);
+    if (!chunk_metadata_or.ok()) {
+      if (unknown_chunk_means_deleted) {
+        LOG(INFO) << "Chunk handle " << stored_chunk_handle
+                  << " no longer exists in the master's metadata; telling "
+                  << "chunk server to garbage collect it";
+        *reply->add_stale_chunk_handles() = stored_chunk_handle;
+      } else {
+        // Persistence-less master restart: trust the report
+        valid_reported_chunks.insert(stored_chunk_handle);
+      }
       continue;
     }
 
     if (reported_versions.contains(stored_chunk_handle)) {
       const uint32_t reported_version =
           reported_versions.at(stored_chunk_handle);
-      const uint32_t master_version =
-          metadata_manager->GetFileChunkMetadata(stored_chunk_handle)
-              .value()
-              .version();
+      const uint32_t master_version = chunk_metadata_or.value().version();
       if (reported_version < master_version) {
-        LOG(INFO) << "Chunk handle " << stored_chunk_handle << " at version "
-                  << reported_version << " is stale (master has version "
-                  << master_version << "); telling chunk server to delete it";
-        *reply->add_stale_chunk_handles() = stored_chunk_handle;
+        // Order deletion only if another replica still exists somewhere:
+        // if every up-to-date replica has been lost, this stale copy is the
+        // last surviving data for the chunk, and destroying it would turn a
+        // stale-data situation into irrecoverable loss. It is still dropped
+        // from the serving locations below (clients never read stale data,
+        // GFS paper section 4.5) but stays on disk.
+        bool another_replica_exists = false;
+        for (const auto& location :
+             gfs::server::ChunkServerManager::GetInstance().GetChunkLocations(
+                 stored_chunk_handle)) {
+          if (!(location == new_server_info.location())) {
+            another_replica_exists = true;
+            break;
+          }
+        }
+        if (another_replica_exists) {
+          LOG(INFO) << "Chunk handle " << stored_chunk_handle << " at version "
+                    << reported_version << " is stale (master has version "
+                    << master_version
+                    << "); telling chunk server to delete it";
+          *reply->add_stale_chunk_handles() = stored_chunk_handle;
+        } else {
+          LOG(ERROR) << "Chunk handle " << stored_chunk_handle
+                     << " is stale (v" << reported_version << " < master's v"
+                     << master_version << ") but is the last surviving "
+                     << "replica; retaining it on disk without serving it";
+        }
         continue;
       }
       if (reported_version > master_version) {
@@ -83,10 +131,6 @@ grpc::Status MasterChunkServerManagerServiceImpl::ReportChunkServer(
 
     valid_reported_chunks.insert(stored_chunk_handle);
   }
-
-  auto existing_server_info =
-      gfs::server::ChunkServerManager::GetInstance().GetChunkServer(
-          new_server_info.location());
 
   if (!existing_server_info.has_location()) {
     // Not found, new server info, maybe chunkserver is just starting up or
