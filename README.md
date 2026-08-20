@@ -1,6 +1,4 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Gan-Tu/cppGFS2.0)
-![CI](https://github.com/Gan-Tu/cppGFS2.0/workflows/CI/badge.svg)
-![Docker Image Build](https://github.com/Gan-Tu/cppGFS2.0/workflows/Docker%20Image%20CI/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 # cppGFS2.0
@@ -62,6 +60,8 @@ bazel test --test_output=errors //tests/...
 All dependencies (gRPC, Protobuf, Abseil, LevelDB, ...) are pinned in [MODULE.bazel](MODULE.bazel) and downloaded automatically on first build.
 
 ## The Playground: try it in your browser
+
+<img width="800" height="600" alt="CleanShot 2026-08-20 at 01 54 36" src="https://github.com/user-attachments/assets/d163b055-8d7b-4505-b3ee-2314878ec21e" />
 
 The fastest way to experience the system is the **GFS Playground**, an interactive web app bundled with the repo. Make sure you have [Docker](https://docs.docker.com/engine/install/) with the compose plugin installed (works on both x86_64 and Apple Silicon), then:
 
